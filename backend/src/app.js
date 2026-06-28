@@ -6,10 +6,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const { sendSuccess } = require("./utils/apiResponse");
+
 app.get("/", (req, res) => {
-  res.json({
-    message: "Welcome to Rints Travels API",
-  });
+  return sendSuccess(res, "Welcome to Rints Travels API");
 });
 
 module.exports = app;
