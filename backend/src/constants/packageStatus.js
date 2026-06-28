@@ -1,0 +1,6 @@
+const PACKAGE_STATUS = {
+  ACTIVE: "ACTIVE",
+  INACTIVE: "INACTIVE",
+};
+
+module.exports = PACKAGE_STATUS;
