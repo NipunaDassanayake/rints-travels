@@ -1,7 +1,7 @@
 const app = require("./app");
+const env = require("./config/env");
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Rints Travels API running on port ${PORT}`);
+app.listen(env.port, () => {
+  console.log(`Rints Travels API running on port ${env.port}`);
+  console.log(`Environment: ${env.nodeEnv}`);
 });
