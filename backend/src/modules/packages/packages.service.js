@@ -1,4 +1,5 @@
 const packagesRepository = require("./packages.repository");
+const { NotFoundError } = require("../../utils/AppError");
 
 const getAllPackages = async (query) => {
   const page = Number(query.page) || 1;
@@ -46,9 +47,7 @@ const updatePackage = async (id, packageData) => {
   const existingPackage = await packagesRepository.findById(id);
 
   if (!existingPackage) {
-    const error = new Error("Travel package not found");
-    error.statusCode = 404;
-    throw error;
+   throw new NotFoundError("Travel package not found");
   }
 
   return packagesRepository.update(id, packageData);
@@ -58,9 +57,7 @@ const deletePackage = async (id) => {
   const existingPackage = await packagesRepository.findById(id);
 
   if (!existingPackage) {
-    const error = new Error("Travel package not found");
-    error.statusCode = 404;
-    throw error;
+   throw new NotFoundError("Travel package not found");
   }
 
   return packagesRepository.remove(id);

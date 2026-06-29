@@ -1,5 +1,6 @@
 const packagesService = require("./packages.service");
 const { sendSuccess } = require("../../utils/apiResponse");
+const { NotFoundError } = require("../../utils/AppError");
 
 const getAllPackages = async (req, res, next) => {
   try {
@@ -26,9 +27,7 @@ const getPackageById = async (req, res, next) => {
     const travelPackage = await packagesService.getPackageById(req.params.id);
 
     if (!travelPackage) {
-      const error = new Error("Travel package not found");
-      error.statusCode = 404;
-      throw error;
+      throw new NotFoundError("Travel package not found");
     }
 
     return sendSuccess(res, "Travel package retrieved successfully", travelPackage);
