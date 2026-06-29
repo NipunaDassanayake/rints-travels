@@ -45,9 +45,18 @@ const update = async (id, data) => {
   });
 };
 
+const remove = async (id) => {
+  return prisma.travelPackage.delete({
+    where: {
+      id: Number(id),
+    },
+  });
+};
+
 module.exports = {
   findAll,
   create,
   findById,
   update,
+  remove,
 };

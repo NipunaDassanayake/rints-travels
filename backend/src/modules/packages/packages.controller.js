@@ -47,10 +47,21 @@ const updatePackage = async (req, res, next) => {
   }
 };
 
+const deletePackage = async (req, res, next) => {
+  try {
+    await packagesService.deletePackage(req.params.id);
+
+    return sendSuccess(res, "Travel package deleted successfully");
+  } catch (error) {
+    next(error);
+  }
+}; 
+
 
 module.exports = {
   getAllPackages,
   createPackage,
   getPackageById,
   updatePackage,
+  deletePackage,
 };

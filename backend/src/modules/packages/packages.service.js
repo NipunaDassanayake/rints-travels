@@ -24,9 +24,22 @@ const updatePackage = async (id, packageData) => {
   return packagesRepository.update(id, packageData);
 };
 
+const deletePackage = async (id) => {
+  const existingPackage = await packagesRepository.findById(id);
+
+  if (!existingPackage) {
+    const error = new Error("Travel package not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return packagesRepository.remove(id);
+};
+
 module.exports = {
   getAllPackages,
   createPackage,
   getPackageById,
   updatePackage,
+  deletePackage,
 };
