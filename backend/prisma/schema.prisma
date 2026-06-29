@@ -19,5 +19,74 @@ model TravelPackage {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  images      PackageImage[]
+  itineraries PackageItinerary[]
+  inclusions  PackageInclusion[]
+  exclusions  PackageExclusion[]
+  faqs        PackageFAQ[]
+
   @@map("travel_packages")
+}
+
+model PackageImage {
+  id           Int      @id @default(autoincrement())
+  packageId    Int
+  imageUrl     String
+  isPrimary    Boolean  @default(false)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  travelPackage TravelPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("package_images")
+}
+
+model PackageItinerary {
+  id          Int      @id @default(autoincrement())
+  packageId   Int
+  dayNumber   Int
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  travelPackage TravelPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("package_itineraries")
+}
+
+model PackageInclusion {
+  id        Int      @id @default(autoincrement())
+  packageId Int
+  title     String
+  createdAt DateTime @default(now())
+
+  travelPackage TravelPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("package_inclusions")
+}
+
+model PackageExclusion {
+  id        Int      @id @default(autoincrement())
+  packageId Int
+  title     String
+  createdAt DateTime @default(now())
+
+  travelPackage TravelPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("package_exclusions")
+}
+
+model PackageFAQ {
+  id           Int      @id @default(autoincrement())
+  packageId    Int
+  question     String
+  answer       String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  travelPackage TravelPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("package_faqs")
 }
