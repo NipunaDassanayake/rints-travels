@@ -5,5 +5,6 @@ const router = express.Router();
 
 router.get("/", packagesController.getAllPackages);
 router.post("/", packagesController.createPackage);
+router.get("/:id", packagesController.getPackageById);
 
 module.exports = router;

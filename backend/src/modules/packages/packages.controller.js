@@ -21,7 +21,24 @@ const createPackage = async (req, res, next) => {
   }
 };
 
+const getPackageById = async (req, res, next) => {
+  try {
+    const travelPackage = await packagesService.getPackageById(req.params.id);
+
+    if (!travelPackage) {
+      const error = new Error("Travel package not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return sendSuccess(res, "Travel package retrieved successfully", travelPackage);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllPackages,
   createPackage,
+  getPackageById,
 };

@@ -21,7 +21,23 @@ const create = async (data) => {
   });
 };
 
+const findById = async (id) => {
+  return prisma.travelPackage.findUnique({
+    where: {
+      id: Number(id),
+    },
+    include: {
+      images: true,
+      itineraries: true,
+      inclusions: true,
+      exclusions: true,
+      faqs: true,
+    },
+  });
+};
+
 module.exports = {
   findAll,
   create,
+  findById,
 };
