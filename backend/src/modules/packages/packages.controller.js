@@ -37,8 +37,20 @@ const getPackageById = async (req, res, next) => {
   }
 };
 
+const updatePackage = async (req, res, next) => {
+  try {
+    const updatedPackage = await packagesService.updatePackage(req.params.id, req.body);
+
+    return sendSuccess(res, "Travel package updated successfully", updatedPackage);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   getAllPackages,
   createPackage,
   getPackageById,
+  updatePackage,
 };

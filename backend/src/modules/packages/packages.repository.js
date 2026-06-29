@@ -36,8 +36,18 @@ const findById = async (id) => {
   });
 };
 
+const update = async (id, data) => {
+  return prisma.travelPackage.update({
+    where: {
+      id: Number(id),
+    },
+    data,
+  });
+};
+
 module.exports = {
   findAll,
   create,
   findById,
+  update,
 };
