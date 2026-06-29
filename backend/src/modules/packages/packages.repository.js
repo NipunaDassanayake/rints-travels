@@ -15,6 +15,13 @@ const findAll = async () => {
   });
 };
 
+const create = async (data) => {
+  return prisma.travelPackage.create({
+    data,
+  });
+};
+
 module.exports = {
   findAll,
+  create,
 };
