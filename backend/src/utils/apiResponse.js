@@ -1,6 +1,7 @@
-const buildMeta = (extraMeta = {}) => {
+const buildMeta = (req, extraMeta = {}) => {
   return {
     timestamp: new Date().toISOString(),
+    correlationId: req?.correlationId || null,
     ...extraMeta,
   };
 };
@@ -11,7 +12,7 @@ const sendSuccess = (res, message, data = null, statusCode = 200, meta = {}) => 
     message,
     data,
     errors: null,
-    meta: buildMeta(meta),
+    meta: buildMeta(res.req, meta),
   });
 };
 
@@ -21,7 +22,7 @@ const sendError = (res, message, errors = null, statusCode = 500, meta = {}) => 
     message,
     data: null,
     errors,
-    meta: buildMeta(meta),
+    meta: buildMeta(res.req, meta),
   });
 };
 
