@@ -1,7 +1,8 @@
 const prisma = require("../../config/prisma");
 
-const findAll = async () => {
+const findAll = async ({ skip, take, filters }) => {
   return prisma.travelPackage.findMany({
+    where: filters,
     include: {
       images: true,
       itineraries: true,
@@ -12,6 +13,14 @@ const findAll = async () => {
     orderBy: {
       createdAt: "desc",
     },
+    skip,
+    take,
+  });
+};
+
+const count = async (filters) => {
+  return prisma.travelPackage.count({
+    where: filters,
   });
 };
 
@@ -55,6 +64,7 @@ const remove = async (id) => {
 
 module.exports = {
   findAll,
+  count,
   create,
   findById,
   update,

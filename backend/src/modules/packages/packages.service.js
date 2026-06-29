@@ -1,7 +1,37 @@
 const packagesRepository = require("./packages.repository");
 
-const getAllPackages = async () => {
-  return packagesRepository.findAll();
+const getAllPackages = async (query) => {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const filters = {};
+
+  if (query.status) {
+    filters.status = query.status;
+  }
+
+  if (query.destination) {
+    filters.destination = {
+      contains: query.destination,
+      mode: "insensitive",
+    };
+  }
+
+  const [packages, total] = await Promise.all([
+    packagesRepository.findAll({ skip, take: limit, filters }),
+    packagesRepository.count(filters),
+  ]);
+
+  return {
+    items: packages,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };
 
 const createPackage = async (packageData) => {
@@ -10,7 +40,7 @@ const createPackage = async (packageData) => {
 
 const getPackageById = async (id) => {
   return packagesRepository.findById(id);
-}
+};
 
 const updatePackage = async (id, packageData) => {
   const existingPackage = await packagesRepository.findById(id);

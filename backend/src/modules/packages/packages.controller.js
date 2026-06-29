@@ -3,7 +3,7 @@ const { sendSuccess } = require("../../utils/apiResponse");
 
 const getAllPackages = async (req, res, next) => {
   try {
-    const packages = await packagesService.getAllPackages();
+    const packages = await packagesService.getAllPackages(req.query);
 
     return sendSuccess(res, "Travel packages retrieved successfully", packages);
   } catch (error) {
