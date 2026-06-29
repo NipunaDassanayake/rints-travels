@@ -1,16 +1,18 @@
+const { BadRequestError } = require("../utils/AppError");
+
 const validateRequest = (schema) => {
   return (req, res, next) => {
-    const { error } = schema.validate(req.body, {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
 
     if (error) {
-      error.statusCode = 400;
-      error.errors = error.details.map((detail) => detail.message);
-      return next(error);
+      const errors = error.details.map((detail) => detail.message);
+      return next(new BadRequestError("Validation failed", errors));
     }
 
+    req.body = value;
     next();
   };
 };
