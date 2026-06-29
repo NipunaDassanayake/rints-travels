@@ -4,5 +4,6 @@ const packagesController = require("./packages.controller");
 const router = express.Router();
 
 router.get("/", packagesController.getAllPackages);
+router.post("/", packagesController.createPackage);
 
 module.exports = router;

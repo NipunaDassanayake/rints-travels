@@ -11,6 +11,17 @@ const getAllPackages = async (req, res, next) => {
   }
 };
 
+const createPackage = async (req, res, next) => {
+  try {
+    const createdPackage = await packagesService.createPackage(req.body);
+
+    return sendSuccess(res, "Travel package created successfully", createdPackage, 201);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllPackages,
+  createPackage,
 };
