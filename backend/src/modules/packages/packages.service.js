@@ -1,21 +1,15 @@
 const packagesRepository = require("./packages.repository");
 const { NotFoundError } = require("../../utils/AppError");
 const getPagination = require("../../core/pagination/getPagination");
+const buildFilters = require("../../core/query/buildFilters");
 
 const getAllPackages = async (query) => {
 const { page, limit, skip, take } = getPagination(query);
-  const filters = {};
 
-  if (query.status) {
-    filters.status = query.status;
-  }
-
-  if (query.destination) {
-    filters.destination = {
-      contains: query.destination,
-      mode: "insensitive",
-    };
-  }
+const filters = buildFilters(query, {
+  status: "equals",
+  destination: "contains",
+});
 
   const [packages, total] = await Promise.all([
     packagesRepository.findPackages({ skip, take, filters }),
