@@ -1,11 +1,9 @@
 const packagesRepository = require("./packages.repository");
 const { NotFoundError } = require("../../utils/AppError");
+const getPagination = require("../../core/pagination/getPagination");
 
 const getAllPackages = async (query) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
-  const skip = (page - 1) * limit;
-
+const { page, limit, skip, take } = getPagination(query);
   const filters = {};
 
   if (query.status) {
@@ -20,7 +18,7 @@ const getAllPackages = async (query) => {
   }
 
   const [packages, total] = await Promise.all([
-    packagesRepository.findPackages({ skip, take: limit, filters }),
+    packagesRepository.findPackages({ skip, take, filters }),
     packagesRepository.countPackages(filters),
   ]);
 
