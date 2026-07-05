@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+//joi is used to validate the environment variables
 const Joi = require("joi");
 
 const envSchema = Joi.object({
