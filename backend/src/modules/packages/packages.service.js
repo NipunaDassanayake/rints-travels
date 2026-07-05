@@ -3,34 +3,23 @@ const { NotFoundError } = require("../../utils/AppError");
 const getPagination = require("../../core/pagination/getPagination");
 const buildFilters = require("../../core/query/buildFilters");
 const buildSorting = require("../../core/query/buildSorting");
+const { buildPackageQueryOptions } = require("./packages.query");
 
 const getAllPackages = async (query) => {
-  const { page, limit, skip, take } = getPagination(query);
-  const orderBy = buildSorting(query, [
-    "title",
-    "destination",
-    "durationDays",
-    "price",
-    "createdAt",
-  ]);
-
-  const filters = buildFilters(query, {
-    status: "equals",
-    destination: "contains",
-  });
+  const options = buildPackageQueryOptions(query);
 
   const [packages, total] = await Promise.all([
-    packagesRepository.findPackages({ skip, take, filters, orderBy }),
-    packagesRepository.countPackages(filters),
+    packagesRepository.findPackages(options),
+    packagesRepository.countPackages(options.filters),
   ]);
 
   return {
     items: packages,
     pagination: {
-      page,
-      limit,
+      page: options.page,
+      limit: options.limit,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / options.limit),
     },
   };
 };
