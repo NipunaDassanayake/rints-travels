@@ -2,17 +2,25 @@ const packagesRepository = require("./packages.repository");
 const { NotFoundError } = require("../../utils/AppError");
 const getPagination = require("../../core/pagination/getPagination");
 const buildFilters = require("../../core/query/buildFilters");
+const buildSorting = require("../../core/query/buildSorting");
 
 const getAllPackages = async (query) => {
-const { page, limit, skip, take } = getPagination(query);
+  const { page, limit, skip, take } = getPagination(query);
+  const orderBy = buildSorting(query, [
+    "title",
+    "destination",
+    "durationDays",
+    "price",
+    "createdAt",
+  ]);
 
-const filters = buildFilters(query, {
-  status: "equals",
-  destination: "contains",
-});
+  const filters = buildFilters(query, {
+    status: "equals",
+    destination: "contains",
+  });
 
   const [packages, total] = await Promise.all([
-    packagesRepository.findPackages({ skip, take, filters }),
+    packagesRepository.findPackages({ skip, take, filters, orderBy }),
     packagesRepository.countPackages(filters),
   ]);
 
@@ -39,7 +47,7 @@ const updatePackage = async (id, packageData) => {
   const existingPackage = await packagesRepository.findPackageById(id);
 
   if (!existingPackage) {
-   throw new NotFoundError("Travel package not found");
+    throw new NotFoundError("Travel package not found");
   }
 
   return packagesRepository.updatePackage(id, packageData);
@@ -49,7 +57,7 @@ const deletePackage = async (id) => {
   const existingPackage = await packagesRepository.findPackageById(id);
 
   if (!existingPackage) {
-   throw new NotFoundError("Travel package not found");
+    throw new NotFoundError("Travel package not found");
   }
 
   return packagesRepository.deletePackage(id);

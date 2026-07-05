@@ -1,6 +1,6 @@
 const prisma = require("../../config/prisma");
 
-const findPackages = async ({ skip, take, filters }) => {
+const findPackages = async ({ skip, take, filters, orderBy }) => {
   return prisma.travelPackage.findMany({
     where: filters,
     include: {
@@ -10,9 +10,7 @@ const findPackages = async ({ skip, take, filters }) => {
       exclusions: true,
       faqs: true,
     },
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy,
     skip,
     take,
   });
