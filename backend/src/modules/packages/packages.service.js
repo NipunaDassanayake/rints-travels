@@ -20,8 +20,8 @@ const getAllPackages = async (query) => {
   }
 
   const [packages, total] = await Promise.all([
-    packagesRepository.findAll({ skip, take: limit, filters }),
-    packagesRepository.count(filters),
+    packagesRepository.findPackages({ skip, take: limit, filters }),
+    packagesRepository.countPackages(filters),
   ]);
 
   return {
@@ -36,31 +36,31 @@ const getAllPackages = async (query) => {
 };
 
 const createPackage = async (packageData) => {
-  return packagesRepository.create(packageData);
+  return packagesRepository.createPackage(packageData);
 };
 
 const getPackageById = async (id) => {
-  return packagesRepository.findById(id);
+  return packagesRepository.findPackageById(id);
 };
 
 const updatePackage = async (id, packageData) => {
-  const existingPackage = await packagesRepository.findById(id);
+  const existingPackage = await packagesRepository.findPackageById(id);
 
   if (!existingPackage) {
    throw new NotFoundError("Travel package not found");
   }
 
-  return packagesRepository.update(id, packageData);
+  return packagesRepository.updatePackage(id, packageData);
 };
 
 const deletePackage = async (id) => {
-  const existingPackage = await packagesRepository.findById(id);
+  const existingPackage = await packagesRepository.findPackageById(id);
 
   if (!existingPackage) {
    throw new NotFoundError("Travel package not found");
   }
 
-  return packagesRepository.remove(id);
+  return packagesRepository.deletePackage(id);
 };
 
 module.exports = {

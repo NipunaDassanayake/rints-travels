@@ -1,6 +1,6 @@
 const prisma = require("../../config/prisma");
 
-const findAll = async ({ skip, take, filters }) => {
+const findPackages = async ({ skip, take, filters }) => {
   return prisma.travelPackage.findMany({
     where: filters,
     include: {
@@ -18,19 +18,19 @@ const findAll = async ({ skip, take, filters }) => {
   });
 };
 
-const count = async (filters) => {
+const countPackages = async (filters) => {
   return prisma.travelPackage.count({
     where: filters,
   });
 };
 
-const create = async (data) => {
+const createPackage = async (data) => {
   return prisma.travelPackage.create({
     data,
   });
 };
 
-const findById = async (id) => {
+const findPackageById = async (id) => {
   return prisma.travelPackage.findUnique({
     where: {
       id: Number(id),
@@ -45,7 +45,7 @@ const findById = async (id) => {
   });
 };
 
-const update = async (id, data) => {
+const updatePackage = async (id, data) => {
   return prisma.travelPackage.update({
     where: {
       id: Number(id),
@@ -54,7 +54,7 @@ const update = async (id, data) => {
   });
 };
 
-const remove = async (id) => {
+const deletePackage = async (id) => {
   return prisma.travelPackage.delete({
     where: {
       id: Number(id),
@@ -63,10 +63,10 @@ const remove = async (id) => {
 };
 
 module.exports = {
-  findAll,
-  count,
-  create,
-  findById,
-  update,
-  remove,
+  findPackages,
+  countPackages,
+  createPackage,
+  findPackageById,
+  updatePackage,
+  deletePackage,
 };
