@@ -1,15 +1,10 @@
 const prisma = require("../../config/prisma");
+const packageInclude = require("./packages.include");
 
 const findPackages = async ({ skip, take, filters, orderBy }) => {
   return prisma.travelPackage.findMany({
     where: filters,
-    include: {
-      images: true,
-      itineraries: true,
-      inclusions: true,
-      exclusions: true,
-      faqs: true,
-    },
+    include: packageInclude,
     orderBy,
     skip,
     take,
@@ -33,13 +28,7 @@ const findPackageById = async (id) => {
     where: {
       id: Number(id),
     },
-    include: {
-      images: true,
-      itineraries: true,
-      inclusions: true,
-      exclusions: true,
-      faqs: true,
-    },
+    include: packageInclude,
   });
 };
 
