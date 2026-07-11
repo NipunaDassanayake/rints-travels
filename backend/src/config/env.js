@@ -13,6 +13,18 @@ const envSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_ACCESS_EXPIRES_IN: Joi.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default("7d"),
+  REFRESH_TOKEN_COOKIE_NAME: Joi.string().default("travora_refresh_token"),
+
+  REFRESH_TOKEN_COOKIE_MAX_AGE_MS: Joi.number()
+    .integer()
+    .positive()
+    .default(604800000),
+
+  COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").default(false),
+
+  COOKIE_SAME_SITE: Joi.string()
+    .valid("strict", "lax", "none")
+    .default("strict"),
 }).unknown(true);
 
 const { value, error } = envSchema.validate(process.env, {
@@ -33,6 +45,13 @@ const env = {
     refreshSecret: value.JWT_REFRESH_SECRET,
     accessExpiresIn: value.JWT_ACCESS_EXPIRES_IN,
     refreshExpiresIn: value.JWT_REFRESH_EXPIRES_IN,
+  },
+
+  cookie: {
+    refreshTokenName: value.REFRESH_TOKEN_COOKIE_NAME,
+    refreshTokenMaxAgeMs: value.REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
+    secure: value.COOKIE_SECURE,
+    sameSite: value.COOKIE_SAME_SITE,
   },
 };
 
