@@ -7,6 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  TOURIST
+  ADMIN
+  TOUR_GUIDE
+  SYSTEM_ADMIN
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  DELETED
+}
 model TravelPackage {
   id           Int      @id @default(autoincrement())
   title        String
