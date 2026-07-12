@@ -22,7 +22,12 @@ const register = asyncHandler(async (req, res) => {
 
 const login = asyncHandler(async (req, res) => {
   const loginDto = authMapper.toLoginDto(req.body);
-  const result = await authService.login(loginDto);
+
+  const result = await authService.login(loginDto, {
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent") || null,
+    deviceName: null,
+  });
 
   setRefreshTokenCookie(res, result.refreshToken);
 

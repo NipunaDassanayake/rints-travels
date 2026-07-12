@@ -2,10 +2,7 @@ const crypto = require("crypto");
 const env = require("../../config/env");
 const authRepository = require("./auth.repository");
 const { hashPassword, comparePassword } = require("./auth.password");
-const {
-  generateAccessToken,
-  generateRefreshToken,
-} = require("./auth.token");
+const { generateAccessToken, generateRefreshToken } = require("./auth.token");
 const { hashToken } = require("./auth.tokenHash");
 const {
   ConflictError,
@@ -36,7 +33,7 @@ const register = async (registerDto) => {
   });
 };
 
-const login = async (loginDto) => {
+const login = async (loginDto, loginContext = {}) => {
   const user = await authRepository.findUserByEmail(loginDto.email);
 
   if (!user || !user.passwordHash || user.provider !== "LOCAL") {
@@ -45,7 +42,7 @@ const login = async (loginDto) => {
 
   const passwordMatches = await comparePassword(
     loginDto.password,
-    user.passwordHash
+    user.passwordHash,
   );
 
   if (!passwordMatches) {
@@ -74,10 +71,12 @@ const login = async (loginDto) => {
 
   await authRepository.createRefreshToken({
     userId: user.id,
+    sessionId,
     tokenHash,
-    expiresAt: new Date(
-      Date.now() + env.cookie.refreshTokenMaxAgeMs
-    ),
+    deviceName: loginContext.deviceName || null,
+    ipAddress: loginContext.ipAddress || null,
+    userAgent: loginContext.userAgent || null,
+    expiresAt: new Date(Date.now() + env.cookie.refreshTokenMaxAgeMs),
   });
 
   return {
