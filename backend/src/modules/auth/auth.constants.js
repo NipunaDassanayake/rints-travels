@@ -8,6 +8,7 @@ const AUTH_MESSAGES = {
   INVALID_CREDENTIALS: "Invalid email or password",
   EMAIL_ALREADY_EXISTS: "An account with this email already exists",
   INVALID_REFRESH_TOKEN: "Invalid or expired refresh token",
+  ACCOUNT_NOT_ACTIVE: "This account is not active",
 };
 
 module.exports = {

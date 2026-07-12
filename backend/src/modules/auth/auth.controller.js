@@ -1,9 +1,11 @@
+const env = require("../../config/env");
 const authService = require("./auth.service");
 const authMapper = require("./auth.mapper");
 const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess } = require("../../utils/apiResponse");
 const HTTP_STATUS = require("../../core/constants/httpStatus");
 const { AUTH_MESSAGES } = require("./auth.constants");
+const { setRefreshTokenCookie } = require("./auth.cookie");
 
 const register = asyncHandler(async (req, res) => {
   const registerDto = authMapper.toRegisterUserDto(req.body);
@@ -18,6 +20,20 @@ const register = asyncHandler(async (req, res) => {
   );
 });
 
+const login = asyncHandler(async (req, res) => {
+  const loginDto = authMapper.toLoginDto(req.body);
+  const result = await authService.login(loginDto);
+
+  setRefreshTokenCookie(res, result.refreshToken);
+
+  return sendSuccess(res, AUTH_MESSAGES.LOGIN_SUCCESS, {
+    user: authMapper.toAuthUserResponse(result.user),
+    accessToken: result.accessToken,
+    expiresIn: env.jwt.accessExpiresIn,
+  });
+});
+
 module.exports = {
   register,
+  login,
 };
