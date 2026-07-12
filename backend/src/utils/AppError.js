@@ -21,8 +21,15 @@ class BadRequestError extends AppError {
   }
 }
 
+class ConflictError extends AppError {
+  constructor(message = "Resource conflict", errors = null) {
+    super(message, 409, errors);
+  }
+}
+
 module.exports = {
   AppError,
   NotFoundError,
   BadRequestError,
+  ConflictError,
 };
