@@ -1,5 +1,5 @@
-const env = require("../../config/env");
-const { AUTH_COOKIE_PATH } = require("./auth.constants");
+const env = require("../../../config/env");
+const { AUTH_COOKIE_PATH } = require("../auth.constants");
 
 const getRefreshTokenCookieOptions = () => ({
   httpOnly: true,

@@ -1,7 +1,7 @@
 const crypto = require("crypto");
-const env = require("../../config/env");
+const env = require("../../../config/env");
 
-const authRepository = require("./auth.repository");
+const authRepository = require("../repositories/auth.repository");
 
 const {
   comparePassword,
@@ -19,11 +19,11 @@ const {
 const {
   UnauthorizedError,
   ForbiddenError,
-} = require("../../utils/AppError");
+} = require("../../../utils/AppError");
 
 const {
   AUTH_MESSAGES,
-} = require("./auth.constants");
+} = require("../auth.constants");
 
 /**
  * Verify local account credentials.

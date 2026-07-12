@@ -1,7 +1,7 @@
 const {
   verifyLocalCredentials,
   createUserSession,
-} = require("../auth.helpers");
+} = require("../helpers/auth.helpers");
 
 const login = async (
   loginDto,

@@ -1,5 +1,5 @@
-const authRepository = require("../auth.repository");
-const { hashPassword } = require("../auth.password");
+const authRepository = require("../repositories/auth.repository");
+const { hashPassword } = require("../helpers/auth.password");
 const { ConflictError } = require("../../../utils/AppError");
 const { AUTH_MESSAGES } = require("../auth.constants");
 
