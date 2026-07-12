@@ -1,29 +1,25 @@
 const crypto = require("crypto");
 const env = require("../../../config/env");
+const {
+  USER_STATUS,
+  AUTH_PROVIDERS,
+  TOKEN_TYPES,
+} = require("../../../core/constants/auth.constants");
 
 const authRepository = require("../repositories/auth.repository");
 
-const {
-  comparePassword,
-} = require("./auth.password");
+const { comparePassword } = require("./auth.password");
 
-const {
-  generateAccessToken,
-  generateRefreshToken,
-} = require("./auth.token");
+const { generateAccessToken, generateRefreshToken } = require("./auth.token");
 
-const {
-  hashToken,
-} = require("./auth.tokenHash");
+const { hashToken } = require("./auth.tokenHash");
 
 const {
   UnauthorizedError,
   ForbiddenError,
 } = require("../../../utils/AppError");
 
-const {
-  AUTH_MESSAGES,
-} = require("../auth.constants");
+const { AUTH_MESSAGES } = require("../auth.constants");
 
 /**
  * Verify local account credentials.
@@ -31,20 +27,20 @@ const {
 const verifyLocalCredentials = async (loginDto) => {
   const user = await authRepository.findUserByEmail(loginDto.email);
 
-  if (!user || !user.passwordHash || user.provider !== "LOCAL") {
+  if (!user || !user.passwordHash || user.provider !== AUTH_PROVIDERS.LOCAL) {
     throw new UnauthorizedError(AUTH_MESSAGES.INVALID_CREDENTIALS);
   }
 
   const validPassword = await comparePassword(
     loginDto.password,
-    user.passwordHash
+    user.passwordHash,
   );
 
   if (!validPassword) {
     throw new UnauthorizedError(AUTH_MESSAGES.INVALID_CREDENTIALS);
   }
 
-  if (user.status !== "ACTIVE") {
+  if (user.status !== USER_STATUS.ACTIVE) {
     throw new ForbiddenError(AUTH_MESSAGES.ACCOUNT_NOT_ACTIVE);
   }
 
@@ -54,17 +50,13 @@ const verifyLocalCredentials = async (loginDto) => {
 /**
  * Create a login session.
  */
-const createUserSession = async (
-  user,
-  loginContext = {}
-) => {
-
+const createUserSession = async (user, loginContext = {}) => {
   const sessionId = crypto.randomUUID();
 
   const accessToken = generateAccessToken({
     sub: user.id,
     role: user.role,
-    type: "access",
+    type: TOKEN_TYPES.ACCESS,
   });
 
   const refreshToken = generateRefreshToken({
@@ -82,9 +74,7 @@ const createUserSession = async (
     deviceName: loginContext.deviceName || null,
     ipAddress: loginContext.ipAddress || null,
     userAgent: loginContext.userAgent || null,
-    expiresAt: new Date(
-      Date.now() + env.cookie.refreshTokenMaxAgeMs
-    ),
+    expiresAt: new Date(Date.now() + env.cookie.refreshTokenMaxAgeMs),
   });
 
   return {

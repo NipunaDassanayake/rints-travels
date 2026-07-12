@@ -38,7 +38,33 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+const refresh = asyncHandler(async (req, res) => {
+  const rawRefreshToken =
+    req.cookies?.[env.cookie.refreshTokenName];
+
+  const result = await authService.refresh(
+    rawRefreshToken,
+    {
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") || null,
+    }
+  );
+
+  setRefreshTokenCookie(res, result.refreshToken);
+
+  return sendSuccess(
+    res,
+    AUTH_MESSAGES.TOKEN_REFRESH_SUCCESS,
+    {
+      user: authMapper.toAuthUserResponse(result.user),
+      accessToken: result.accessToken,
+      expiresIn: env.jwt.accessExpiresIn,
+    }
+  );
+});
+
 module.exports = {
   register,
   login,
+  refresh,
 };

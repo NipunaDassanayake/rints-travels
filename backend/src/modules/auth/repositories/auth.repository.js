@@ -39,6 +39,29 @@ const findRefreshTokenByHash = async (tokenHash) => {
   });
 };
 
+const findRefreshTokenBySessionId = async (sessionId) => {
+  return prisma.refreshToken.findUnique({
+    where: {
+      sessionId,
+    },
+    include: {
+      user: true,
+    },
+  });
+};
+
+const updateRefreshTokenUsage = async (id, data) => {
+  return prisma.refreshToken.update({
+    where: {
+      id,
+    },
+    data: {
+      ...data,
+      lastUsedAt: new Date(),
+    },
+  });
+};
+
 const revokeRefreshToken = async (id) => {
   return prisma.refreshToken.update({
     where: {
@@ -70,4 +93,6 @@ module.exports = {
   findRefreshTokenByHash,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
+  findRefreshTokenBySessionId,
+  updateRefreshTokenUsage,
 };

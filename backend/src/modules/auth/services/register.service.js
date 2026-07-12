@@ -21,7 +21,7 @@ const register = async (registerDto) => {
     phone: registerDto.phone,
     passwordHash,
     role: USER_ROLES.TOURIST,
-    provider: AUTH_PROVIDERS.LOCAL,
+    provider: "LOCAL",
     isEmailVerified: false,
     status: "ACTIVE",
   });
