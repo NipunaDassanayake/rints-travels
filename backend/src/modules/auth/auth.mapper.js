@@ -6,6 +6,11 @@ const toRegisterUserDto = (body) => ({
   password: body.password,
 });
 
+const toLoginDto = (body) => ({
+  email: body.email.trim().toLowerCase(),
+  password: body.password,
+});
+
 const toAuthUserResponse = (user) => ({
   id: user.id,
   firstName: user.firstName,
@@ -22,5 +27,6 @@ const toAuthUserResponse = (user) => ({
 
 module.exports = {
   toRegisterUserDto,
+  toLoginDto,
   toAuthUserResponse,
 };
