@@ -70,7 +70,7 @@ const createUserSession = async (
   const refreshToken = generateRefreshToken({
     sub: user.id,
     jti: sessionId,
-    type: "refresh",
+    type: TOKEN_TYPES.REFRESH,
   });
 
   const tokenHash = hashToken(refreshToken);

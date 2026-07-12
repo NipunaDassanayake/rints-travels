@@ -20,8 +20,8 @@ const register = async (registerDto) => {
     email: registerDto.email,
     phone: registerDto.phone,
     passwordHash,
-    role: "TOURIST",
-    provider: "LOCAL",
+    role: USER_ROLES.TOURIST,
+    provider: AUTH_PROVIDERS.LOCAL,
     isEmailVerified: false,
     status: "ACTIVE",
   });
