@@ -5,7 +5,7 @@ const asyncHandler = require("../../../utils/asyncHandler");
 const { sendSuccess } = require("../../../utils/apiResponse");
 const HTTP_STATUS = require("../../../core/constants/httpStatus");
 const { AUTH_MESSAGES } = require("../auth.constants");
-const { setRefreshTokenCookie } = require("../helpers/auth.cookie");
+const { setRefreshTokenCookie,clearRefreshTokenCookie, } = require("../helpers/auth.cookie");
 
 const register = asyncHandler(async (req, res) => {
   const registerDto = authMapper.toRegisterUserDto(req.body);
@@ -63,8 +63,23 @@ const refresh = asyncHandler(async (req, res) => {
   );
 });
 
+const logout = asyncHandler(async (req, res) => {
+  const rawRefreshToken =
+    req.cookies?.[env.cookie.refreshTokenName];
+
+  await authService.logout(rawRefreshToken);
+
+  clearRefreshTokenCookie(res);
+
+  return sendSuccess(
+    res,
+    AUTH_MESSAGES.LOGOUT_SUCCESS
+  );
+});
+
 module.exports = {
   register,
   login,
   refresh,
-};
+  logout,
+};    
