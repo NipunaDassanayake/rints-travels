@@ -14,6 +14,9 @@ const AUTH_MESSAGES = {
 
   ACCESS_TOKEN_REQUIRED: "Access token is required",
   INVALID_ACCESS_TOKEN: "Invalid or expired access token",
+
+  FORBIDDEN: "You do not have permission to perform this action",
+  NOT_AUTHENTICATED: "Authentication required",
 };
 
 module.exports = {
