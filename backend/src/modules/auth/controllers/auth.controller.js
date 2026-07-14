@@ -87,10 +87,24 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   );
 });
 
+const logoutAll = asyncHandler(async (req, res) => {
+
+    await authService.logoutAll(req.user.id);
+
+    clearRefreshTokenCookie(res);
+
+    return sendSuccess(
+        res,
+        AUTH_MESSAGES.LOGOUT_SUCCESS
+    );
+
+});
+
 module.exports = {
   register,
   login,
   refresh,
   logout,
   getCurrentUser,
+  logoutAll,
 };    
