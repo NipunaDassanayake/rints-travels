@@ -77,9 +77,20 @@ const logout = asyncHandler(async (req, res) => {
   );
 });
 
+const getCurrentUser = asyncHandler(async (req, res) => {
+  const user = await authService.getCurrentUser(req.user.id);
+
+  return sendSuccess(
+    res,
+    AUTH_MESSAGES.CURRENT_USER_SUCCESS,
+    authMapper.toAuthUserResponse(user)
+  );
+});
+
 module.exports = {
   register,
   login,
   refresh,
   logout,
+  getCurrentUser,
 };    

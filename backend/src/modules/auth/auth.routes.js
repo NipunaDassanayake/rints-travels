@@ -33,6 +33,8 @@ router.post("/refresh", authController.refresh);
 
 router.post("/logout", authController.logout);
 
+router.get("/me", authenticate, authController.getCurrentUser);
+
 // Temporary route to test authentication.
 router.get("/protected-test", authenticate, (req, res) => {
   return res.status(200).json({
