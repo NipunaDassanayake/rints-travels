@@ -88,16 +88,14 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const logoutAll = asyncHandler(async (req, res) => {
+  await authService.logoutAll(req.user.id);
 
-    await authService.logoutAll(req.user.id);
+  clearRefreshTokenCookie(res);
 
-    clearRefreshTokenCookie(res);
-
-    return sendSuccess(
-        res,
-        AUTH_MESSAGES.LOGOUT_SUCCESS
-    );
-
+  return sendSuccess(
+    res,
+    AUTH_MESSAGES.LOGOUT_ALL_SUCCESS
+  );
 });
 
 module.exports = {

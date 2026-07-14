@@ -17,6 +17,8 @@ const AUTH_MESSAGES = {
 
   FORBIDDEN: "You do not have permission to perform this action",
   NOT_AUTHENTICATED: "Authentication required",
+
+  LOGOUT_ALL_SUCCESS: "Logged out from all devices successfully",
 };
 
 module.exports = {
