@@ -3,6 +3,7 @@ const { login } = require("./services/login.service");
 const { refresh } = require("./services/refresh.service");
 const { logout } = require("./services/logout.service");
 const { getCurrentUser } = require("./services/me.service");
+const { logoutAll } = require("./services/logoutAll.service");
 
 module.exports = {
   register,
@@ -10,4 +11,5 @@ module.exports = {
   refresh,
   logout,
   getCurrentUser,
+  logoutAll,
 };
