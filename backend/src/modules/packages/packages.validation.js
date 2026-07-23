@@ -8,12 +8,21 @@ const createPackageSchema = Joi.object({
   durationDays: Joi.number().integer().min(1).required(),
   price: Joi.number().positive().required(),
   status: Joi.string().valid("ACTIVE", "INACTIVE").optional(),
-});
+}).required();
 
-const updatePackageSchema = createPackageSchema.fork(
-  ["title", "slug", "destination", "description", "durationDays", "price"],
-  (schema) => schema.optional()
-);
+const updatePackageSchema = createPackageSchema
+  .fork(
+    [
+      "title",
+      "slug",
+      "destination",
+      "description",
+      "durationDays",
+      "price",
+    ],
+    (schema) => schema.optional(),
+  )
+  .required();
 
 module.exports = {
   createPackageSchema,
