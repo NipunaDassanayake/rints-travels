@@ -1,4 +1,5 @@
 const { ForbiddenError } = require("../utils/AppError");
+const { AUTH_MESSAGES } = require("../modules/auth/auth.constants");
 
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
