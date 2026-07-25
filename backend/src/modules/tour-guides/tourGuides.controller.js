@@ -15,6 +15,31 @@ const createTourGuide = asyncHandler(async (req, res) => {
   );
 });
 
+// Additional functions to retrieve tour guides
+const getAllTourGuides = asyncHandler(async (req, res) => {
+  const tourGuides =
+    await tourGuidesService.getAllTourGuides();
+
+  return sendSuccess(
+    res,
+    "Tour guides retrieved successfully",
+    tourGuides
+  );
+});
+
+const getTourGuideById = asyncHandler(async (req, res) => {
+  const tourGuide =
+    await tourGuidesService.getTourGuideById(req.params.id);
+
+  return sendSuccess(
+    res,
+    "Tour guide retrieved successfully",
+    tourGuide
+  );
+});
+
 module.exports = {
   createTourGuide,
+  getAllTourGuides,
+  getTourGuideById,
 };

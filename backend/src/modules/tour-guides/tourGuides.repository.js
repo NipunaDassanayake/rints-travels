@@ -31,7 +31,49 @@ const createTourGuide = async ({
   });
 };
 
+// Additional function to find all available tour guides
+const findAllTourGuides = async () => {
+  return prisma.tourGuideProfile.findMany({
+    where: {
+      deletedAt: null,
+      isAvailable: true,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+    orderBy: {
+      averageRating: "desc",
+    },
+  });
+};
+
+const findTourGuideById = async (id) => {
+  return prisma.tourGuideProfile.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  });
+};
+
 module.exports = {
   findUserByEmail,
   createTourGuide,
+  findAllTourGuides,
+  findTourGuideById,
 };

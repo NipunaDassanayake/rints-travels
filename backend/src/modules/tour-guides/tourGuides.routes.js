@@ -33,4 +33,15 @@ router.post(
   tourGuidesController.createTourGuide
 );
 
+
+// Public routes for fetching tour guides
+router.get(
+  "/",
+  tourGuidesController.getAllTourGuides
+);
+
+router.get(
+  "/:id",
+  tourGuidesController.getTourGuideById
+);
 module.exports = router;
