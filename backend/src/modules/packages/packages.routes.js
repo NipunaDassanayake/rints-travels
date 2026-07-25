@@ -17,6 +17,8 @@ const {
   updatePackageInclusionSchema,
   createPackageExclusionSchema,
   updatePackageExclusionSchema,
+  createPackageFaqSchema,
+  updatePackageFaqSchema,
 } = require("./packages.validation");
 
 const {
@@ -225,4 +227,39 @@ router.delete(
   ),
   packagesController.deletePackageExclusion
 );
+
+
+// Package FAQs
+router.post(
+  "/:packageId/faqs",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createPackageFaqSchema),
+  packagesController.addPackageFaq
+);
+
+router.patch(
+  "/:packageId/faqs/:faqId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updatePackageFaqSchema),
+  packagesController.updatePackageFaq
+);
+
+router.delete(
+  "/:packageId/faqs/:faqId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  packagesController.deletePackageFaq
+);
+
 module.exports = router;

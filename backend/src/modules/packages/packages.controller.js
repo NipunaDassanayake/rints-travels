@@ -226,6 +226,48 @@ const deletePackageExclusion = asyncHandler(async (req, res) => {
   );
 });
 
+
+// Package FAQs
+const addPackageFaq = asyncHandler(async (req, res) => {
+  const faq = await packagesService.addPackageFaq(
+    req.params.packageId,
+    req.body
+  );
+
+  return sendSuccess(
+    res,
+    "Package FAQ added successfully",
+    faq,
+    HTTP_STATUS.CREATED
+  );
+});
+
+const updatePackageFaq = asyncHandler(async (req, res) => {
+  const faq = await packagesService.updatePackageFaq(
+    req.params.packageId,
+    req.params.faqId,
+    req.body
+  );
+
+  return sendSuccess(
+    res,
+    "Package FAQ updated successfully",
+    faq
+  );
+});
+
+const deletePackageFaq = asyncHandler(async (req, res) => {
+  await packagesService.deletePackageFaq(
+    req.params.packageId,
+    req.params.faqId
+  );
+
+  return sendSuccess(
+    res,
+    "Package FAQ deleted successfully"
+  );
+});
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -248,4 +290,8 @@ module.exports = {
   addPackageExclusion,
   updatePackageExclusion,
   deletePackageExclusion,
+
+  addPackageFaq,
+  updatePackageFaq,
+  deletePackageFaq,
 };
