@@ -96,10 +96,23 @@ const assignAdminToTourRequest = async (id, adminId) => {
   });
 };
 
+// Additional function to update the status of a tour request
+const updateTourRequestStatus = async (id, status) => {
+  return prisma.tourRequest.update({
+    where: {
+      id,
+    },
+    data: {
+      status,
+    },
+  });
+};
+
 module.exports = {
   createTourRequest,
   findTourRequestById,
   findTourRequestsByTouristId,
   findAllTourRequests,
   assignAdminToTourRequest,
+  updateTourRequestStatus,
 };

@@ -62,8 +62,24 @@ const assignAdminSchema = Joi.object({
   adminId: Joi.string().uuid().required(),
 }).required();
 
+const updateTourRequestStatusSchema = Joi.object({
+  status: Joi.string()
+    .valid(
+      "PENDING_REVIEW",
+      "UNDER_DISCUSSION",
+      "READY_FOR_QUOTATION",
+      "QUOTATION_SENT",
+      "ACCEPTED",
+      "REJECTED",
+      "CANCELLED",
+      "BOOKED"
+    )
+    .required(),
+}).required();
+
 module.exports = {
   packageBasedTourRequestSchema,
   customTourRequestSchema,
   assignAdminSchema,
+  updateTourRequestStatusSchema,
 };

@@ -134,6 +134,67 @@ const assignAdmin = async (tourRequestId, adminId) => {
   );
 };
 
+// Define allowed status transitions for tour requests
+const ALLOWED_STATUS_TRANSITIONS = {
+  PENDING_REVIEW: [
+    "UNDER_DISCUSSION",
+    "REJECTED",
+    "CANCELLED",
+  ],
+
+  UNDER_DISCUSSION: [
+    "READY_FOR_QUOTATION",
+    "REJECTED",
+    "CANCELLED",
+  ],
+
+  READY_FOR_QUOTATION: [
+    "QUOTATION_SENT",
+    "UNDER_DISCUSSION",
+    "CANCELLED",
+  ],
+
+  QUOTATION_SENT: [
+    "UNDER_DISCUSSION",
+    "ACCEPTED",
+    "REJECTED",
+    "CANCELLED",
+  ],
+
+  ACCEPTED: [
+    "BOOKED",
+  ],
+
+  REJECTED: [],
+  CANCELLED: [],
+  BOOKED: [],
+};
+
+const updateStatus = async (tourRequestId, newStatus) => {
+  const tourRequest =
+    await tourRequestsRepository.findTourRequestById(
+      tourRequestId
+    );
+
+  if (!tourRequest) {
+    throw new NotFoundError("Tour request not found");
+  }
+
+  const allowedStatuses =
+    ALLOWED_STATUS_TRANSITIONS[tourRequest.status] || [];
+
+  if (!allowedStatuses.includes(newStatus)) {
+    throw new BadRequestError(
+      `Cannot change tour request status from ${tourRequest.status} to ${newStatus}`
+    );
+  }
+
+  return tourRequestsRepository.updateTourRequestStatus(
+    tourRequestId,
+    newStatus
+  );
+};
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
@@ -141,4 +202,5 @@ module.exports = {
   getTourRequestById,
   getAllTourRequests,
   assignAdmin,
+  updateStatus,
 };

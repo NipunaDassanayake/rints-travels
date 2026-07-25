@@ -14,6 +14,7 @@ const {
   packageBasedTourRequestSchema,
   customTourRequestSchema,
   assignAdminSchema,
+  updateTourRequestStatusSchema
 } = require("./tourRequests.validation");
 
 const router = express.Router();
@@ -67,6 +68,17 @@ router.patch(
   ),
   validateRequest(assignAdminSchema),
   tourRequestsController.assignAdmin
+);
+
+router.patch(
+  "/:id/status",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updateTourRequestStatusSchema),
+  tourRequestsController.updateStatus
 );
 
 module.exports = router;
