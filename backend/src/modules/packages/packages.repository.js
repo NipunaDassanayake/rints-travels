@@ -242,6 +242,40 @@ const deletePackageExclusion = async (exclusionId) => {
   });
 };
 
+
+// Package FAQs
+const createPackageFaq = async (data) => {
+  return prisma.packageFAQ.create({
+    data,
+  });
+};
+
+const findPackageFaqById = async (packageId, faqId) => {
+  return prisma.packageFAQ.findFirst({
+    where: {
+      id: Number(faqId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageFaq = async (faqId, data) => {
+  return prisma.packageFAQ.update({
+    where: {
+      id: Number(faqId),
+    },
+    data,
+  });
+};
+
+const deletePackageFaq = async (faqId) => {
+  return prisma.packageFAQ.delete({
+    where: {
+      id: Number(faqId),
+    },
+  });
+};
+
 module.exports = {
   findPackages,
   countPackages,
@@ -272,4 +306,9 @@ module.exports = {
   findPackageExclusionById,
   updatePackageExclusion,
   deletePackageExclusion,
+
+  createPackageFaq,
+  findPackageFaqById,
+  updatePackageFaq,
+  deletePackageFaq,
 };

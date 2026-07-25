@@ -74,6 +74,22 @@ const updatePackageExclusionSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255).required(),
 }).required();
 
+
+// Package FAQ Validation Schemas
+const createPackageFaqSchema = Joi.object({
+  question: Joi.string().trim().min(5).max(500).required(),
+  answer: Joi.string().trim().min(5).required(),
+  displayOrder: Joi.number().integer().min(0).optional(),
+}).required();
+
+const updatePackageFaqSchema = Joi.object({
+  question: Joi.string().trim().min(5).max(500).optional(),
+  answer: Joi.string().trim().min(5).optional(),
+  displayOrder: Joi.number().integer().min(0).optional(),
+})
+  .min(1)
+  .required();
+
 module.exports = {
   createPackageSchema,
   updatePackageSchema,
@@ -85,4 +101,6 @@ module.exports = {
   updatePackageInclusionSchema,
   createPackageExclusionSchema,
   updatePackageExclusionSchema,
+  createPackageFaqSchema,
+  updatePackageFaqSchema,
 };

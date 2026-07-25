@@ -356,6 +356,63 @@ const deletePackageExclusion = async (
     exclusionId
   );
 };
+
+
+// Package FAQs
+const addPackageFaq = async (packageId, faqData) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  return packagesRepository.createPackageFaq({
+    packageId: Number(packageId),
+    question: faqData.question,
+    answer: faqData.answer,
+    displayOrder: faqData.displayOrder ?? 0,
+  });
+};
+
+const updatePackageFaq = async (
+  packageId,
+  faqId,
+  faqData
+) => {
+  const existingFaq =
+    await packagesRepository.findPackageFaqById(
+      packageId,
+      faqId
+    );
+
+  if (!existingFaq) {
+    throw new NotFoundError("Package FAQ not found");
+  }
+
+  return packagesRepository.updatePackageFaq(
+    faqId,
+    faqData
+  );
+};
+
+const deletePackageFaq = async (
+  packageId,
+  faqId
+) => {
+  const existingFaq =
+    await packagesRepository.findPackageFaqById(
+      packageId,
+      faqId
+    );
+
+  if (!existingFaq) {
+    throw new NotFoundError("Package FAQ not found");
+  }
+
+  return packagesRepository.deletePackageFaq(faqId);
+};
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -377,4 +434,8 @@ module.exports = {
   addPackageExclusion,
   updatePackageExclusion,
   deletePackageExclusion,
+
+  addPackageFaq,
+  updatePackageFaq,
+  deletePackageFaq,
 };
