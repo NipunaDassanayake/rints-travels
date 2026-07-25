@@ -27,16 +27,17 @@ enum UserStatus {
 }
 
 model TravelPackage {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   title        String
-  slug         String   @unique
+  slug         String    @unique
   destination  String
   description  String
   durationDays Int
-  price        Decimal  @db.Decimal(10, 2)
-  status       String   @default("ACTIVE")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  price        Decimal   @db.Decimal(10, 2)
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? @map("deleted_at")
 
   images      PackageImage[]
   itineraries PackageItinerary[]
@@ -44,6 +45,8 @@ model TravelPackage {
   exclusions  PackageExclusion[]
   faqs        PackageFAQ[]
 
+  @@index([status])
+  @@index([deletedAt])
   @@map("travel_packages")
 }
 
