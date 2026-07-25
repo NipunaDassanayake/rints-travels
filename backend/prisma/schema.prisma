@@ -54,12 +54,15 @@ model PackageImage {
   id           Int      @id @default(autoincrement())
   packageId    Int
   imageUrl     String
+  altText      String?
   isPrimary    Boolean  @default(false)
   displayOrder Int      @default(0)
   createdAt    DateTime @default(now())
 
   travelPackage TravelPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
+  @@index([packageId])
+  @@index([isPrimary])
   @@map("package_images")
 }
 

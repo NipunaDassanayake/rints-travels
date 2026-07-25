@@ -60,6 +60,50 @@ const deletePackage = async (id) => {
   });
 };
 
+const createPackageImage = async (data) => {
+  return prisma.packageImage.create({
+    data,
+  });
+};
+
+const findPackageImageById = async (packageId, imageId) => {
+  return prisma.packageImage.findFirst({
+    where: {
+      id: Number(imageId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageImage = async (imageId, data) => {
+  return prisma.packageImage.update({
+    where: {
+      id: Number(imageId),
+    },
+    data,
+  });
+};
+
+const deletePackageImage = async (imageId) => {
+  return prisma.packageImage.delete({
+    where: {
+      id: Number(imageId),
+    },
+  });
+};
+
+const unsetPrimaryPackageImages = async (packageId) => {
+  return prisma.packageImage.updateMany({
+    where: {
+      packageId: Number(packageId),
+      isPrimary: true,
+    },
+    data: {
+      isPrimary: false,
+    },
+  });
+};
+
 module.exports = {
   findPackages,
   countPackages,
@@ -67,4 +111,10 @@ module.exports = {
   findPackageById,
   updatePackage,
   deletePackage,
+
+  createPackageImage,
+  findPackageImageById,
+  updatePackageImage,
+  deletePackageImage,
+  unsetPrimaryPackageImages,
 };
