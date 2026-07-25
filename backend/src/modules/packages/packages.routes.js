@@ -9,6 +9,8 @@ const authorize = require("../../middlewares/authorize");
 const {
   createPackageSchema,
   updatePackageSchema,
+  createPackageImageSchema,
+  updatePackageImageSchema,
 } = require("./packages.validation");
 
 const {
@@ -18,23 +20,57 @@ const {
 const router = express.Router();
 
 /**
- * Public routes
+ * Public Package Routes
  */
 
-// Get all travel packages
+// Get all active travel packages
 router.get(
   "/",
   packagesController.getAllPackages
 );
 
-// Get travel package by ID
-router.get(
-  "/:id",
-  packagesController.getPackageById
+/**
+ * Package Image Management
+ * ADMIN / SYSTEM_ADMIN only
+ */
+
+// Add package image
+router.post(
+  "/:packageId/images",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createPackageImageSchema),
+  packagesController.addPackageImage
+);
+
+// Update package image
+router.patch(
+  "/:packageId/images/:imageId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updatePackageImageSchema),
+  packagesController.updatePackageImage
+);
+
+// Delete package image
+router.delete(
+  "/:packageId/images/:imageId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  packagesController.deletePackageImage
 );
 
 /**
- * Admin protected routes
+ * Admin Package Management
  */
 
 // Create travel package
@@ -61,7 +97,7 @@ router.put(
   packagesController.updatePackage
 );
 
-// Delete travel package
+// Soft delete travel package
 router.delete(
   "/:id",
   authenticate,
@@ -72,36 +108,17 @@ router.delete(
   packagesController.deletePackage
 );
 
-router.post(
-  "/:packageId/images",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  validateRequest(createPackageImageSchema),
-  packagesController.addPackageImage
-);
+/**
+ * Public Package Detail Route
+ *
+ * Keep generic parameter routes near the bottom so that
+ * more specific routes can be declared above them.
+ */
 
-router.patch(
-  "/:packageId/images/:imageId",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  validateRequest(updatePackageImageSchema),
-  packagesController.updatePackageImage
-);
-
-router.delete(
-  "/:packageId/images/:imageId",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackageImage
+// Get travel package by ID
+router.get(
+  "/:id",
+  packagesController.getPackageById
 );
 
 module.exports = router;
