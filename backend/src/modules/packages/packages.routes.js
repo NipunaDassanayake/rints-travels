@@ -13,6 +13,8 @@ const {
   updatePackageImageSchema,
   createPackageItinerarySchema,
   updatePackageItinerarySchema,
+  createPackageInclusionSchema,
+  updatePackageInclusionSchema,
 } = require("./packages.validation");
 
 const {

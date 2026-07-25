@@ -164,6 +164,45 @@ const deletePackageItinerary = async (itineraryId) => {
   });
 };
 
+// Package Inclusions
+const createPackageInclusion = async (data) => {
+  return prisma.packageInclusion.create({
+    data,
+  });
+};
+
+const findPackageInclusionById = async (
+  packageId,
+  inclusionId
+) => {
+  return prisma.packageInclusion.findFirst({
+    where: {
+      id: Number(inclusionId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageInclusion = async (
+  inclusionId,
+  data
+) => {
+  return prisma.packageInclusion.update({
+    where: {
+      id: Number(inclusionId),
+    },
+    data,
+  });
+};
+
+const deletePackageInclusion = async (inclusionId) => {
+  return prisma.packageInclusion.delete({
+    where: {
+      id: Number(inclusionId),
+    },
+  });
+};
+
 module.exports = {
   findPackages,
   countPackages,
@@ -184,4 +223,9 @@ module.exports = {
   findPackageItineraryByDayNumber,
   updatePackageItinerary,
   deletePackageItinerary,
+
+  createPackageInclusion,
+  findPackageInclusionById,
+  updatePackageInclusion,
+  deletePackageInclusion,
 };
