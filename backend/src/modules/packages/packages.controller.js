@@ -102,4 +102,8 @@ module.exports = {
   getPackageById,
   updatePackage,
   deletePackage,
+
+  addPackageImage,
+  updatePackageImage,
+  deletePackageImage,
 };
