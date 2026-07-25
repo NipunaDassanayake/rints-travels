@@ -139,6 +139,49 @@ const deletePackageItinerary = asyncHandler(async (req, res) => {
   );
 });
 
+// Package Inclusions
+const addPackageInclusion = asyncHandler(async (req, res) => {
+  const inclusion =
+    await packagesService.addPackageInclusion(
+      req.params.packageId,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Package inclusion added successfully",
+    inclusion,
+    HTTP_STATUS.CREATED
+  );
+});
+
+const updatePackageInclusion = asyncHandler(async (req, res) => {
+  const inclusion =
+    await packagesService.updatePackageInclusion(
+      req.params.packageId,
+      req.params.inclusionId,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Package inclusion updated successfully",
+    inclusion
+  );
+});
+
+const deletePackageInclusion = asyncHandler(async (req, res) => {
+  await packagesService.deletePackageInclusion(
+    req.params.packageId,
+    req.params.inclusionId
+  );
+
+  return sendSuccess(
+    res,
+    "Package inclusion deleted successfully"
+  );
+});
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -153,4 +196,8 @@ module.exports = {
   addPackageItinerary,
   updatePackageItinerary,
   deletePackageItinerary,
+
+  addPackageInclusion,
+  updatePackageInclusion,
+  deletePackageInclusion,
 };

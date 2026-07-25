@@ -308,4 +308,8 @@ module.exports = {
   addPackageItinerary,
   updatePackageItinerary,
   deletePackageItinerary,
+
+  addPackageInclusion,
+  updatePackageInclusion,
+  deletePackageInclusion,
 };

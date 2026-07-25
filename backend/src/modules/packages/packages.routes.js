@@ -157,4 +157,37 @@ router.delete(
   ),
   packagesController.deletePackageItinerary
 );
+
+// Package Inclusions
+router.post(
+  "/:packageId/inclusions",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createPackageInclusionSchema),
+  packagesController.addPackageInclusion
+);
+
+router.patch(
+  "/:packageId/inclusions/:inclusionId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updatePackageInclusionSchema),
+  packagesController.updatePackageInclusion
+);
+
+router.delete(
+  "/:packageId/inclusions/:inclusionId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  packagesController.deletePackageInclusion
+);
 module.exports = router;
