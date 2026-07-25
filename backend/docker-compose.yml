@@ -1,0 +1,16 @@
+services:
+  rints-travels-db:
+    image: postgres:16
+    container_name: rints-travels-db
+    restart: always
+    environment:
+      POSTGRES_USER: rints_user
+      POSTGRES_PASSWORD: rints_password
+      POSTGRES_DB: rints_travels_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - rints_travels_db_data:/var/lib/postgresql/data
+
+volumes:
+  rints_travels_db_data:
