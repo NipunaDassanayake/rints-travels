@@ -72,4 +72,36 @@ router.delete(
   packagesController.deletePackage
 );
 
+router.post(
+  "/:packageId/images",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createPackageImageSchema),
+  packagesController.addPackageImage
+);
+
+router.patch(
+  "/:packageId/images/:imageId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updatePackageImageSchema),
+  packagesController.updatePackageImage
+);
+
+router.delete(
+  "/:packageId/images/:imageId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  packagesController.deletePackageImage
+);
+
 module.exports = router;

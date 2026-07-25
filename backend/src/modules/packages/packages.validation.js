@@ -24,7 +24,25 @@ const updatePackageSchema = createPackageSchema
   )
   .required();
 
+  const createPackageImageSchema = Joi.object({
+  imageUrl: Joi.string().uri().required(),
+  altText: Joi.string().max(255).allow(null, ""),
+  isPrimary: Joi.boolean().optional(),
+  displayOrder: Joi.number().integer().min(0).optional(),
+}).required();
+
+const updatePackageImageSchema = Joi.object({
+  imageUrl: Joi.string().uri().optional(),
+  altText: Joi.string().max(255).allow(null, ""),
+  isPrimary: Joi.boolean().optional(),
+  displayOrder: Joi.number().integer().min(0).optional(),
+})
+  .min(1)
+  .required();
+
 module.exports = {
   createPackageSchema,
   updatePackageSchema,
+  createPackageImageSchema,
+  updatePackageImageSchema,
 };
