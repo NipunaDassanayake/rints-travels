@@ -54,6 +54,48 @@ const deletePackage = asyncHandler(async (req, res) => {
   return sendSuccess(res, "Travel package deleted successfully");
 });
 
+
+// Package Images
+const addPackageImage = asyncHandler(async (req, res) => {
+  const createdImage = await packagesService.addPackageImage(
+    req.params.packageId,
+    req.body
+  );
+
+  return sendSuccess(
+    res,
+    "Package image added successfully",
+    createdImage,
+    HTTP_STATUS.CREATED
+  );
+});
+
+const updatePackageImage = asyncHandler(async (req, res) => {
+  const updatedImage = await packagesService.updatePackageImage(
+    req.params.packageId,
+    req.params.imageId,
+    req.body
+  );
+
+  return sendSuccess(
+    res,
+    "Package image updated successfully",
+    updatedImage
+  );
+});
+
+const deletePackageImage = asyncHandler(async (req, res) => {
+  await packagesService.deletePackageImage(
+    req.params.packageId,
+    req.params.imageId
+  );
+
+  return sendSuccess(
+    res,
+    "Package image deleted successfully"
+  );
+});
+
 module.exports = {
   getAllPackages,
   createPackage,
