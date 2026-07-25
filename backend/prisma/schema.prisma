@@ -58,8 +58,9 @@ model TourRequest {
   requestType TourRequestType @map("request_type")
   title       String?         @db.VarChar(200)
 
-  preferredStartDate DateTime  @map("preferred_start_date") @db.Date
-  preferredEndDate   DateTime? @map("preferred_end_date") @db.Date
+  preferredStartDate DateTime          @map("preferred_start_date") @db.Date
+  preferredEndDate   DateTime?         @map("preferred_end_date") @db.Date
+  preferredGuide     TourGuideProfile? @relation("PreferredGuideRequests", fields: [preferredGuideId], references: [id], onDelete: SetNull)
 
   adultCount Int @default(1) @map("adult_count")
   childCount Int @default(0) @map("child_count")
@@ -84,6 +85,8 @@ model TourRequest {
 
   @@index([touristId])
   @@index([packageId])
+  @@index([preferredGuideId])
+  @@index([assignedAdminId])
   @@index([status])
   @@index([requestType])
   @@index([preferredStartDate])
@@ -277,7 +280,8 @@ model TourGuideProfile {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  preferredTourRequests TourRequest[] @relation("PreferredGuideRequests")
 
   @@index([location])
   @@index([isAvailable])
