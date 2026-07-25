@@ -1,6 +1,6 @@
 const tourRequestsRepository = require("./tourRequests.repository");
 const packagesRepository = require("../packages/packages.repository");
-const { NotFoundError } = require("../../utils/AppError");
+const { NotFoundError , ForbiddenError } = require("../../utils/AppError");
 
 
 const createPackageBasedRequest = async (
@@ -79,7 +79,42 @@ const createCustomRequest = async (
   });
 };
 
+const getMyTourRequests = async (touristId) => {
+  return tourRequestsRepository.findTourRequestsByTouristId(
+    touristId
+  );
+};
+
+const getTourRequestById = async (
+  id,
+  currentUser
+) => {
+  const tourRequest =
+    await tourRequestsRepository.findTourRequestById(id);
+
+  if (!tourRequest) {
+    throw new NotFoundError("Tour request not found");
+  }
+
+  const isOwner =
+    tourRequest.touristId === currentUser.id;
+
+  const isAdmin =
+    currentUser.role === "ADMIN" ||
+    currentUser.role === "SYSTEM_ADMIN";
+
+  if (!isOwner && !isAdmin) {
+    throw new ForbiddenError(
+      "You do not have permission to view this tour request"
+    );
+  }
+
+  return tourRequest;
+};
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
+  getMyTourRequests,
+  getTourRequestById,
 };

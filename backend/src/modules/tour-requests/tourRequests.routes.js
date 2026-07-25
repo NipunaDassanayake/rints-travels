@@ -33,4 +33,18 @@ router.post(
   tourRequestsController.createCustomRequest
 );
 
+router.get(
+  "/me",
+  authenticate,
+  authorize(USER_ROLES.TOURIST),
+  tourRequestsController.getMyTourRequests
+);
+
+router.get(
+  "/:id",
+  authenticate,
+  authorize(USER_ROLES.TOURIST),
+  tourRequestsController.getTourRequestById
+);
+
 module.exports = router;

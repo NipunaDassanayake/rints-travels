@@ -33,7 +33,36 @@ const createCustomRequest = asyncHandler(async (req, res) => {
   );
 });
 
+const getMyTourRequests = asyncHandler(async (req, res) => {
+  const tourRequests =
+    await tourRequestsService.getMyTourRequests(
+      req.user.id
+    );
+
+  return sendSuccess(
+    res,
+    "Tour requests retrieved successfully",
+    tourRequests
+  );
+});
+
+const getTourRequestById = asyncHandler(async (req, res) => {
+  const tourRequest =
+    await tourRequestsService.getTourRequestById(
+      req.params.id,
+      req.user
+    );
+
+  return sendSuccess(
+    res,
+    "Tour request retrieved successfully",
+    tourRequest
+  );
+});
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
+  getMyTourRequests,
+  getTourRequestById,
 };
