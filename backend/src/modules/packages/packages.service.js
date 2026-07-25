@@ -49,10 +49,90 @@ const deletePackage = async (id) => {
   return packagesRepository.deletePackage(id);
 };
 
+// Package Images
+const addPackageImage = async (packageId, imageData) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  if (imageData.isPrimary) {
+    await packagesRepository.unsetPrimaryPackageImages(packageId);
+  }
+
+  return packagesRepository.createPackageImage({
+    packageId: Number(packageId),
+    imageUrl: imageData.imageUrl,
+    altText: imageData.altText || null,
+    isPrimary: imageData.isPrimary || false,
+    displayOrder: imageData.displayOrder || 0,
+  });
+};
+
+const updatePackageImage = async (
+  packageId,
+  imageId,
+  imageData
+) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  const existingImage =
+    await packagesRepository.findPackageImageById(
+      packageId,
+      imageId
+    );
+
+  if (!existingImage) {
+    throw new NotFoundError("Package image not found");
+  }
+
+  if (imageData.isPrimary === true) {
+    await packagesRepository.unsetPrimaryPackageImages(
+      packageId
+    );
+  }
+
+  return packagesRepository.updatePackageImage(
+    imageId,
+    imageData
+  );
+};
+
+const deletePackageImage = async (packageId, imageId) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  const existingImage =
+    await packagesRepository.findPackageImageById(
+      packageId,
+      imageId
+    );
+
+  if (!existingImage) {
+    throw new NotFoundError("Package image not found");
+  }
+
+  return packagesRepository.deletePackageImage(imageId);
+};
+
 module.exports = {
   getAllPackages,
   createPackage,
   getPackageById,
   updatePackage,
   deletePackage,
+  addPackageImage,
+  updatePackageImage,
+  deletePackageImage,
 };
