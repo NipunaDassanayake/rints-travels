@@ -135,6 +135,104 @@ const deletePackageImage = async (packageId, imageId) => {
   return packagesRepository.deletePackageImage(imageId);
 };
 
+// Package Itineraries
+const addPackageItinerary = async (
+  packageId,
+  itineraryData
+) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  const existingDay =
+    await packagesRepository.findPackageItineraryByDayNumber(
+      packageId,
+      itineraryData.dayNumber
+    );
+
+  if (existingDay) {
+    throw new ConflictError(
+      `Day ${itineraryData.dayNumber} already exists for this package`
+    );
+  }
+
+  return packagesRepository.createPackageItinerary({
+    packageId: Number(packageId),
+    ...itineraryData,
+  });
+};
+
+const updatePackageItinerary = async (
+  packageId,
+  itineraryId,
+  itineraryData
+) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  const existingItinerary =
+    await packagesRepository.findPackageItineraryById(
+      packageId,
+      itineraryId
+    );
+
+  if (!existingItinerary) {
+    throw new NotFoundError(
+      "Package itinerary item not found"
+    );
+  }
+
+  if (
+    itineraryData.dayNumber &&
+    itineraryData.dayNumber !== existingItinerary.dayNumber
+  ) {
+    const existingDay =
+      await packagesRepository.findPackageItineraryByDayNumber(
+        packageId,
+        itineraryData.dayNumber
+      );
+
+    if (existingDay) {
+      throw new ConflictError(
+        `Day ${itineraryData.dayNumber} already exists for this package`
+      );
+    }
+  }
+
+  return packagesRepository.updatePackageItinerary(
+    itineraryId,
+    itineraryData
+  );
+};
+
+const deletePackageItinerary = async (
+  packageId,
+  itineraryId
+) => {
+  const existingItinerary =
+    await packagesRepository.findPackageItineraryById(
+      packageId,
+      itineraryId
+    );
+
+  if (!existingItinerary) {
+    throw new NotFoundError(
+      "Package itinerary item not found"
+    );
+  }
+
+  return packagesRepository.deletePackageItinerary(
+    itineraryId
+  );
+};
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -144,4 +242,8 @@ module.exports = {
   addPackageImage,
   updatePackageImage,
   deletePackageImage,
+
+  addPackageItinerary,
+  updatePackageItinerary,
+  deletePackageItinerary,
 };

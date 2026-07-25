@@ -96,6 +96,49 @@ const deletePackageImage = asyncHandler(async (req, res) => {
   );
 });
 
+// Package Itineraries
+const addPackageItinerary = asyncHandler(async (req, res) => {
+  const itinerary =
+    await packagesService.addPackageItinerary(
+      req.params.packageId,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Package itinerary added successfully",
+    itinerary,
+    HTTP_STATUS.CREATED
+  );
+});
+
+const updatePackageItinerary = asyncHandler(async (req, res) => {
+  const itinerary =
+    await packagesService.updatePackageItinerary(
+      req.params.packageId,
+      req.params.itineraryId,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Package itinerary updated successfully",
+    itinerary
+  );
+});
+
+const deletePackageItinerary = asyncHandler(async (req, res) => {
+  await packagesService.deletePackageItinerary(
+    req.params.packageId,
+    req.params.itineraryId
+  );
+
+  return sendSuccess(
+    res,
+    "Package itinerary deleted successfully"
+  );
+});
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -106,4 +149,8 @@ module.exports = {
   addPackageImage,
   updatePackageImage,
   deletePackageImage,
+
+  addPackageItinerary,
+  updatePackageItinerary,
+  deletePackageItinerary,
 };
