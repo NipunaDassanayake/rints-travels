@@ -60,6 +60,15 @@ const deletePackage = async (id) => {
   });
 };
 
+//find package by slug
+const findPackageBySlug = async (slug) => {
+  return prisma.travelPackage.findUnique({
+    where: {
+      slug,
+    },
+  });
+};
+
 const createPackageImage = async (data) => {
   return prisma.packageImage.create({
     data,
@@ -104,6 +113,169 @@ const unsetPrimaryPackageImages = async (packageId) => {
   });
 };
 
+// Package Itineraries
+const createPackageItinerary = async (data) => {
+  return prisma.packageItinerary.create({
+    data,
+  });
+};
+
+const findPackageItineraryById = async (
+  packageId,
+  itineraryId
+) => {
+  return prisma.packageItinerary.findFirst({
+    where: {
+      id: Number(itineraryId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const findPackageItineraryByDayNumber = async (
+  packageId,
+  dayNumber
+) => {
+  return prisma.packageItinerary.findFirst({
+    where: {
+      packageId: Number(packageId),
+      dayNumber,
+    },
+  });
+};
+
+const updatePackageItinerary = async (
+  itineraryId,
+  data
+) => {
+  return prisma.packageItinerary.update({
+    where: {
+      id: Number(itineraryId),
+    },
+    data,
+  });
+};
+
+const deletePackageItinerary = async (itineraryId) => {
+  return prisma.packageItinerary.delete({
+    where: {
+      id: Number(itineraryId),
+    },
+  });
+};
+
+// Package Inclusions
+const createPackageInclusion = async (data) => {
+  return prisma.packageInclusion.create({
+    data,
+  });
+};
+
+const findPackageInclusionById = async (
+  packageId,
+  inclusionId
+) => {
+  return prisma.packageInclusion.findFirst({
+    where: {
+      id: Number(inclusionId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageInclusion = async (
+  inclusionId,
+  data
+) => {
+  return prisma.packageInclusion.update({
+    where: {
+      id: Number(inclusionId),
+    },
+    data,
+  });
+};
+
+const deletePackageInclusion = async (inclusionId) => {
+  return prisma.packageInclusion.delete({
+    where: {
+      id: Number(inclusionId),
+    },
+  });
+};
+
+// Package Exclusions
+const createPackageExclusion = async (data) => {
+  return prisma.packageExclusion.create({
+    data,
+  });
+};
+
+const findPackageExclusionById = async (
+  packageId,
+  exclusionId
+) => {
+  return prisma.packageExclusion.findFirst({
+    where: {
+      id: Number(exclusionId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageExclusion = async (
+  exclusionId,
+  data
+) => {
+  return prisma.packageExclusion.update({
+    where: {
+      id: Number(exclusionId),
+    },
+    data,
+  });
+};
+
+const deletePackageExclusion = async (exclusionId) => {
+  return prisma.packageExclusion.delete({
+    where: {
+      id: Number(exclusionId),
+    },
+  });
+};
+
+
+// Package FAQs
+const createPackageFaq = async (data) => {
+  return prisma.packageFAQ.create({
+    data,
+  });
+};
+
+const findPackageFaqById = async (packageId, faqId) => {
+  return prisma.packageFAQ.findFirst({
+    where: {
+      id: Number(faqId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageFaq = async (faqId, data) => {
+  return prisma.packageFAQ.update({
+    where: {
+      id: Number(faqId),
+    },
+    data,
+  });
+};
+
+const deletePackageFaq = async (faqId) => {
+  return prisma.packageFAQ.delete({
+    where: {
+      id: Number(faqId),
+    },
+  });
+};
+
 module.exports = {
   findPackages,
   countPackages,
@@ -111,10 +283,32 @@ module.exports = {
   findPackageById,
   updatePackage,
   deletePackage,
+  findPackageBySlug,
 
   createPackageImage,
   findPackageImageById,
   updatePackageImage,
   deletePackageImage,
   unsetPrimaryPackageImages,
+
+  createPackageItinerary,
+  findPackageItineraryById,
+  findPackageItineraryByDayNumber,
+  updatePackageItinerary,
+  deletePackageItinerary,
+
+  createPackageInclusion,
+  findPackageInclusionById,
+  updatePackageInclusion,
+  deletePackageInclusion,
+
+  createPackageExclusion,
+  findPackageExclusionById,
+  updatePackageExclusion,
+  deletePackageExclusion,
+
+  createPackageFaq,
+  findPackageFaqById,
+  updatePackageFaq,
+  deletePackageFaq,
 };
