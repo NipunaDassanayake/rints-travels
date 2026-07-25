@@ -1,5 +1,5 @@
 const packagesRepository = require("./packages.repository");
-const { NotFoundError } = require("../../utils/AppError");
+const { NotFoundError, ConflictError } = require("../../utils/AppError");
 const { buildPackageQueryOptions } = require("./packages.query");
 
 const getAllPackages = async (query) => {
@@ -22,6 +22,15 @@ const getAllPackages = async (query) => {
 };
 
 const createPackage = async (packageData) => {
+  const existingPackage =
+    await packagesRepository.findPackageBySlug(packageData.slug);
+
+  if (existingPackage) {
+    throw new ConflictError(
+      "A travel package with this slug already exists"
+    );
+  }
+
   return packagesRepository.createPackage(packageData);
 };
 

@@ -60,6 +60,15 @@ const deletePackage = async (id) => {
   });
 };
 
+//find package by slug
+const findPackageBySlug = async (slug) => {
+  return prisma.travelPackage.findUnique({
+    where: {
+      slug,
+    },
+  });
+};
+
 const createPackageImage = async (data) => {
   return prisma.packageImage.create({
     data,
@@ -111,6 +120,7 @@ module.exports = {
   findPackageById,
   updatePackage,
   deletePackage,
+  findPackageBySlug,
 
   createPackageImage,
   findPackageImageById,
