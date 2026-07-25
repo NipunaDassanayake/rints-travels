@@ -233,6 +233,68 @@ const deletePackageItinerary = async (
   );
 };
 
+// Package Inclusions
+const addPackageInclusion = async (
+  packageId,
+  inclusionData
+) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  return packagesRepository.createPackageInclusion({
+    packageId: Number(packageId),
+    title: inclusionData.title,
+  });
+};
+
+const updatePackageInclusion = async (
+  packageId,
+  inclusionId,
+  inclusionData
+) => {
+  const existingInclusion =
+    await packagesRepository.findPackageInclusionById(
+      packageId,
+      inclusionId
+    );
+
+  if (!existingInclusion) {
+    throw new NotFoundError(
+      "Package inclusion not found"
+    );
+  }
+
+  return packagesRepository.updatePackageInclusion(
+    inclusionId,
+    inclusionData
+  );
+};
+
+const deletePackageInclusion = async (
+  packageId,
+  inclusionId
+) => {
+  const existingInclusion =
+    await packagesRepository.findPackageInclusionById(
+      packageId,
+      inclusionId
+    );
+
+  if (!existingInclusion) {
+    throw new NotFoundError(
+      "Package inclusion not found"
+    );
+  }
+
+  return packagesRepository.deletePackageInclusion(
+    inclusionId
+  );
+};
+
 module.exports = {
   getAllPackages,
   createPackage,

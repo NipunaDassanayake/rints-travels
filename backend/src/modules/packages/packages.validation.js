@@ -55,6 +55,15 @@ const updatePackageItinerarySchema = Joi.object({
   .min(1)
   .required();
 
+  // Package Inclusion Validation Schemas
+const createPackageInclusionSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(255).required(),
+}).required();
+
+const updatePackageInclusionSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(255).required(),
+}).required();
+
 module.exports = {
   createPackageSchema,
   updatePackageSchema,
@@ -62,4 +71,6 @@ module.exports = {
   updatePackageImageSchema,
   createPackageItinerarySchema,
   updatePackageItinerarySchema,
+  createPackageInclusionSchema,
+  updatePackageInclusionSchema,
 };
