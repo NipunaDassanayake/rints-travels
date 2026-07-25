@@ -11,6 +11,8 @@ const {
   updatePackageSchema,
   createPackageImageSchema,
   updatePackageImageSchema,
+  createPackageItinerarySchema,
+  updatePackageItinerarySchema,
 } = require("./packages.validation");
 
 const {
@@ -121,4 +123,36 @@ router.get(
   packagesController.getPackageById
 );
 
+// Get travel package by slug
+router.post(
+  "/:packageId/itineraries",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createPackageItinerarySchema),
+  packagesController.addPackageItinerary
+);
+
+router.patch(
+  "/:packageId/itineraries/:itineraryId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updatePackageItinerarySchema),
+  packagesController.updatePackageItinerary
+);
+
+router.delete(
+  "/:packageId/itineraries/:itineraryId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  packagesController.deletePackageItinerary
+);
 module.exports = router;
