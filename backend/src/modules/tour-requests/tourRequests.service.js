@@ -195,6 +195,43 @@ const updateStatus = async (tourRequestId, newStatus) => {
   );
 };
 
+const adminEditTourRequest = async (
+  tourRequestId,
+  updateData
+) => {
+  const tourRequest =
+    await tourRequestsRepository.findTourRequestById(
+      tourRequestId
+    );
+
+  if (!tourRequest) {
+    throw new NotFoundError("Tour request not found");
+  }
+
+  const startDate =
+    updateData.preferredStartDate ??
+    tourRequest.preferredStartDate;
+
+  const endDate =
+    updateData.preferredEndDate !== undefined
+      ? updateData.preferredEndDate
+      : tourRequest.preferredEndDate;
+
+  if (
+    endDate &&
+    new Date(endDate) < new Date(startDate)
+  ) {
+    throw new BadRequestError(
+      "Preferred end date cannot be before preferred start date"
+    );
+  }
+
+  return tourRequestsRepository.updateTourRequest(
+    tourRequestId,
+    updateData
+  );
+};
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
@@ -203,4 +240,5 @@ module.exports = {
   getAllTourRequests,
   assignAdmin,
   updateStatus,
+  adminEditTourRequest,
 };

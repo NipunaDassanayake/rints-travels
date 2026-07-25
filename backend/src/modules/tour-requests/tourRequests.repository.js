@@ -108,6 +108,19 @@ const updateTourRequestStatus = async (id, status) => {
   });
 };
 
+
+const updateTourRequest = async (id, data) => {
+  return prisma.tourRequest.update({
+    where: {
+      id,
+    },
+    data,
+    include: {
+      travelPackage: true,
+    },
+  });
+};
+
 module.exports = {
   createTourRequest,
   findTourRequestById,
@@ -115,4 +128,5 @@ module.exports = {
   findAllTourRequests,
   assignAdminToTourRequest,
   updateTourRequestStatus,
+  updateTourRequest,
 };

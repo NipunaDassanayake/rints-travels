@@ -77,9 +77,66 @@ const updateTourRequestStatusSchema = Joi.object({
     .required(),
 }).required();
 
+
+const adminEditTourRequestSchema = Joi.object({
+  preferredStartDate: Joi.date().iso().optional(),
+
+  preferredEndDate: Joi.date().iso().allow(null).optional(),
+
+  adultCount: Joi.number().integer().min(1).optional(),
+
+  childCount: Joi.number().integer().min(0).optional(),
+
+  destinationPreferences: Joi.string()
+    .trim()
+    .allow(null, "")
+    .optional(),
+
+  budget: Joi.number()
+    .positive()
+    .allow(null)
+    .optional(),
+
+  currency: Joi.string()
+    .trim()
+    .uppercase()
+    .max(10)
+    .optional(),
+
+  preferredGuideId: Joi.string()
+    .uuid()
+    .allow(null)
+    .optional(),
+
+  hotelPreference: Joi.string()
+    .trim()
+    .max(100)
+    .allow(null, "")
+    .optional(),
+
+  transportPreference: Joi.string()
+    .trim()
+    .max(100)
+    .allow(null, "")
+    .optional(),
+
+  specialRequirements: Joi.string()
+    .trim()
+    .allow(null, "")
+    .optional(),
+
+  contactMethod: Joi.string()
+    .valid("WHATSAPP", "PHONE", "EMAIL")
+    .allow(null)
+    .optional(),
+})
+  .min(1)
+  .required();
+
 module.exports = {
   packageBasedTourRequestSchema,
   customTourRequestSchema,
   assignAdminSchema,
   updateTourRequestStatusSchema,
+  adminEditTourRequestSchema,
 };

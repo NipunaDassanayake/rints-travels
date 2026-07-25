@@ -105,6 +105,23 @@ const updateStatus = asyncHandler(async (req, res) => {
   );
 });
 
+
+const adminEditTourRequest = asyncHandler(
+  async (req, res) => {
+    const tourRequest =
+      await tourRequestsService.adminEditTourRequest(
+        req.params.id,
+        req.body
+      );
+
+    return sendSuccess(
+      res,
+      "Tour request updated successfully",
+      tourRequest
+    );
+  }
+);
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
@@ -113,4 +130,5 @@ module.exports = {
   getTourRequestById,
   assignAdmin,
   updateStatus,
+  adminEditTourRequest,
 };
