@@ -2,6 +2,7 @@ const tourRequestsRepository = require("./tourRequests.repository");
 const packagesRepository = require("../packages/packages.repository");
 const { NotFoundError, ForbiddenError } = require("../../utils/AppError");
 const authRepository = require("../auth/repositories/auth.repository");
+const tourGuidesRepository = require("../tour-guides/tourGuides.repository");
 
 const {
   USER_ROLES,
@@ -16,6 +17,10 @@ const createPackageBasedRequest = async (touristId, requestData) => {
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
   }
+
+  await validatePreferredGuide(
+    requestData.preferredGuideId
+  );
 
   return tourRequestsRepository.createTourRequest({
     touristId,
@@ -44,6 +49,10 @@ const createPackageBasedRequest = async (touristId, requestData) => {
 };
 
 const createCustomRequest = async (touristId, requestData) => {
+  await validatePreferredGuide(
+    requestData.preferredGuideId
+  );
+
   return tourRequestsRepository.createTourRequest({
     touristId,
     packageId: null,
@@ -230,6 +239,23 @@ const adminEditTourRequest = async (
     tourRequestId,
     updateData
   );
+};
+
+const validatePreferredGuide = async (preferredGuideId) => {
+  if (!preferredGuideId) {
+    return;
+  }
+
+  const guide =
+    await tourGuidesRepository.findTourGuideById(
+      preferredGuideId
+    );
+
+  if (!guide || !guide.isAvailable) {
+    throw new NotFoundError(
+      "Available preferred tour guide not found"
+    );
+  }
 };
 
 module.exports = {
