@@ -26,18 +26,83 @@ enum UserStatus {
   DELETED
 }
 
+enum TourRequestType {
+  PACKAGE_BASED
+  CUSTOM
+}
+
+enum TourRequestStatus {
+  PENDING_REVIEW
+  UNDER_DISCUSSION
+  READY_FOR_QUOTATION
+  QUOTATION_SENT
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  BOOKED
+}
+
+enum ContactMethod {
+  WHATSAPP
+  PHONE
+  EMAIL
+}
+
+model TourRequest {
+  id               String  @id @default(uuid()) @db.Uuid
+  touristId        String  @map("tourist_id") @db.Uuid
+  packageId        Int?    @map("package_id")
+  preferredGuideId String? @map("preferred_guide_id") @db.Uuid
+  assignedAdminId  String? @map("assigned_admin_id") @db.Uuid
+
+  requestType TourRequestType @map("request_type")
+  title       String?         @db.VarChar(200)
+
+  preferredStartDate DateTime  @map("preferred_start_date") @db.Date
+  preferredEndDate   DateTime? @map("preferred_end_date") @db.Date
+
+  adultCount Int @default(1) @map("adult_count")
+  childCount Int @default(0) @map("child_count")
+
+  destinationPreferences String?  @map("destination_preferences")
+  budget                 Decimal? @db.Decimal(12, 2)
+  currency               String   @default("USD") @db.VarChar(10)
+
+  hotelPreference     String? @map("hotel_preference") @db.VarChar(100)
+  transportPreference String? @map("transport_preference") @db.VarChar(100)
+  specialRequirements String? @map("special_requirements")
+
+  contactMethod ContactMethod?    @map("contact_method")
+  status        TourRequestStatus @default(PENDING_REVIEW)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tourist       User           @relation("TourRequestTourist", fields: [touristId], references: [id], onDelete: Restrict)
+  travelPackage TravelPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  @@index([touristId])
+  @@index([packageId])
+  @@index([status])
+  @@index([requestType])
+  @@index([preferredStartDate])
+  @@map("tour_requests")
+}
+
 model TravelPackage {
-  id           Int       @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   title        String
-  slug         String    @unique
+  slug         String        @unique
   destination  String
   description  String
   durationDays Int
-  price        Decimal   @db.Decimal(10, 2)
-  status       String    @default("ACTIVE")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime? @map("deleted_at")
+  price        Decimal       @db.Decimal(10, 2)
+  status       String        @default("ACTIVE")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?     @map("deleted_at")
+  tourRequests TourRequest[]
 
   images      PackageImage[]
   itineraries PackageItinerary[]
@@ -117,21 +182,22 @@ model PackageFAQ {
 }
 
 model User {
-  id              String       @id @default(uuid()) @db.Uuid
-  firstName       String       @map("first_name") @db.VarChar(100)
-  lastName        String       @map("last_name") @db.VarChar(100)
-  email           String       @unique @db.VarChar(255)
-  phone           String?      @db.VarChar(30)
-  passwordHash    String?      @map("password_hash") @db.VarChar(255)
-  role            UserRole     @default(TOURIST)
-  provider        AuthProvider @default(LOCAL)
-  providerId      String?      @map("provider_id") @db.VarChar(255)
-  profileImageUrl String?      @map("profile_image_url")
-  isEmailVerified Boolean      @default(false) @map("is_email_verified")
-  status          UserStatus   @default(ACTIVE)
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  deletedAt       DateTime?    @map("deleted_at")
+  id              String        @id @default(uuid()) @db.Uuid
+  firstName       String        @map("first_name") @db.VarChar(100)
+  lastName        String        @map("last_name") @db.VarChar(100)
+  email           String        @unique @db.VarChar(255)
+  phone           String?       @db.VarChar(30)
+  passwordHash    String?       @map("password_hash") @db.VarChar(255)
+  role            UserRole      @default(TOURIST)
+  provider        AuthProvider  @default(LOCAL)
+  providerId      String?       @map("provider_id") @db.VarChar(255)
+  profileImageUrl String?       @map("profile_image_url")
+  isEmailVerified Boolean       @default(false) @map("is_email_verified")
+  status          UserStatus    @default(ACTIVE)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  deletedAt       DateTime?     @map("deleted_at")
+  tourRequests    TourRequest[] @relation("TourRequestTourist")
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
