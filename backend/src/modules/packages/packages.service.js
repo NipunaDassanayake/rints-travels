@@ -295,6 +295,67 @@ const deletePackageInclusion = async (
   );
 };
 
+// Package Exclusions
+const addPackageExclusion = async (
+  packageId,
+  exclusionData
+) => {
+  const travelPackage =
+    await packagesRepository.findPackageById(packageId);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  return packagesRepository.createPackageExclusion({
+    packageId: Number(packageId),
+    title: exclusionData.title,
+  });
+};
+
+const updatePackageExclusion = async (
+  packageId,
+  exclusionId,
+  exclusionData
+) => {
+  const existingExclusion =
+    await packagesRepository.findPackageExclusionById(
+      packageId,
+      exclusionId
+    );
+
+  if (!existingExclusion) {
+    throw new NotFoundError(
+      "Package exclusion not found"
+    );
+  }
+
+  return packagesRepository.updatePackageExclusion(
+    exclusionId,
+    exclusionData
+  );
+};
+
+const deletePackageExclusion = async (
+  packageId,
+  exclusionId
+) => {
+  const existingExclusion =
+    await packagesRepository.findPackageExclusionById(
+      packageId,
+      exclusionId
+    );
+
+  if (!existingExclusion) {
+    throw new NotFoundError(
+      "Package exclusion not found"
+    );
+  }
+
+  return packagesRepository.deletePackageExclusion(
+    exclusionId
+  );
+};
 module.exports = {
   getAllPackages,
   createPackage,
@@ -312,4 +373,8 @@ module.exports = {
   addPackageInclusion,
   updatePackageInclusion,
   deletePackageInclusion,
+
+  addPackageExclusion,
+  updatePackageExclusion,
+  deletePackageExclusion,
 };

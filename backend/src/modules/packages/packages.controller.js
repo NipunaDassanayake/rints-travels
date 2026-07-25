@@ -182,6 +182,50 @@ const deletePackageInclusion = asyncHandler(async (req, res) => {
   );
 });
 
+
+// Package Exclusions
+const addPackageExclusion = asyncHandler(async (req, res) => {
+  const exclusion =
+    await packagesService.addPackageExclusion(
+      req.params.packageId,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Package exclusion added successfully",
+    exclusion,
+    HTTP_STATUS.CREATED
+  );
+});
+
+const updatePackageExclusion = asyncHandler(async (req, res) => {
+  const exclusion =
+    await packagesService.updatePackageExclusion(
+      req.params.packageId,
+      req.params.exclusionId,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Package exclusion updated successfully",
+    exclusion
+  );
+});
+
+const deletePackageExclusion = asyncHandler(async (req, res) => {
+  await packagesService.deletePackageExclusion(
+    req.params.packageId,
+    req.params.exclusionId
+  );
+
+  return sendSuccess(
+    res,
+    "Package exclusion deleted successfully"
+  );
+});
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -200,4 +244,8 @@ module.exports = {
   addPackageInclusion,
   updatePackageInclusion,
   deletePackageInclusion,
+
+  addPackageExclusion,
+  updatePackageExclusion,
+  deletePackageExclusion,
 };

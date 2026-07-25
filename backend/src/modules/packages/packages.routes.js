@@ -15,6 +15,8 @@ const {
   updatePackageItinerarySchema,
   createPackageInclusionSchema,
   updatePackageInclusionSchema,
+  createPackageExclusionSchema,
+  updatePackageExclusionSchema,
 } = require("./packages.validation");
 
 const {
@@ -189,5 +191,38 @@ router.delete(
     USER_ROLES.SYSTEM_ADMIN
   ),
   packagesController.deletePackageInclusion
+);
+
+
+router.post(
+  "/:packageId/exclusions",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createPackageExclusionSchema),
+  packagesController.addPackageExclusion
+);
+
+router.patch(
+  "/:packageId/exclusions/:exclusionId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updatePackageExclusionSchema),
+  packagesController.updatePackageExclusion
+);
+
+router.delete(
+  "/:packageId/exclusions/:exclusionId",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  packagesController.deletePackageExclusion
 );
 module.exports = router;
