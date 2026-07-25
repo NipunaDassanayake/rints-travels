@@ -113,6 +113,57 @@ const unsetPrimaryPackageImages = async (packageId) => {
   });
 };
 
+// Package Itineraries
+const createPackageItinerary = async (data) => {
+  return prisma.packageItinerary.create({
+    data,
+  });
+};
+
+const findPackageItineraryById = async (
+  packageId,
+  itineraryId
+) => {
+  return prisma.packageItinerary.findFirst({
+    where: {
+      id: Number(itineraryId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const findPackageItineraryByDayNumber = async (
+  packageId,
+  dayNumber
+) => {
+  return prisma.packageItinerary.findFirst({
+    where: {
+      packageId: Number(packageId),
+      dayNumber,
+    },
+  });
+};
+
+const updatePackageItinerary = async (
+  itineraryId,
+  data
+) => {
+  return prisma.packageItinerary.update({
+    where: {
+      id: Number(itineraryId),
+    },
+    data,
+  });
+};
+
+const deletePackageItinerary = async (itineraryId) => {
+  return prisma.packageItinerary.delete({
+    where: {
+      id: Number(itineraryId),
+    },
+  });
+};
+
 module.exports = {
   findPackages,
   countPackages,
@@ -127,4 +178,10 @@ module.exports = {
   updatePackageImage,
   deletePackageImage,
   unsetPrimaryPackageImages,
+
+  createPackageItinerary,
+  findPackageItineraryById,
+  findPackageItineraryByDayNumber,
+  updatePackageItinerary,
+  deletePackageItinerary,
 };

@@ -40,9 +40,26 @@ const updatePackageImageSchema = Joi.object({
   .min(1)
   .required();
 
+// Package Itinerary Validation Schemas
+  const createPackageItinerarySchema = Joi.object({
+  dayNumber: Joi.number().integer().min(1).required(),
+  title: Joi.string().trim().min(3).max(150).required(),
+  description: Joi.string().trim().min(5).required(),
+}).required();
+
+const updatePackageItinerarySchema = Joi.object({
+  dayNumber: Joi.number().integer().min(1).optional(),
+  title: Joi.string().trim().min(3).max(150).optional(),
+  description: Joi.string().trim().min(5).optional(),
+})
+  .min(1)
+  .required();
+
 module.exports = {
   createPackageSchema,
   updatePackageSchema,
   createPackageImageSchema,
   updatePackageImageSchema,
+  createPackageItinerarySchema,
+  updatePackageItinerarySchema,
 };
