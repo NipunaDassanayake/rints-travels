@@ -1,21 +1,20 @@
 const tourRequestsRepository = require("./tourRequests.repository");
 const packagesRepository = require("../packages/packages.repository");
-const { NotFoundError , ForbiddenError } = require("../../utils/AppError");
+const { NotFoundError, ForbiddenError } = require("../../utils/AppError");
+const authRepository = require("../auth/repositories/auth.repository");
 
+const {
+  USER_ROLES,
+  USER_STATUS,
+} = require("../../core/constants/auth.constants");
 
-const createPackageBasedRequest = async (
-  touristId,
-  requestData
-) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(
-      requestData.packageId
-    );
+const createPackageBasedRequest = async (touristId, requestData) => {
+  const travelPackage = await packagesRepository.findPackageById(
+    requestData.packageId,
+  );
 
   if (!travelPackage) {
-    throw new NotFoundError(
-      "Travel package not found"
-    );
+    throw new NotFoundError("Travel package not found");
   }
 
   return tourRequestsRepository.createTourRequest({
@@ -44,10 +43,7 @@ const createPackageBasedRequest = async (
   });
 };
 
-const createCustomRequest = async (
-  touristId,
-  requestData
-) => {
+const createCustomRequest = async (touristId, requestData) => {
   return tourRequestsRepository.createTourRequest({
     touristId,
     packageId: null,
@@ -61,8 +57,7 @@ const createCustomRequest = async (
     adultCount: requestData.adultCount,
     childCount: requestData.childCount,
 
-    destinationPreferences:
-      requestData.destinationPreferences,
+    destinationPreferences: requestData.destinationPreferences,
 
     budget: requestData.budget,
     currency: requestData.currency,
@@ -80,32 +75,24 @@ const createCustomRequest = async (
 };
 
 const getMyTourRequests = async (touristId) => {
-  return tourRequestsRepository.findTourRequestsByTouristId(
-    touristId
-  );
+  return tourRequestsRepository.findTourRequestsByTouristId(touristId);
 };
 
-const getTourRequestById = async (
-  id,
-  currentUser
-) => {
-  const tourRequest =
-    await tourRequestsRepository.findTourRequestById(id);
+const getTourRequestById = async (id, currentUser) => {
+  const tourRequest = await tourRequestsRepository.findTourRequestById(id);
 
   if (!tourRequest) {
     throw new NotFoundError("Tour request not found");
   }
 
-  const isOwner =
-    tourRequest.touristId === currentUser.id;
+  const isOwner = tourRequest.touristId === currentUser.id;
 
   const isAdmin =
-    currentUser.role === "ADMIN" ||
-    currentUser.role === "SYSTEM_ADMIN";
+    currentUser.role === "ADMIN" || currentUser.role === "SYSTEM_ADMIN";
 
   if (!isOwner && !isAdmin) {
     throw new ForbiddenError(
-      "You do not have permission to view this tour request"
+      "You do not have permission to view this tour request",
     );
   }
 
@@ -122,10 +109,36 @@ const getAllTourRequests = async (query) => {
   });
 };
 
+// Additional function to assign an admin to a tour request
+const assignAdmin = async (tourRequestId, adminId) => {
+  const tourRequest =
+    await tourRequestsRepository.findTourRequestById(tourRequestId);
+
+  if (!tourRequest) {
+    throw new NotFoundError("Tour request not found");
+  }
+
+  const admin = await authRepository.findUserById(adminId);
+
+  if (
+    !admin ||
+    ![USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN].includes(admin.role) ||
+    admin.status !== USER_STATUS.ACTIVE
+  ) {
+    throw new NotFoundError("Active admin user not found");
+  }
+
+  return tourRequestsRepository.assignAdminToTourRequest(
+    tourRequestId,
+    adminId,
+  );
+};
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
   getMyTourRequests,
   getTourRequestById,
   getAllTourRequests,
+  assignAdmin,
 };

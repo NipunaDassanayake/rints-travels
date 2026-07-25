@@ -56,7 +56,14 @@ const customTourRequestSchema = Joi.object({
     .allow(null),
 }).required();
 
+
+// 
+const assignAdminSchema = Joi.object({
+  adminId: Joi.string().uuid().required(),
+}).required();
+
 module.exports = {
   packageBasedTourRequestSchema,
   customTourRequestSchema,
+  assignAdminSchema,
 };

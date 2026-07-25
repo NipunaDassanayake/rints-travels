@@ -13,6 +13,7 @@ const {
 const {
   packageBasedTourRequestSchema,
   customTourRequestSchema,
+  assignAdminSchema,
 } = require("./tourRequests.validation");
 
 const router = express.Router();
@@ -55,6 +56,17 @@ router.get(
     USER_ROLES.SYSTEM_ADMIN
   ),
   tourRequestsController.getAllTourRequests
+);
+
+router.patch(
+  "/:id/assign-admin",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(assignAdminSchema),
+  tourRequestsController.assignAdmin
 );
 
 module.exports = router;

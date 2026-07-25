@@ -71,10 +71,26 @@ const getAllTourRequests = asyncHandler(async (req, res) => {
   );
 });
 
+// Additional controller function to assign an admin to a tour request
+const assignAdmin = asyncHandler(async (req, res) => {
+  const tourRequest =
+    await tourRequestsService.assignAdmin(
+      req.params.id,
+      req.body.adminId
+    );
+
+  return sendSuccess(
+    res,
+    "Admin assigned to tour request successfully",
+    tourRequest
+  );
+});
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
   getMyTourRequests,
   getAllTourRequests,
   getTourRequestById,
+  assignAdmin,
 };

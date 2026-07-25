@@ -37,7 +37,6 @@ const findTourRequestsByTouristId = async (touristId) => {
   });
 };
 
-
 // Additional function to find all tour requests with optional filters
 const findAllTourRequests = async ({
   status,
@@ -85,9 +84,22 @@ const findAllTourRequests = async ({
   });
 };
 
+// Additional function to assign an admin to a tour request
+const assignAdminToTourRequest = async (id, adminId) => {
+  return prisma.tourRequest.update({
+    where: {
+      id,
+    },
+    data: {
+      assignedAdminId: adminId,
+    },
+  });
+};
+
 module.exports = {
   createTourRequest,
   findTourRequestById,
   findTourRequestsByTouristId,
   findAllTourRequests,
+  assignAdminToTourRequest,
 };
