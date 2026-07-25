@@ -64,6 +64,16 @@ const updatePackageInclusionSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255).required(),
 }).required();
 
+
+// Package Exclusion Validation Schemas
+const createPackageExclusionSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(255).required(),
+}).required();
+
+const updatePackageExclusionSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(255).required(),
+}).required();
+
 module.exports = {
   createPackageSchema,
   updatePackageSchema,
@@ -73,4 +83,6 @@ module.exports = {
   updatePackageItinerarySchema,
   createPackageInclusionSchema,
   updatePackageInclusionSchema,
+  createPackageExclusionSchema,
+  updatePackageExclusionSchema,
 };

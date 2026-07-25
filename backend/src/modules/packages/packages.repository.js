@@ -203,6 +203,45 @@ const deletePackageInclusion = async (inclusionId) => {
   });
 };
 
+// Package Exclusions
+const createPackageExclusion = async (data) => {
+  return prisma.packageExclusion.create({
+    data,
+  });
+};
+
+const findPackageExclusionById = async (
+  packageId,
+  exclusionId
+) => {
+  return prisma.packageExclusion.findFirst({
+    where: {
+      id: Number(exclusionId),
+      packageId: Number(packageId),
+    },
+  });
+};
+
+const updatePackageExclusion = async (
+  exclusionId,
+  data
+) => {
+  return prisma.packageExclusion.update({
+    where: {
+      id: Number(exclusionId),
+    },
+    data,
+  });
+};
+
+const deletePackageExclusion = async (exclusionId) => {
+  return prisma.packageExclusion.delete({
+    where: {
+      id: Number(exclusionId),
+    },
+  });
+};
+
 module.exports = {
   findPackages,
   countPackages,
@@ -228,4 +267,9 @@ module.exports = {
   findPackageInclusionById,
   updatePackageInclusion,
   deletePackageInclusion,
+
+  createPackageExclusion,
+  findPackageExclusionById,
+  updatePackageExclusion,
+  deletePackageExclusion,
 };
