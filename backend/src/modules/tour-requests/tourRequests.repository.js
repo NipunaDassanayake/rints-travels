@@ -37,8 +37,57 @@ const findTourRequestsByTouristId = async (touristId) => {
   });
 };
 
+
+// Additional function to find all tour requests with optional filters
+const findAllTourRequests = async ({
+  status,
+  requestType,
+  touristId,
+  assignedAdminId,
+}) => {
+  const where = {
+    deletedAt: null,
+  };
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (requestType) {
+    where.requestType = requestType;
+  }
+
+  if (touristId) {
+    where.touristId = touristId;
+  }
+
+  if (assignedAdminId) {
+    where.assignedAdminId = assignedAdminId;
+  }
+
+  return prisma.tourRequest.findMany({
+    where,
+    include: {
+      travelPackage: true,
+      tourist: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+};
+
 module.exports = {
   createTourRequest,
   findTourRequestById,
   findTourRequestsByTouristId,
+  findAllTourRequests,
 };

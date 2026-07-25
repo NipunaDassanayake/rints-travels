@@ -112,9 +112,20 @@ const getTourRequestById = async (
   return tourRequest;
 };
 
+// Additional function to get all tour requests with optional filters
+const getAllTourRequests = async (query) => {
+  return tourRequestsRepository.findAllTourRequests({
+    status: query.status,
+    requestType: query.requestType,
+    touristId: query.touristId,
+    assignedAdminId: query.assignedAdminId,
+  });
+};
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
   getMyTourRequests,
   getTourRequestById,
+  getAllTourRequests,
 };

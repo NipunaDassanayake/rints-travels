@@ -47,4 +47,14 @@ router.get(
   tourRequestsController.getTourRequestById
 );
 
+router.get(
+  "/",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  tourRequestsController.getAllTourRequests
+);
+
 module.exports = router;

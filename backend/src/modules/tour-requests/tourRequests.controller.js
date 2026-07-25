@@ -60,9 +60,21 @@ const getTourRequestById = asyncHandler(async (req, res) => {
   );
 });
 
+const getAllTourRequests = asyncHandler(async (req, res) => {
+  const tourRequests =
+    await tourRequestsService.getAllTourRequests(req.query);
+
+  return sendSuccess(
+    res,
+    "Tour requests retrieved successfully",
+    tourRequests
+  );
+});
+
 module.exports = {
   createPackageBasedRequest,
   createCustomRequest,
   getMyTourRequests,
+  getAllTourRequests,
   getTourRequestById,
 };
