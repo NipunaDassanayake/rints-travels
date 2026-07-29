@@ -33,6 +33,37 @@ const createTourGuideSchema = Joi.object({
   isAvailable: Joi.boolean().default(true),
 }).required();
 
+const updateTourGuideSchema = Joi.object({
+  firstName: Joi.string().trim().min(2).max(100).optional(),
+  lastName: Joi.string().trim().min(2).max(100).optional(),
+  phone: Joi.string().trim().max(30).allow(null, "").optional(),
+
+  bio: Joi.string().trim().allow(null, "").optional(),
+
+  experienceYears: Joi.number().integer().min(0).optional(),
+
+  languages: Joi.array()
+    .items(Joi.string().trim().min(2).max(50))
+    .min(1)
+    .optional(),
+
+  specializations: Joi.array()
+    .items(Joi.string().trim().min(2).max(100))
+    .optional(),
+
+  location: Joi.string().trim().max(150).allow(null, "").optional(),
+
+  dailyRate: Joi.number().positive().allow(null).optional(),
+})
+  .min(1)
+  .required();
+
+const updateTourGuideAvailabilitySchema = Joi.object({
+  isAvailable: Joi.boolean().required(),
+}).required();
+
 module.exports = {
   createTourGuideSchema,
+  updateTourGuideSchema,
+  updateTourGuideAvailabilitySchema,
 };
