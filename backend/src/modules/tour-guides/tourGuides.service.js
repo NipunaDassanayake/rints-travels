@@ -59,8 +59,83 @@ const getTourGuideById = async (id) => {
   return tourGuide;
 };
 
+const updateTourGuide = async (guideId, data) => {
+  const existingGuide =
+    await tourGuidesRepository.findTourGuideById(guideId);
+
+  if (!existingGuide) {
+    throw new NotFoundError("Tour guide not found");
+  }
+
+  const userData = {};
+  const profileData = {};
+
+  // User fields
+  if (data.firstName !== undefined) {
+    userData.firstName = data.firstName;
+  }
+
+  if (data.lastName !== undefined) {
+    userData.lastName = data.lastName;
+  }
+
+  if (data.phone !== undefined) {
+    userData.phone = data.phone || null;
+  }
+
+  // TourGuideProfile fields
+  if (data.bio !== undefined) {
+    profileData.bio = data.bio || null;
+  }
+
+  if (data.experienceYears !== undefined) {
+    profileData.experienceYears = data.experienceYears;
+  }
+
+  if (data.languages !== undefined) {
+    profileData.languages = data.languages;
+  }
+
+  if (data.specializations !== undefined) {
+    profileData.specializations = data.specializations;
+  }
+
+  if (data.location !== undefined) {
+    profileData.location = data.location || null;
+  }
+
+  if (data.dailyRate !== undefined) {
+    profileData.dailyRate = data.dailyRate;
+  }
+
+  return tourGuidesRepository.updateTourGuide(
+    guideId,
+    userData,
+    profileData
+  );
+};
+
+const updateTourGuideAvailability = async (
+  guideId,
+  isAvailable
+) => {
+  const existingGuide =
+    await tourGuidesRepository.findTourGuideById(guideId);
+
+  if (!existingGuide) {
+    throw new NotFoundError("Tour guide not found");
+  }
+
+  return tourGuidesRepository.updateTourGuideAvailability(
+    guideId,
+    isAvailable
+  );
+};
+
 module.exports = {
   createTourGuide,
   getAllTourGuides,
   getTourGuideById,
+  updateTourGuide,
+  updateTourGuideAvailability,
 };
