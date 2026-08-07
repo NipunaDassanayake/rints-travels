@@ -1,6 +1,7 @@
 const express = require("express");
 
 const tourRequestsController = require("./tourRequests.controller");
+const quotationsController = require("../quotations/quotations.controller");
 
 const authenticate = require("../../middlewares/authenticate");
 const authorize = require("../../middlewares/authorize");
@@ -15,10 +16,18 @@ const {
   customTourRequestSchema,
   assignAdminSchema,
   updateTourRequestStatusSchema,
-  adminEditTourRequestSchema
+  adminEditTourRequestSchema,
 } = require("./tourRequests.validation");
 
+const {
+  createQuotationSchema,
+} = require("../quotations/quotations.validation");
+
 const router = express.Router();
+
+/**
+ * Tourist - Create requests
+ */
 
 router.post(
   "/package-based",
@@ -36,6 +45,10 @@ router.post(
   tourRequestsController.createCustomRequest
 );
 
+/**
+ * Tourist - Own requests
+ */
+
 router.get(
   "/me",
   authenticate,
@@ -43,12 +56,30 @@ router.get(
   tourRequestsController.getMyTourRequests
 );
 
-router.get(
-  "/:id",
+/**
+ * Quotations linked to a tour request
+ */
+
+router.post(
+  "/:tourRequestId/quotations",
   authenticate,
-  authorize(USER_ROLES.TOURIST),
-  tourRequestsController.getTourRequestById
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(createQuotationSchema),
+  quotationsController.createQuotation
 );
+
+router.get(
+  "/:tourRequestId/quotations",
+  authenticate,
+  quotationsController.getTourRequestQuotations
+);
+
+/**
+ * Admin - Tour Request management
+ */
 
 router.get(
   "/",
@@ -91,6 +122,21 @@ router.patch(
   ),
   validateRequest(adminEditTourRequestSchema),
   tourRequestsController.adminEditTourRequest
+);
+
+/**
+ * Tourist owner or Admin - Request details
+ */
+
+router.get(
+  "/:id",
+  authenticate,
+  authorize(
+    USER_ROLES.TOURIST,
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  tourRequestsController.getTourRequestById
 );
 
 module.exports = router;
