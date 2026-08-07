@@ -71,9 +71,88 @@ const findTourGuideById = async (id) => {
   });
 };
 
+const updateTourGuide = async (
+  guideId,
+  userData,
+  profileData
+) => {
+  return prisma.$transaction(async (tx) => {
+    const guide = await tx.tourGuideProfile.findFirst({
+      where: {
+        id: guideId,
+        deletedAt: null,
+      },
+    });
+
+    if (!guide) {
+      return null;
+    }
+
+    if (Object.keys(userData).length > 0) {
+      await tx.user.update({
+        where: {
+          id: guide.userId,
+        },
+        data: userData,
+      });
+    }
+
+    await tx.tourGuideProfile.update({
+      where: {
+        id: guideId,
+      },
+      data: profileData,
+    });
+
+    return tx.tourGuideProfile.findUnique({
+      where: {
+        id: guideId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+  });
+};
+
+const updateTourGuideAvailability = async (
+  guideId,
+  isAvailable
+) => {
+  return prisma.tourGuideProfile.update({
+    where: {
+      id: guideId,
+    },
+    data: {
+      isAvailable,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+  });
+};
+
 module.exports = {
   findUserByEmail,
   createTourGuide,
   findAllTourGuides,
   findTourGuideById,
+  updateTourGuide,
+  updateTourGuideAvailability,
 };
