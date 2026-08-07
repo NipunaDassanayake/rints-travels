@@ -18,6 +18,8 @@ const {
 
 const {
   createTourGuideSchema,
+  updateTourGuideSchema,
+  updateTourGuideAvailabilitySchema
 } = require("./tourGuides.validation");
 
 const router = express.Router();
@@ -43,5 +45,37 @@ router.get(
 router.get(
   "/:id",
   tourGuidesController.getTourGuideById
+);
+
+router.patch(
+  "/:id",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updateTourGuideSchema),
+  tourGuidesController.updateTourGuide
+);
+
+router.patch(
+  "/:id/availability",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updateTourGuideAvailabilitySchema),
+  tourGuidesController.updateTourGuideAvailability
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  tourGuidesController.deleteTourGuide
 );
 module.exports = router;

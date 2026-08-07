@@ -148,6 +148,18 @@ const updateTourGuideAvailability = async (
   });
 };
 
+const softDeleteTourGuide = async (guideId) => {
+  return prisma.tourGuideProfile.update({
+    where: {
+      id: guideId,
+    },
+    data: {
+      isAvailable: false,
+      deletedAt: new Date(),
+    },
+  });
+};
+
 module.exports = {
   findUserByEmail,
   createTourGuide,
@@ -155,4 +167,5 @@ module.exports = {
   findTourGuideById,
   updateTourGuide,
   updateTourGuideAvailability,
+  softDeleteTourGuide,
 };

@@ -132,10 +132,24 @@ const updateTourGuideAvailability = async (
   );
 };
 
+const deleteTourGuide = async (guideId) => {
+  const existingGuide =
+    await tourGuidesRepository.findTourGuideById(guideId);
+
+  if (!existingGuide) {
+    throw new NotFoundError("Tour guide not found");
+  }
+
+  return tourGuidesRepository.softDeleteTourGuide(
+    guideId
+  );
+};
+
 module.exports = {
   createTourGuide,
   getAllTourGuides,
   getTourGuideById,
   updateTourGuide,
   updateTourGuideAvailability,
+  deleteTourGuide,
 };

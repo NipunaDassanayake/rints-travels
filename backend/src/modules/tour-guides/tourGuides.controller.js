@@ -38,8 +38,53 @@ const getTourGuideById = asyncHandler(async (req, res) => {
   );
 });
 
+
+const updateTourGuide = asyncHandler(async (req, res) => {
+  const tourGuide =
+    await tourGuidesService.updateTourGuide(
+      req.params.id,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Tour guide updated successfully",
+    tourGuide
+  );
+});
+
+const updateTourGuideAvailability = asyncHandler(
+  async (req, res) => {
+    const tourGuide =
+      await tourGuidesService.updateTourGuideAvailability(
+        req.params.id,
+        req.body.isAvailable
+      );
+
+    return sendSuccess(
+      res,
+      "Tour guide availability updated successfully",
+      tourGuide
+    );
+  }
+);
+
+const deleteTourGuide = asyncHandler(async (req, res) => {
+  await tourGuidesService.deleteTourGuide(
+    req.params.id
+  );
+
+  return sendSuccess(
+    res,
+    "Tour guide deleted successfully"
+  );
+});
+
 module.exports = {
   createTourGuide,
   getAllTourGuides,
   getTourGuideById,
+  updateTourGuide,
+  updateTourGuideAvailability,
+  deleteTourGuide,
 };
