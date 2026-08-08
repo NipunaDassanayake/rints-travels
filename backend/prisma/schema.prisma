@@ -57,6 +57,22 @@ enum QuotationStatus {
   SUPERSEDED
 }
 
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  CASH
+  OTHER
+}
+
 model TourRequest {
   id               String  @id @default(uuid()) @db.Uuid
   touristId        String  @map("tourist_id") @db.Uuid
@@ -215,6 +231,7 @@ model User {
 
   tourRequests     TourRequest[]     @relation("TourRequestTourist")
   tourGuideProfile TourGuideProfile?
+  payments         Payment[]
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -344,6 +361,7 @@ model TourQuotation {
   itineraries QuotationItinerary[]
   inclusions  QuotationInclusion[]
   exclusions  QuotationExclusion[]
+  payments    Payment[]
 
   @@unique([tourRequestId, revisionNumber])
   @@index([tourRequestId])
@@ -388,4 +406,33 @@ model QuotationExclusion {
 
   @@index([quotationId])
   @@map("quotation_exclusions")
+}
+
+model Payment {
+  id          String @id @default(uuid()) @db.Uuid
+  quotationId String @map("quotation_id") @db.Uuid
+  touristId   String @map("tourist_id") @db.Uuid
+
+  paymentReference String  @unique @map("payment_reference") @db.VarChar(100)
+  gatewayReference String? @unique @map("gateway_reference") @db.VarChar(255)
+
+  amount   Decimal @db.Decimal(12, 2)
+  currency String  @default("USD") @db.VarChar(10)
+
+  paymentMethod PaymentMethod? @map("payment_method")
+  status        PaymentStatus  @default(PENDING)
+
+  failureReason String?   @map("failure_reason")
+  paidAt        DateTime? @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  quotation TourQuotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  tourist   User          @relation(fields: [touristId], references: [id], onDelete: Restrict)
+
+  @@index([quotationId])
+  @@index([touristId])
+  @@index([status])
+  @@map("payments")
 }
