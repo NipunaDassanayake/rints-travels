@@ -73,6 +73,13 @@ enum PaymentMethod {
   OTHER
 }
 
+enum BookingStatus {
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 model TourRequest {
   id               String  @id @default(uuid()) @db.Uuid
   touristId        String  @map("tourist_id") @db.Uuid
@@ -109,6 +116,7 @@ model TourRequest {
   travelPackage TravelPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   quotations TourQuotation[]
+  booking    Booking?
 
   @@index([touristId])
   @@index([packageId])
@@ -232,6 +240,7 @@ model User {
   tourRequests     TourRequest[]     @relation("TourRequestTourist")
   tourGuideProfile TourGuideProfile?
   payments         Payment[]
+  bookings         Booking[]
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -362,6 +371,7 @@ model TourQuotation {
   inclusions  QuotationInclusion[]
   exclusions  QuotationExclusion[]
   payments    Payment[]
+  booking     Booking?
 
   @@unique([tourRequestId, revisionNumber])
   @@index([tourRequestId])
@@ -430,9 +440,45 @@ model Payment {
 
   quotation TourQuotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
   tourist   User          @relation(fields: [touristId], references: [id], onDelete: Restrict)
+  booking   Booking?
 
   @@index([quotationId])
   @@index([touristId])
   @@index([status])
   @@map("payments")
+}
+
+model Booking {
+  id            String @id @default(uuid()) @db.Uuid
+  tourRequestId String @unique @map("tour_request_id") @db.Uuid
+  quotationId   String @unique @map("quotation_id") @db.Uuid
+  paymentId     String @unique @map("payment_id") @db.Uuid
+  touristId     String @map("tourist_id") @db.Uuid
+
+  bookingReference String @unique @map("booking_reference") @db.VarChar(100)
+
+  status BookingStatus @default(CONFIRMED)
+
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  totalAmount Decimal @map("total_amount") @db.Decimal(12, 2)
+  currency    String  @default("USD") @db.VarChar(10)
+
+  confirmedAt DateTime  @default(now()) @map("confirmed_at")
+  completedAt DateTime? @map("completed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tourRequest TourRequest   @relation(fields: [tourRequestId], references: [id], onDelete: Restrict)
+  quotation   TourQuotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  payment     Payment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  tourist     User          @relation(fields: [touristId], references: [id], onDelete: Restrict)
+
+  @@index([touristId])
+  @@index([status])
+  @@index([startDate])
+  @@map("bookings")
 }
