@@ -253,26 +253,10 @@ const acceptQuotation = async (
     );
   }
 
-  await quotationsRepository.supersedeOtherQuotations(
-    quotation.tourRequestId,
-    quotationId
-  );
-
-  const accepted =
-    await quotationsRepository.updateQuotationStatus(
-      quotationId,
-      {
-        status: "ACCEPTED",
-        respondedAt: new Date(),
-      }
-    );
-
-  await tourRequestsRepository.updateTourRequestStatus(
-    quotation.tourRequestId,
-    "ACCEPTED"
-  );
-
-  return accepted;
+  return quotationsRepository.acceptQuotationTransaction({
+  quotationId,
+  tourRequestId: quotation.tourRequestId,
+});
 };
 
 const rejectQuotation = async (

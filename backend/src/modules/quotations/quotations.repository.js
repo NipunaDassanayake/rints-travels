@@ -155,6 +155,51 @@ const supersedeOtherQuotations = async (
   });
 };
 
+const acceptQuotationTransaction = async ({
+  quotationId,
+  tourRequestId,
+}) => {
+  return prisma.$transaction(async (tx) => {
+    await tx.tourQuotation.updateMany({
+      where: {
+        tourRequestId,
+        id: {
+          not: quotationId,
+        },
+        status: {
+          in: ["DRAFT", "SENT"],
+        },
+      },
+      data: {
+        status: "SUPERSEDED",
+      },
+    });
+
+    const acceptedQuotation =
+      await tx.tourQuotation.update({
+        where: {
+          id: quotationId,
+        },
+        data: {
+          status: "ACCEPTED",
+          respondedAt: new Date(),
+        },
+        include: quotationInclude,
+      });
+
+    await tx.tourRequest.update({
+      where: {
+        id: tourRequestId,
+      },
+      data: {
+        status: "ACCEPTED",
+      },
+    });
+
+    return acceptedQuotation;
+  });
+};
+
 module.exports = {
   findQuotationById,
   findQuotationsByTourRequest,
@@ -163,4 +208,5 @@ module.exports = {
   updateQuotation,
   updateQuotationStatus,
   supersedeOtherQuotations,
+  acceptQuotationTransaction,
 };
