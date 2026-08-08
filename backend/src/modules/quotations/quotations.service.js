@@ -305,6 +305,102 @@ const rejectQuotation = async (
   return rejected;
 };
 
+const createRevision = async (quotationId, data) => {
+  const quotation =
+    await quotationsRepository.findQuotationById(
+      quotationId
+    );
+
+  if (!quotation) {
+    throw new NotFoundError("Quotation not found");
+  }
+
+  if (
+    !["SENT", "REJECTED"].includes(quotation.status)
+  ) {
+    throw new BadRequestError(
+      "Only sent or rejected quotations can be revised"
+    );
+  }
+
+  const latestRevision =
+    await quotationsRepository.getLatestRevisionNumber(
+      quotation.tourRequestId
+    );
+
+  await quotationsRepository.updateQuotationStatus(
+    quotation.id,
+    {
+      status: "SUPERSEDED",
+    }
+  );
+
+  return quotationsRepository.createQuotation({
+    ...data,
+
+    tourRequestId: quotation.tourRequestId,
+
+    guideId:
+      data.guideId !== undefined
+        ? data.guideId
+        : quotation.guideId,
+
+    title: data.title ?? quotation.title,
+    description:
+      data.description ?? quotation.description,
+
+    startDate: data.startDate ?? quotation.startDate,
+    endDate: data.endDate ?? quotation.endDate,
+
+    adultCount:
+      data.adultCount ?? quotation.adultCount,
+
+    childCount:
+      data.childCount ?? quotation.childCount,
+
+    subtotal: data.subtotal ?? quotation.subtotal,
+
+    discountAmount:
+      data.discountAmount ?? quotation.discountAmount,
+
+    taxAmount:
+      data.taxAmount ?? quotation.taxAmount,
+
+    totalAmount:
+      data.totalAmount ?? quotation.totalAmount,
+
+    currency: data.currency ?? quotation.currency,
+
+    notes: data.notes ?? quotation.notes,
+
+    termsConditions:
+      data.termsConditions ??
+      quotation.termsConditions,
+
+    validUntil:
+      data.validUntil ?? quotation.validUntil,
+
+    itineraries:
+      data.itineraries ??
+      quotation.itineraries.map((item) => ({
+        dayNumber: item.dayNumber,
+        title: item.title,
+        description: item.description,
+      })),
+
+    inclusions:
+      data.inclusions ??
+      quotation.inclusions.map((item) => item.title),
+
+    exclusions:
+      data.exclusions ??
+      quotation.exclusions.map((item) => item.title),
+
+    revisionNumber: latestRevision + 1,
+    quotationNumber: generateQuotationNumber(),
+  });
+};
+
 module.exports = {
   createQuotation,
   getQuotationsByTourRequest,
@@ -313,4 +409,5 @@ module.exports = {
   sendQuotation,
   acceptQuotation,
   rejectQuotation,
+  createRevision,
 };

@@ -65,4 +65,15 @@ router.post(
   quotationsController.rejectQuotation
 );
 
+router.post(
+  "/:id/revisions",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  validateRequest(updateQuotationSchema),
+  quotationsController.createRevision
+);
+
 module.exports = router;

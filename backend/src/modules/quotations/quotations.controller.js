@@ -105,6 +105,21 @@ const rejectQuotation = asyncHandler(async (req, res) => {
   );
 });
 
+const createRevision = asyncHandler(async (req, res) => {
+  const quotation =
+    await quotationsService.createRevision(
+      req.params.id,
+      req.body
+    );
+
+  return sendSuccess(
+    res,
+    "Quotation revision created successfully",
+    quotation,
+    HTTP_STATUS.CREATED
+  );
+});
+
 module.exports = {
   createQuotation,
   getTourRequestQuotations,
@@ -113,4 +128,5 @@ module.exports = {
   sendQuotation,
   acceptQuotation,
   rejectQuotation,
+  createRevision,
 };
