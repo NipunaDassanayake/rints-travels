@@ -6,6 +6,9 @@ const paymentsRepository =
 const quotationsRepository =
   require("../quotations/quotations.repository");
 
+const bookingsService =
+  require("../bookings/bookings.service");
+
 const {
   NotFoundError,
   BadRequestError,
@@ -54,9 +57,10 @@ const initiatePayment = async (
   }
 
   const successfulPayment =
-    await paymentsRepository.findSuccessfulPaymentByQuotationId(
-      quotation.id
-    );
+    await paymentsRepository
+      .findSuccessfulPaymentByQuotationId(
+        quotation.id
+      );
 
   if (successfulPayment) {
     throw new ConflictError(
@@ -65,9 +69,10 @@ const initiatePayment = async (
   }
 
   const activePayment =
-    await paymentsRepository.findActivePaymentByQuotationId(
-      quotation.id
-    );
+    await paymentsRepository
+      .findActivePaymentByQuotationId(
+        quotation.id
+      );
 
   if (activePayment) {
     return activePayment;
@@ -89,9 +94,10 @@ const initiatePayment = async (
 };
 
 const getMyPayments = async (touristId) => {
-  return paymentsRepository.findPaymentsByTouristId(
-    touristId
-  );
+  return paymentsRepository
+    .findPaymentsByTouristId(
+      touristId
+    );
 };
 
 const getPaymentById = async (
@@ -140,11 +146,21 @@ const markPaymentSuccessful = async (
     );
   }
 
-  /*
+  /**
    * Idempotency:
-   * Gateway may send the same SUCCESS callback more than once.
+   * The payment gateway may send the same
+   * SUCCESS callback more than once.
    */
   if (payment.status === "SUCCESS") {
+    /*
+     * Make sure a booking exists even if a previous
+     * request updated the payment but failed before
+     * booking creation.
+     */
+    await bookingsService.createBookingFromPayment(
+      payment.id
+    );
+
     return payment;
   }
 
@@ -158,15 +174,22 @@ const markPaymentSuccessful = async (
     );
   }
 
-  return paymentsRepository.updatePaymentStatus(
-    paymentId,
-    {
-      status: "SUCCESS",
-      gatewayReference,
-      failureReason: null,
-      paidAt: new Date(),
-    }
+  const successfulPayment =
+    await paymentsRepository.updatePaymentStatus(
+      paymentId,
+      {
+        status: "SUCCESS",
+        gatewayReference,
+        failureReason: null,
+        paidAt: new Date(),
+      }
+    );
+
+  await bookingsService.createBookingFromPayment(
+    successfulPayment.id
   );
+
+  return successfulPayment;
 };
 
 const markPaymentFailed = async (
@@ -184,9 +207,9 @@ const markPaymentFailed = async (
     );
   }
 
-  /*
-   * Do not allow a late FAILED callback to overwrite
-   * an already successful payment.
+  /**
+   * Never allow a late FAILED callback
+   * to overwrite a successful payment.
    */
   if (payment.status === "SUCCESS") {
     return payment;
