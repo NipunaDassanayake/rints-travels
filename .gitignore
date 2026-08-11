@@ -1,6 +1,11 @@
 # Node
 node_modules/
+**/node_modules/
+
+# Environment
 .env
+.env.*
+!.env.example
 
 # Logs
 *.log
@@ -8,6 +13,12 @@ node_modules/
 # Build
 dist/
 build/
+**/dist/
+**/build/
+
+# Next.js
+**/.next/
+**/out/
 
 # OS
 .DS_Store
@@ -16,4 +27,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Prisma generated
 /generated/prisma
+**/generated/prisma
