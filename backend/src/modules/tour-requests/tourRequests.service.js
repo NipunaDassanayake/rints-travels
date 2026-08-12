@@ -1,6 +1,6 @@
 const tourRequestsRepository = require("./tourRequests.repository");
 const packagesRepository = require("../packages/packages.repository");
-const { NotFoundError, ForbiddenError } = require("../../utils/AppError");
+const { NotFoundError, ForbiddenError,BadRequestError } = require("../../utils/AppError");
 const authRepository = require("../auth/repositories/auth.repository");
 const tourGuidesRepository = require("../tour-guides/tourGuides.repository");
 
