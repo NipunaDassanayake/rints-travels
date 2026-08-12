@@ -10,6 +10,8 @@ import {
   TourGuideCard,
 } from "@/features/tour-guides/components/tour-guide-card";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Sri Lanka Tour Guides",
 

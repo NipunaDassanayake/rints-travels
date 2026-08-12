@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 import { buttonVariants } from "@/components/ui/button";
 
 export default function HomePage() {
