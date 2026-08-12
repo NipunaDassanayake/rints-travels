@@ -4,13 +4,17 @@ import { useEffect } from "react";
 import {
   usePathname,
   useRouter,
-  useSearchParams,
 } from "next/navigation";
 
 import { useAuth } from "@/providers/auth-provider";
-import { getDashboardPath } from "@/features/auth/auth.utils";
 
-import type { UserRole } from "@/features/auth/auth.types";
+import {
+  getDashboardPath,
+} from "@/features/auth/auth.utils";
+
+import type {
+  UserRole,
+} from "@/features/auth/auth.types";
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -23,7 +27,6 @@ export function RoleGuard({
 }: RoleGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const {
     user,
@@ -38,12 +41,10 @@ export function RoleGuard({
 
     if (!isAuthenticated || !user) {
       const queryString =
-        searchParams.toString();
+        window.location.search;
 
       const currentUrl =
-        queryString
-          ? `${pathname}?${queryString}`
-          : pathname;
+        `${pathname}${queryString}`;
 
       router.replace(
         `/login?returnUrl=${encodeURIComponent(
@@ -54,9 +55,15 @@ export function RoleGuard({
       return;
     }
 
-    if (!allowedRoles.includes(user.role)) {
+    if (
+      !allowedRoles.includes(
+        user.role
+      )
+    ) {
       router.replace(
-        getDashboardPath(user.role)
+        getDashboardPath(
+          user.role
+        )
       );
     }
   }, [
@@ -66,7 +73,6 @@ export function RoleGuard({
     allowedRoles,
     router,
     pathname,
-    searchParams,
   ]);
 
   if (isLoading) {
@@ -81,7 +87,9 @@ export function RoleGuard({
 
   if (
     !user ||
-    !allowedRoles.includes(user.role)
+    !allowedRoles.includes(
+      user.role
+    )
   ) {
     return null;
   }

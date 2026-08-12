@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -48,7 +45,6 @@ type LoginFormValues =
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const { login } = useAuth();
 
@@ -83,11 +79,26 @@ export default function LoginPage() {
       const authenticatedUser =
         await login(data);
 
-      const returnUrl =
-        searchParams.get(
-          "returnUrl"
+      /*
+       * Read returnUrl only in the browser.
+       *
+       * Example:
+       * /login?returnUrl=%2Ftourist%2Frequests%2Fnew%3FpackageId%3D7
+       */
+      const params =
+        new URLSearchParams(
+          window.location.search
         );
 
+      const returnUrl =
+        params.get("returnUrl");
+
+      /*
+       * Only allow internal application paths.
+       *
+       * This prevents redirecting users
+       * to arbitrary external websites.
+       */
       if (
         returnUrl &&
         returnUrl.startsWith("/")
@@ -96,6 +107,10 @@ export default function LoginPage() {
         return;
       }
 
+      /*
+       * Normal login with no returnUrl:
+       * send user to their role dashboard.
+       */
       router.replace(
         getDashboardPath(
           authenticatedUser.role
