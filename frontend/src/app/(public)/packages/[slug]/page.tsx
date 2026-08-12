@@ -1,8 +1,13 @@
-import type { Metadata } from "next";
+import type {
+  Metadata,
+} from "next";
 
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+
+import {
+  notFound,
+} from "next/navigation";
 
 import {
   Check,
@@ -25,6 +30,30 @@ type PackagePageProps = {
   }>;
 };
 
+const getValidPrimaryImage = (
+  images: {
+    imageUrl: string;
+    isPrimary: boolean;
+    altText?: string | null;
+  }[]
+) => {
+  return (
+    images.find(
+      (image) =>
+        image.isPrimary &&
+        !image.imageUrl.includes(
+          "example.com"
+        )
+    ) ??
+    images.find(
+      (image) =>
+        !image.imageUrl.includes(
+          "example.com"
+        )
+    )
+  );
+};
+
 export async function generateMetadata({
   params,
 }: PackagePageProps): Promise<Metadata> {
@@ -35,17 +64,19 @@ export async function generateMetadata({
 
   if (!travelPackage) {
     return {
-      title: "Package Not Found",
+      title:
+        "Package Not Found",
     };
   }
 
   const primaryImage =
-    travelPackage.images.find(
-      (image) => image.isPrimary
-    ) ?? travelPackage.images[0];
+    getValidPrimaryImage(
+      travelPackage.images
+    );
 
   return {
-    title: travelPackage.title,
+    title:
+      travelPackage.title,
 
     description:
       travelPackage.description.slice(
@@ -54,7 +85,8 @@ export async function generateMetadata({
       ),
 
     openGraph: {
-      title: travelPackage.title,
+      title:
+        travelPackage.title,
 
       description:
         travelPackage.description.slice(
@@ -63,7 +95,9 @@ export async function generateMetadata({
         ),
 
       images: primaryImage
-        ? [primaryImage.imageUrl]
+        ? [
+            primaryImage.imageUrl,
+          ]
         : [],
     },
   };
@@ -82,15 +116,16 @@ export default async function PackagePage({
   }
 
   const primaryImage =
-    travelPackage.images.find(
-      (image) => image.isPrimary
-    ) ?? travelPackage.images[0];
+    getValidPrimaryImage(
+      travelPackage.images
+    );
 
   const sortedItineraries = [
     ...travelPackage.itineraries,
   ].sort(
     (a, b) =>
-      a.dayNumber - b.dayNumber
+      a.dayNumber -
+      b.dayNumber
   );
 
   return (
@@ -101,7 +136,9 @@ export default async function PackagePage({
             {primaryImage ? (
               <div className="relative aspect-[4/3] w-full overflow-hidden">
                 <Image
-                  src={primaryImage.imageUrl}
+                  src={
+                    primaryImage.imageUrl
+                  }
                   alt={
                     primaryImage.altText ??
                     travelPackage.title
@@ -124,25 +161,34 @@ export default async function PackagePage({
             </p>
 
             <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
-              {travelPackage.title}
+              {
+                travelPackage.title
+              }
             </h1>
 
             <div className="mt-5 flex flex-wrap gap-5 text-muted-foreground">
               <div className="flex items-center gap-2">
                 <MapPin className="size-5" />
 
-                {travelPackage.destination}
+                {
+                  travelPackage.destination
+                }
               </div>
 
               <div className="flex items-center gap-2">
                 <Clock3 className="size-5" />
 
-                {travelPackage.durationDays} days
+                {
+                  travelPackage.durationDays
+                }{" "}
+                days
               </div>
             </div>
 
             <p className="mt-6 leading-7 text-muted-foreground">
-              {travelPackage.description}
+              {
+                travelPackage.description
+              }
             </p>
 
             <div className="mt-8">
@@ -151,26 +197,34 @@ export default async function PackagePage({
               </p>
 
               <p className="text-3xl font-bold">
-                ${travelPackage.price}
+                $
+                {
+                  travelPackage.price
+                }
               </p>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href={`/tourist/requests/new?packageId=${travelPackage.id}`}
-                className={buttonVariants({
-                  size: "lg",
-                })}
+                className={buttonVariants(
+                  {
+                    size: "lg",
+                  }
+                )}
               >
                 Customize this tour
               </Link>
 
               <Link
                 href="/packages"
-                className={buttonVariants({
-                  variant: "outline",
-                  size: "lg",
-                })}
+                className={buttonVariants(
+                  {
+                    variant:
+                      "outline",
+                    size: "lg",
+                  }
+                )}
               >
                 Explore packages
               </Link>
@@ -179,7 +233,8 @@ export default async function PackagePage({
         </div>
       </section>
 
-      {sortedItineraries.length > 0 && (
+      {sortedItineraries.length >
+        0 && (
         <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
           <h2 className="text-3xl font-bold">
             Your journey
@@ -189,20 +244,29 @@ export default async function PackagePage({
             {sortedItineraries.map(
               (item) => (
                 <div
-                  key={item.id}
+                  key={
+                    item.id
+                  }
                   className="grid gap-4 border-l-2 pl-6 sm:grid-cols-[100px_1fr]"
                 >
                   <p className="font-semibold text-primary">
-                    Day {item.dayNumber}
+                    Day{" "}
+                    {
+                      item.dayNumber
+                    }
                   </p>
 
                   <div>
                     <h3 className="font-semibold">
-                      {item.title}
+                      {
+                        item.title
+                      }
                     </h3>
 
                     <p className="mt-2 text-muted-foreground">
-                      {item.description}
+                      {
+                        item.description
+                      }
                     </p>
                   </div>
                 </div>
@@ -216,20 +280,25 @@ export default async function PackagePage({
         <div className="mx-auto grid max-w-5xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2">
           <div>
             <h2 className="text-2xl font-bold">
-              What&apos;s included
+              What&apos;s
+              included
             </h2>
 
             <div className="mt-6 space-y-3">
               {travelPackage.inclusions.map(
                 (item) => (
                   <div
-                    key={item.id}
+                    key={
+                      item.id
+                    }
                     className="flex gap-3"
                   >
                     <Check className="mt-0.5 size-5 shrink-0 text-primary" />
 
                     <span>
-                      {item.title}
+                      {
+                        item.title
+                      }
                     </span>
                   </div>
                 )
@@ -239,20 +308,25 @@ export default async function PackagePage({
 
           <div>
             <h2 className="text-2xl font-bold">
-              What&apos;s not included
+              What&apos;s
+              not included
             </h2>
 
             <div className="mt-6 space-y-3">
               {travelPackage.exclusions.map(
                 (item) => (
                   <div
-                    key={item.id}
+                    key={
+                      item.id
+                    }
                     className="flex gap-3"
                   >
                     <X className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
                     <span>
-                      {item.title}
+                      {
+                        item.title
+                      }
                     </span>
                   </div>
                 )
@@ -262,33 +336,45 @@ export default async function PackagePage({
         </div>
       </section>
 
-      {travelPackage.faqs.length > 0 && (
+      {travelPackage.faqs.length >
+        0 && (
         <section className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
           <h2 className="text-3xl font-bold">
-            Frequently asked questions
+            Frequently asked
+            questions
           </h2>
 
           <div className="mt-8 divide-y border-y">
-            {[...travelPackage.faqs]
+            {[
+              ...travelPackage.faqs,
+            ]
               .sort(
                 (a, b) =>
                   a.displayOrder -
                   b.displayOrder
               )
-              .map((faq) => (
-                <div
-                  key={faq.id}
-                  className="py-6"
-                >
-                  <h3 className="font-semibold">
-                    {faq.question}
-                  </h3>
+              .map(
+                (faq) => (
+                  <div
+                    key={
+                      faq.id
+                    }
+                    className="py-6"
+                  >
+                    <h3 className="font-semibold">
+                      {
+                        faq.question
+                      }
+                    </h3>
 
-                  <p className="mt-2 text-muted-foreground">
-                    {faq.answer}
-                  </p>
-                </div>
-              ))}
+                    <p className="mt-2 text-muted-foreground">
+                      {
+                        faq.answer
+                      }
+                    </p>
+                  </div>
+                )
+              )}
           </div>
         </section>
       )}
