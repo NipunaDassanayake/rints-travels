@@ -62,10 +62,12 @@ const deletePackage = async (id) => {
 
 //find package by slug
 const findPackageBySlug = async (slug) => {
-  return prisma.travelPackage.findUnique({
+  return prisma.travelPackage.findFirst({
     where: {
       slug,
+      deletedAt: null,
     },
+    include: packageInclude,
   });
 };
 

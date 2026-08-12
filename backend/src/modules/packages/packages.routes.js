@@ -262,4 +262,9 @@ router.delete(
   packagesController.deletePackageFaq
 );
 
+router.get(
+  "/slug/:slug",
+  packagesController.getPackageBySlug
+);
+
 module.exports = router;

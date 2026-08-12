@@ -413,6 +413,20 @@ const deletePackageFaq = async (
   return packagesRepository.deletePackageFaq(faqId);
 };
 
+
+const getPackageBySlug = async (slug) => {
+  const travelPackage =
+    await packagesRepository.findPackageBySlug(slug);
+
+  if (!travelPackage) {
+    throw new NotFoundError(
+      "Travel package not found"
+    );
+  }
+
+  return travelPackage;
+};
+
 module.exports = {
   getAllPackages,
   createPackage,
@@ -422,6 +436,7 @@ module.exports = {
   addPackageImage,
   updatePackageImage,
   deletePackageImage,
+  getPackageBySlug,
 
   addPackageItinerary,
   updatePackageItinerary,

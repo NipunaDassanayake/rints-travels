@@ -268,10 +268,30 @@ const deletePackageFaq = asyncHandler(async (req, res) => {
   );
 });
 
+
+const getPackageBySlug = asyncHandler(async (req, res) => {
+  const travelPackage =
+    await packagesService.getPackageBySlug(
+      req.params.slug
+    );
+
+  const response =
+    packageMapper.toPackageResponseDto(
+      travelPackage
+    );
+
+  return sendSuccess(
+    res,
+    "Travel package retrieved successfully",
+    response
+  );
+});
+
 module.exports = {
   getAllPackages,
   createPackage,
   getPackageById,
+  getPackageBySlug,
   updatePackage,
   deletePackage,
 
