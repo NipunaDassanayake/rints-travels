@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
 import { useAuth } from "@/providers/auth-provider";
 import { getDashboardPath } from "@/features/auth/auth.utils";
@@ -18,6 +22,8 @@ export function RoleGuard({
   allowedRoles,
 }: RoleGuardProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const {
     user,
@@ -31,7 +37,20 @@ export function RoleGuard({
     }
 
     if (!isAuthenticated || !user) {
-      router.replace("/login");
+      const queryString =
+        searchParams.toString();
+
+      const currentUrl =
+        queryString
+          ? `${pathname}?${queryString}`
+          : pathname;
+
+      router.replace(
+        `/login?returnUrl=${encodeURIComponent(
+          currentUrl
+        )}`
+      );
+
       return;
     }
 
@@ -46,6 +65,8 @@ export function RoleGuard({
     isLoading,
     allowedRoles,
     router,
+    pathname,
+    searchParams,
   ]);
 
   if (isLoading) {
