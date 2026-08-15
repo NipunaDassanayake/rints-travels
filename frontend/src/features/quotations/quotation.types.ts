@@ -61,3 +61,40 @@ export interface Quotation {
   inclusions: QuotationItem[];
   exclusions: QuotationItem[];
 }
+
+export interface CreateQuotationItineraryItem {
+  dayNumber: number;
+  title: string;
+  description: string;
+}
+
+export interface CreateQuotationPayload {
+  guideId?: string | null;
+
+  title: string;
+  description?: string | null;
+
+  startDate: string;
+  endDate: string;
+
+  adultCount: number;
+  childCount: number;
+
+  subtotal: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  totalAmount: number;
+
+  currency: string;
+
+  notes?: string | null;
+  termsConditions?: string | null;
+
+  validUntil?: string | null;
+
+  itineraries?: CreateQuotationItineraryItem[];
+
+  inclusions?: string[];
+
+  exclusions?: string[];
+}

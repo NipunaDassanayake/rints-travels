@@ -28,9 +28,15 @@ import { getTourRequestById } from "@/features/tour-requests/tour-request.api";
 
 import { updateTourRequestStatus } from "@/features/tour-requests/admin-tour-request.api";
 
-import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
+import { getTourRequestQuotations } from "@/features/quotations/quotation.api";
+
+import { AdminQuotationCard } from "@/features/quotations/components/admin-quotation-card";
+
+import { CreateQuotationForm } from "@/features/quotations/components/create-quotation-form";
 
 import { AdminEditTourRequestDialog } from "@/features/tour-requests/components/admin-edit-tour-request-dialog";
+
+import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -69,6 +75,18 @@ export default function AdminTourRequestDetailsPage() {
     queryKey: ["admin", "tour-request", requestId],
 
     queryFn: () => getTourRequestById(requestId),
+
+    enabled: Boolean(requestId),
+  });
+
+  const {
+    data: quotations,
+    isLoading: areQuotationsLoading,
+    isError: areQuotationsError,
+  } = useQuery({
+    queryKey: ["tour-request", requestId, "quotations"],
+
+    queryFn: () => getTourRequestQuotations(requestId),
 
     enabled: Boolean(requestId),
   });
@@ -373,6 +391,41 @@ export default function AdminTourRequestDetailsPage() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Quotations</CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {areQuotationsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderCircle className="size-4 animate-spin" />
+                  Loading quotations...
+                </div>
+              ) : areQuotationsError ? (
+                <p className="text-sm text-destructive">
+                  Unable to load quotations.
+                </p>
+              ) : quotations && quotations.length > 0 ? (
+                <div className="space-y-4">
+                  {quotations.map((quotation) => (
+                    <AdminQuotationCard
+                      key={quotation.id}
+                      quotation={quotation}
+                      requestId={requestId}
+                    />
+                  ))}
+                </div>
+              ) : request.status === "READY_FOR_QUOTATION" ? (
+                <CreateQuotationForm request={request} requestId={requestId} />
+              ) : (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  No quotations have been created for this request yet.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <aside className="space-y-6">
@@ -459,20 +512,41 @@ export default function AdminTourRequestDetailsPage() {
 
               {request.status === "READY_FOR_QUOTATION" && (
                 <p className="text-sm leading-6 text-muted-foreground">
-                  This request is ready for quotation. Quotation creation will
-                  be added next.
+                  This request is ready for quotation. Create or manage the
+                  quotation from the Quotations section.
                 </p>
               )}
 
-              {[
-                "QUOTATION_SENT",
-                "ACCEPTED",
-                "REJECTED",
-                "CANCELLED",
-                "BOOKED",
-              ].includes(request.status) && (
+              {request.status === "QUOTATION_SENT" && (
                 <p className="text-sm leading-6 text-muted-foreground">
-                  No manual status action is available for this stage.
+                  The quotation has been sent to the tourist and is waiting for
+                  their response.
+                </p>
+              )}
+
+              {request.status === "ACCEPTED" && (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  The tourist has accepted the quotation. The request can now
+                  continue to the payment stage.
+                </p>
+              )}
+
+              {request.status === "REJECTED" && (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  This request or quotation has been rejected.
+                </p>
+              )}
+
+              {request.status === "CANCELLED" && (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  This request has been cancelled.
+                </p>
+              )}
+
+              {request.status === "BOOKED" && (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  This request has completed the quotation and payment process
+                  and is now booked.
                 </p>
               )}
             </CardContent>
