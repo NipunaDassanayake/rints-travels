@@ -3,6 +3,7 @@ const prisma = require("../../config/prisma");
 const createTourRequest = async (data) => {
   return prisma.tourRequest.create({
     data,
+
     include: {
       travelPackage: true,
     },
@@ -15,29 +16,56 @@ const findTourRequestById = async (id) => {
       id,
       deletedAt: null,
     },
+
     include: {
       travelPackage: true,
+
+      tourist: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+
+      preferredGuide: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      },
     },
   });
 };
 
-// Additional function to find tour requests by touristId
+// Find tour requests belonging to a specific tourist
 const findTourRequestsByTouristId = async (touristId) => {
   return prisma.tourRequest.findMany({
     where: {
       touristId,
       deletedAt: null,
     },
+
     include: {
       travelPackage: true,
     },
+
     orderBy: {
       createdAt: "desc",
     },
   });
 };
 
-// Additional function to find all tour requests with optional filters
+// Find all tour requests with optional filters
 const findAllTourRequests = async ({
   status,
   requestType,
@@ -66,8 +94,10 @@ const findAllTourRequests = async ({
 
   return prisma.tourRequest.findMany({
     where,
+
     include: {
       travelPackage: true,
+
       tourist: {
         select: {
           id: true,
@@ -77,46 +107,136 @@ const findAllTourRequests = async ({
           phone: true,
         },
       },
+
+      preferredGuide: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
     },
+
     orderBy: {
       createdAt: "desc",
     },
   });
 };
 
-// Additional function to assign an admin to a tour request
+// Assign an admin to a tour request
 const assignAdminToTourRequest = async (id, adminId) => {
   return prisma.tourRequest.update({
     where: {
       id,
     },
+
     data: {
       assignedAdminId: adminId,
+    },
+
+    include: {
+      travelPackage: true,
+
+      tourist: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+
+      preferredGuide: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
     },
   });
 };
 
-// Additional function to update the status of a tour request
+// Update tour request status
 const updateTourRequestStatus = async (id, status) => {
   return prisma.tourRequest.update({
     where: {
       id,
     },
+
     data: {
       status,
     },
+
+    include: {
+      travelPackage: true,
+
+      tourist: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+
+      preferredGuide: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
+    },
   });
 };
-
 
 const updateTourRequest = async (id, data) => {
   return prisma.tourRequest.update({
     where: {
       id,
     },
+
     data,
+
     include: {
       travelPackage: true,
+
+      tourist: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+
+      preferredGuide: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
     },
   });
 };
