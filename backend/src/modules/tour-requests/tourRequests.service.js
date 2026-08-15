@@ -1,6 +1,10 @@
 const tourRequestsRepository = require("./tourRequests.repository");
 const packagesRepository = require("../packages/packages.repository");
-const { NotFoundError, ForbiddenError,BadRequestError } = require("../../utils/AppError");
+const {
+  NotFoundError,
+  ForbiddenError,
+  BadRequestError,
+} = require("../../utils/AppError");
 const authRepository = require("../auth/repositories/auth.repository");
 const tourGuidesRepository = require("../tour-guides/tourGuides.repository");
 
@@ -18,9 +22,7 @@ const createPackageBasedRequest = async (touristId, requestData) => {
     throw new NotFoundError("Travel package not found");
   }
 
-  await validatePreferredGuide(
-    requestData.preferredGuideId
-  );
+  await validatePreferredGuide(requestData.preferredGuideId);
 
   return tourRequestsRepository.createTourRequest({
     touristId,
@@ -49,9 +51,7 @@ const createPackageBasedRequest = async (touristId, requestData) => {
 };
 
 const createCustomRequest = async (touristId, requestData) => {
-  await validatePreferredGuide(
-    requestData.preferredGuideId
-  );
+  await validatePreferredGuide(requestData.preferredGuideId);
 
   return tourRequestsRepository.createTourRequest({
     touristId,
@@ -145,34 +145,15 @@ const assignAdmin = async (tourRequestId, adminId) => {
 
 // Define allowed status transitions for tour requests
 const ALLOWED_STATUS_TRANSITIONS = {
-  PENDING_REVIEW: [
-    "UNDER_DISCUSSION",
-    "REJECTED",
-    "CANCELLED",
-  ],
+  PENDING_REVIEW: ["UNDER_DISCUSSION", "REJECTED", "CANCELLED"],
 
-  UNDER_DISCUSSION: [
-    "READY_FOR_QUOTATION",
-    "REJECTED",
-    "CANCELLED",
-  ],
+  UNDER_DISCUSSION: ["READY_FOR_QUOTATION", "REJECTED", "CANCELLED"],
 
-  READY_FOR_QUOTATION: [
-    "QUOTATION_SENT",
-    "UNDER_DISCUSSION",
-    "CANCELLED",
-  ],
+  READY_FOR_QUOTATION: ["UNDER_DISCUSSION", "CANCELLED"],
 
-  QUOTATION_SENT: [
-    "UNDER_DISCUSSION",
-    "ACCEPTED",
-    "REJECTED",
-    "CANCELLED",
-  ],
+  QUOTATION_SENT: ["UNDER_DISCUSSION", "CANCELLED"],
 
-  ACCEPTED: [
-    "BOOKED",
-  ],
+  ACCEPTED: [],
 
   REJECTED: [],
   CANCELLED: [],
@@ -181,64 +162,49 @@ const ALLOWED_STATUS_TRANSITIONS = {
 
 const updateStatus = async (tourRequestId, newStatus) => {
   const tourRequest =
-    await tourRequestsRepository.findTourRequestById(
-      tourRequestId
-    );
+    await tourRequestsRepository.findTourRequestById(tourRequestId);
 
   if (!tourRequest) {
     throw new NotFoundError("Tour request not found");
   }
 
-  const allowedStatuses =
-    ALLOWED_STATUS_TRANSITIONS[tourRequest.status] || [];
+  const allowedStatuses = ALLOWED_STATUS_TRANSITIONS[tourRequest.status] || [];
 
   if (!allowedStatuses.includes(newStatus)) {
     throw new BadRequestError(
-      `Cannot change tour request status from ${tourRequest.status} to ${newStatus}`
+      `Cannot change tour request status from ${tourRequest.status} to ${newStatus}`,
     );
   }
 
   return tourRequestsRepository.updateTourRequestStatus(
     tourRequestId,
-    newStatus
+    newStatus,
   );
 };
 
-const adminEditTourRequest = async (
-  tourRequestId,
-  updateData
-) => {
+const adminEditTourRequest = async (tourRequestId, updateData) => {
   const tourRequest =
-    await tourRequestsRepository.findTourRequestById(
-      tourRequestId
-    );
+    await tourRequestsRepository.findTourRequestById(tourRequestId);
 
   if (!tourRequest) {
     throw new NotFoundError("Tour request not found");
   }
 
   const startDate =
-    updateData.preferredStartDate ??
-    tourRequest.preferredStartDate;
+    updateData.preferredStartDate ?? tourRequest.preferredStartDate;
 
   const endDate =
     updateData.preferredEndDate !== undefined
       ? updateData.preferredEndDate
       : tourRequest.preferredEndDate;
 
-  if (
-    endDate &&
-    new Date(endDate) < new Date(startDate)
-  ) {
+  if (endDate && new Date(endDate) < new Date(startDate)) {
     throw new BadRequestError(
-      "Preferred end date cannot be before preferred start date"
+      "Preferred end date cannot be before preferred start date",
     );
   }
 
-  return tourRequestsRepository.updateTourRequest(
-    tourRequestId,
-    updateData
-  );
+  return tourRequestsRepository.updateTourRequest(tourRequestId, updateData);
 };
 
 const validatePreferredGuide = async (preferredGuideId) => {
@@ -246,15 +212,10 @@ const validatePreferredGuide = async (preferredGuideId) => {
     return;
   }
 
-  const guide =
-    await tourGuidesRepository.findTourGuideById(
-      preferredGuideId
-    );
+  const guide = await tourGuidesRepository.findTourGuideById(preferredGuideId);
 
   if (!guide || !guide.isAvailable) {
-    throw new NotFoundError(
-      "Available preferred tour guide not found"
-    );
+    throw new NotFoundError("Available preferred tour guide not found");
   }
 };
 
