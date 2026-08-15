@@ -1,11 +1,6 @@
-export type ContactMethod =
-  | "WHATSAPP"
-  | "PHONE"
-  | "EMAIL";
+export type ContactMethod = "WHATSAPP" | "PHONE" | "EMAIL";
 
-export type TourRequestType =
-  | "PACKAGE_BASED"
-  | "CUSTOM";
+export type TourRequestType = "PACKAGE_BASED" | "CUSTOM";
 
 export type TourRequestStatus =
   | "PENDING_REVIEW"
@@ -80,6 +75,51 @@ export interface TourRequestTravelPackage {
   deletedAt: string | null;
 }
 
+export interface TourRequestTourist {
+  id: string;
+
+  firstName: string;
+  lastName: string;
+
+  email: string;
+  phone: string | null;
+}
+
+export interface TourRequestPreferredGuideUser {
+  id: string;
+
+  firstName: string;
+  lastName: string;
+}
+
+export interface TourRequestPreferredGuide {
+  id: string;
+  userId: string;
+
+  bio: string | null;
+
+  experienceYears: number;
+
+  languages: string[];
+  specializations: string[];
+
+  location: string | null;
+
+  dailyRate: string | null;
+
+  averageRating: string;
+
+  totalReviews: number;
+
+  isAvailable: boolean;
+
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+
+  user: TourRequestPreferredGuideUser;
+}
+
 export interface TourRequest {
   id: string;
 
@@ -117,4 +157,8 @@ export interface TourRequest {
   deletedAt: string | null;
 
   travelPackage: TourRequestTravelPackage | null;
+
+  tourist?: TourRequestTourist | null;
+
+  preferredGuide?: TourRequestPreferredGuide | null;
 }
