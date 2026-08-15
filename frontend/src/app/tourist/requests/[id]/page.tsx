@@ -25,6 +25,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { getTourRequestById } from "@/features/tour-requests/tour-request.api";
 
+import { getTourRequestQuotations } from "@/features/quotations/quotation.api";
+
 import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
 
 const STATUS_ORDER: TourRequestStatus[] = [
@@ -36,7 +38,7 @@ const STATUS_ORDER: TourRequestStatus[] = [
   "BOOKED",
 ];
 
-function formatStatus(status: TourRequestStatus) {
+function formatStatus(status: string) {
   return status
     .replaceAll("_", " ")
     .toLowerCase()
@@ -75,6 +77,18 @@ export default function TourRequestDetailsPage() {
     queryKey: ["tour-request", requestId],
 
     queryFn: () => getTourRequestById(requestId),
+
+    enabled: Boolean(requestId),
+  });
+
+  const {
+    data: quotations,
+    isLoading: areQuotationsLoading,
+    isError: areQuotationsError,
+  } = useQuery({
+    queryKey: ["tour-request", requestId, "quotations"],
+
+    queryFn: () => getTourRequestQuotations(requestId),
 
     enabled: Boolean(requestId),
   });
@@ -269,9 +283,7 @@ export default function TourRequestDetailsPage() {
 
                     <p className="mt-1 font-medium">
                       {request.contactMethod
-                        ? request.contactMethod
-                            .toLowerCase()
-                            .replace(/\b\w/g, (char) => char.toUpperCase())
+                        ? formatStatus(request.contactMethod)
                         : "Not specified"}
                     </p>
                   </div>
@@ -370,18 +382,65 @@ export default function TourRequestDetailsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Quotation</CardTitle>
+              <CardTitle>Quotations</CardTitle>
             </CardHeader>
 
             <CardContent>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Quotations linked to this request will appear here once the
-                Travora team prepares them.
-              </p>
+              {areQuotationsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderCircle className="size-4 animate-spin" />
+                  Loading quotations...
+                </div>
+              ) : areQuotationsError ? (
+                <p className="text-sm text-destructive">
+                  Unable to load quotations.
+                </p>
+              ) : quotations && quotations.length > 0 ? (
+                <div className="space-y-4">
+                  {quotations.map((quotation) => (
+                    <div key={quotation.id} className="rounded-xl border p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {quotation.quotationNumber}
+                          </p>
 
-              {request.status === "QUOTATION_SENT" && (
-                <p className="mt-4 text-sm font-medium">
-                  A quotation may be available for this request.
+                          <h3 className="mt-1 font-semibold">
+                            {quotation.title}
+                          </h3>
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Revision {quotation.revisionNumber}
+                          </p>
+                        </div>
+
+                        <span className="rounded-full border px-3 py-1 text-xs font-medium">
+                          {formatStatus(quotation.status)}
+                        </span>
+                      </div>
+
+                      <div className="mt-4">
+                        <p className="text-sm text-muted-foreground">Total</p>
+
+                        <p className="text-2xl font-bold">
+                          {quotation.currency} {quotation.totalAmount}
+                        </p>
+                      </div>
+
+                      <Link
+                        href={`/tourist/quotations/${quotation.id}`}
+                        className={`${buttonVariants({
+                          variant: "outline",
+                        })} mt-4 w-full`}
+                      >
+                        View quotation
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  No quotations have been received for this request yet.
                 </p>
               )}
             </CardContent>
