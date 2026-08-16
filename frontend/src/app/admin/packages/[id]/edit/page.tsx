@@ -17,6 +17,8 @@ import { buttonVariants } from "@/components/ui/button";
 
 import { AdminPackageImages } from "@/features/packages/components/admin-package-images";
 
+import { AdminPackageItinerary } from "@/features/packages/components/admin-package-itinerary";
+
 import {
   getAdminPackageById,
   updateAdminPackage,
@@ -131,6 +133,10 @@ export default function EditAdminPackagePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      {/* =====================================================
+          PAGE HEADER
+      ===================================================== */}
+
       <div className="mb-8">
         <Link
           href="/admin/packages"
@@ -155,14 +161,15 @@ export default function EditAdminPackagePage() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-muted-foreground">
-              Update package information, visibility, pricing, and travel
-              details.
+              Update package information, images, itinerary, pricing, visibility
+              and travel content.
             </p>
           </div>
 
           <Link
             href={`/packages/${travelPackage.slug}`}
             target="_blank"
+            rel="noopener noreferrer"
             className={buttonVariants({
               variant: "outline",
             })}
@@ -172,6 +179,10 @@ export default function EditAdminPackagePage() {
           </Link>
         </div>
       </div>
+
+      {/* =====================================================
+          UPDATE FEEDBACK
+      ===================================================== */}
 
       {updateMutation.isSuccess && (
         <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
@@ -191,6 +202,10 @@ export default function EditAdminPackagePage() {
         </div>
       )}
 
+      {/* =====================================================
+          BASIC PACKAGE INFORMATION
+      ===================================================== */}
+
       <AdminPackageForm
         key={travelPackage.updatedAt}
         initialValues={initialValues}
@@ -201,6 +216,10 @@ export default function EditAdminPackagePage() {
         }}
       />
 
+      {/* =====================================================
+          PACKAGE IMAGES
+      ===================================================== */}
+
       <div className="mt-8">
         <AdminPackageImages
           packageId={travelPackage.id}
@@ -208,15 +227,32 @@ export default function EditAdminPackagePage() {
         />
       </div>
 
+      {/* =====================================================
+          PACKAGE ITINERARY
+      ===================================================== */}
+
+      <div className="mt-8">
+        <AdminPackageItinerary
+          packageId={travelPackage.id}
+          initialItineraries={travelPackage.itineraries}
+        />
+      </div>
+
+      {/* =====================================================
+          PACKAGE CONTENT SUMMARY
+      ===================================================== */}
+
       <div className="mt-10 rounded-2xl border border-dashed p-6">
         <h2 className="text-lg font-semibold">Package content</h2>
 
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Images, itinerary days, inclusions, exclusions, and FAQs will be
-          managed here next.
+          Images and itinerary are now manageable here. Inclusions, exclusions
+          and FAQs will be added next.
         </p>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Images */}
+
           <div className="rounded-xl border bg-muted/30 p-4">
             <p className="font-medium">Images</p>
 
@@ -225,35 +261,47 @@ export default function EditAdminPackagePage() {
             </p>
           </div>
 
+          {/* Itinerary */}
+
           <div className="rounded-xl border bg-muted/30 p-4">
             <p className="font-medium">Itinerary</p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              {travelPackage.itineraries.length} days
+              {travelPackage.itineraries.length}{" "}
+              {travelPackage.itineraries.length === 1 ? "day" : "days"}
             </p>
           </div>
+
+          {/* Inclusions */}
 
           <div className="rounded-xl border bg-muted/30 p-4">
             <p className="font-medium">Inclusions</p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              {travelPackage.inclusions.length} items
+              {travelPackage.inclusions.length}{" "}
+              {travelPackage.inclusions.length === 1 ? "item" : "items"}
             </p>
           </div>
+
+          {/* Exclusions */}
 
           <div className="rounded-xl border bg-muted/30 p-4">
             <p className="font-medium">Exclusions</p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              {travelPackage.exclusions.length} items
+              {travelPackage.exclusions.length}{" "}
+              {travelPackage.exclusions.length === 1 ? "item" : "items"}
             </p>
           </div>
+
+          {/* FAQs */}
 
           <div className="rounded-xl border bg-muted/30 p-4">
             <p className="font-medium">FAQs</p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              {travelPackage.faqs.length} added
+              {travelPackage.faqs.length}{" "}
+              {travelPackage.faqs.length === 1 ? "question" : "questions"}
             </p>
           </div>
         </div>

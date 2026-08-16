@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api/client";
 
 import type {
   PackageImage,
+  PackageItinerary,
   PackageListData,
   TravelPackage,
 } from "./package.types";
@@ -93,9 +94,6 @@ export async function deleteAdminPackage(id: number): Promise<void> {
  * =========================================================
  */
 
-/**
- * New local-PC upload payload.
- */
 export interface UploadAdminPackageImagePayload {
   file: File;
 
@@ -106,12 +104,6 @@ export interface UploadAdminPackageImagePayload {
   displayOrder?: number;
 }
 
-/**
- * Metadata-only editing.
- *
- * We don't need to resend the image file when changing
- * alt text, primary status, or display order.
- */
 export interface UpdateAdminPackageImagePayload {
   altText?: string | null;
 
@@ -120,15 +112,6 @@ export interface UpdateAdminPackageImagePayload {
   displayOrder?: number;
 }
 
-/**
- * Upload image from the user's PC.
- *
- * Backend endpoint:
- *
- * POST /packages/:packageId/images/upload
- *
- * Content-Type will automatically become multipart/form-data.
- */
 export async function uploadAdminPackageImage(
   packageId: number,
   data: UploadAdminPackageImagePayload,
@@ -158,9 +141,6 @@ export async function uploadAdminPackageImage(
   return response.data.data;
 }
 
-/**
- * Update existing image metadata.
- */
 export async function updateAdminPackageImage(
   packageId: number,
   imageId: number,
@@ -181,18 +161,6 @@ export async function deleteAdminPackageImage(
   await apiClient.delete(`/packages/${packageId}/images/${imageId}`);
 }
 
-/**
- * Converts a backend relative image path:
- *
- * /uploads/packages/example.jpg
- *
- * into:
- *
- * http://localhost:5000/uploads/packages/example.jpg
- *
- * NEXT_PUBLIC_API_BASE_URL is expected to look like:
- * http://localhost:5000/api
- */
 export function getPackageImageUrl(imageUrl: string): string {
   if (
     imageUrl.startsWith("http://") ||
@@ -211,4 +179,51 @@ export function getPackageImageUrl(imageUrl: string): string {
   const backendOrigin = apiBaseUrl.replace(/\/api\/?$/, "");
 
   return `${backendOrigin}${imageUrl}`;
+}
+
+/**
+ * =========================================================
+ * Package Itineraries
+ * =========================================================
+ */
+
+export interface CreateAdminPackageItineraryPayload {
+  dayNumber: number;
+  title: string;
+  description: string;
+}
+
+export type UpdateAdminPackageItineraryPayload =
+  Partial<CreateAdminPackageItineraryPayload>;
+
+export async function addAdminPackageItinerary(
+  packageId: number,
+  data: CreateAdminPackageItineraryPayload,
+): Promise<PackageItinerary> {
+  const response = await apiClient.post(
+    `/packages/${packageId}/itineraries`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function updateAdminPackageItinerary(
+  packageId: number,
+  itineraryId: number,
+  data: UpdateAdminPackageItineraryPayload,
+): Promise<PackageItinerary> {
+  const response = await apiClient.patch(
+    `/packages/${packageId}/itineraries/${itineraryId}`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function deleteAdminPackageItinerary(
+  packageId: number,
+  itineraryId: number,
+): Promise<void> {
+  await apiClient.delete(`/packages/${packageId}/itineraries/${itineraryId}`);
 }
