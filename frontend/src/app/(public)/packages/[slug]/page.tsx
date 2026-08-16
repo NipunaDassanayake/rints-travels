@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import Image from "next/image";
 import Link from "next/link";
 
 import { notFound } from "next/navigation";
@@ -10,6 +9,8 @@ import { Check, Clock3, MapPin, X } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 
 import { getPackageImageUrl } from "@/features/packages/admin-package.api";
+
+import { PackageImageGallery } from "@/features/packages/components/package-image-gallery";
 
 import { getPackageBySlug } from "@/features/packages/package.api";
 
@@ -78,32 +79,6 @@ export default async function PackagePage({ params }: PackagePageProps) {
     notFound();
   }
 
-  /**
-   * Main package image.
-   */
-  const primaryImage = getValidPrimaryImage(travelPackage.images);
-
-  const primaryImageUrl = primaryImage
-    ? getPackageImageUrl(primaryImage.imageUrl)
-    : null;
-
-  /**
-   * Other package images.
-   *
-   * We exclude the primary image,
-   * order by displayOrder,
-   * then use the first two for the
-   * hero gallery.
-   */
-  const secondaryImages = [...travelPackage.images]
-    .filter(
-      (image) =>
-        image.id !== primaryImage?.id &&
-        !image.imageUrl.includes("example.com"),
-    )
-    .sort((a, b) => a.displayOrder - b.displayOrder)
-    .slice(0, 2);
-
   const sortedItineraries = [...travelPackage.itineraries].sort(
     (a, b) => a.dayNumber - b.dayNumber,
   );
@@ -116,75 +91,13 @@ export default async function PackagePage({ params }: PackagePageProps) {
 
       <section className="border-b">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-8">
-          {/* =================================================
-              IMAGE GALLERY
-          ================================================= */}
+          {/* Clickable gallery */}
+          <PackageImageGallery
+            title={travelPackage.title}
+            images={travelPackage.images}
+          />
 
-          <div>
-            {primaryImage && primaryImageUrl ? (
-              <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-                {/* Primary image */}
-
-                <div className="relative min-h-[420px] overflow-hidden rounded-[24px] bg-muted sm:min-h-[520px]">
-                  <Image
-                    src={primaryImageUrl}
-                    alt={primaryImage.altText ?? travelPackage.title}
-                    fill
-                    unoptimized
-                    priority
-                    sizes="(max-width: 1024px) 100vw, 55vw"
-                    className="object-cover"
-                  />
-
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent" />
-                </div>
-
-                {/* Secondary images */}
-
-                <div className="grid gap-3">
-                  {secondaryImages.length > 0 ? (
-                    secondaryImages.map((image, index) => {
-                      const imageUrl = getPackageImageUrl(image.imageUrl);
-
-                      return (
-                        <div
-                          key={image.id}
-                          className="relative min-h-[200px] overflow-hidden rounded-[24px] bg-muted sm:min-h-0"
-                        >
-                          <Image
-                            src={imageUrl}
-                            alt={
-                              image.altText ??
-                              `${travelPackage.title} image ${index + 2}`
-                            }
-                            fill
-                            unoptimized
-                            sizes="(max-width: 640px) 100vw, 25vw"
-                            className="object-cover transition duration-500 hover:scale-105"
-                          />
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <>
-                      <div className="rounded-[24px] bg-muted" />
-
-                      <div className="rounded-[24px] bg-muted" />
-                    </>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex min-h-[520px] items-center justify-center rounded-[24px] bg-muted text-muted-foreground">
-                No image available
-              </div>
-            )}
-          </div>
-
-          {/* =================================================
-              PACKAGE INFORMATION
-          ================================================= */}
-
+          {/* Package information */}
           <div className="flex flex-col justify-center">
             <p className="text-sm font-medium uppercase tracking-[0.16em] text-primary">
               Sri Lanka Journey
@@ -249,58 +162,6 @@ export default async function PackagePage({ params }: PackagePageProps) {
       </section>
 
       {/* =====================================================
-          FULL IMAGE GALLERY
-      ===================================================== */}
-
-      {travelPackage.images.length > 3 && (
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Journey gallery
-              </p>
-
-              <h2 className="mt-2 text-2xl font-bold tracking-tight">
-                A glimpse of the journey
-              </h2>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[...travelPackage.images]
-              .filter(
-                (image) =>
-                  image.id !== primaryImage?.id &&
-                  !secondaryImages.some(
-                    (secondaryImage) => secondaryImage.id === image.id,
-                  ) &&
-                  !image.imageUrl.includes("example.com"),
-              )
-              .sort((a, b) => a.displayOrder - b.displayOrder)
-              .map((image) => {
-                const imageUrl = getPackageImageUrl(image.imageUrl);
-
-                return (
-                  <div
-                    key={image.id}
-                    className="group relative aspect-[16/10] overflow-hidden rounded-[20px] bg-muted"
-                  >
-                    <Image
-                      src={imageUrl}
-                      alt={image.altText ?? travelPackage.title}
-                      fill
-                      unoptimized
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  </div>
-                );
-              })}
-          </div>
-        </section>
-      )}
-
-      {/* =====================================================
           ITINERARY
       ===================================================== */}
 
@@ -344,7 +205,6 @@ export default async function PackagePage({ params }: PackagePageProps) {
       <section className="border-y bg-muted/30">
         <div className="mx-auto grid max-w-5xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2">
           {/* Inclusions */}
-
           <div>
             <h2 className="text-2xl font-bold">What&apos;s included</h2>
 
@@ -366,7 +226,6 @@ export default async function PackagePage({ params }: PackagePageProps) {
           </div>
 
           {/* Exclusions */}
-
           <div>
             <h2 className="text-2xl font-bold">What&apos;s not included</h2>
 
