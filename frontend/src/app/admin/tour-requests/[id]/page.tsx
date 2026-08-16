@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 import { useParams } from "next/navigation";
@@ -8,13 +9,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   ArrowLeft,
+  ArrowUpRight,
   CalendarDays,
+  Circle,
+  CircleCheck,
+  Clock3,
   Hotel,
   LoaderCircle,
   Mail,
   MapPin,
   MessageCircle,
   Phone,
+  Route,
   UserRound,
   Users,
   Wallet,
@@ -23,6 +29,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+
+import { getPackageImageUrl } from "@/features/packages/admin-package.api";
+
+import { getPackageBySlug } from "@/features/packages/package.api";
 
 import { getTourRequestById } from "@/features/tour-requests/tour-request.api";
 
@@ -37,6 +47,21 @@ import { CreateQuotationForm } from "@/features/quotations/components/create-quo
 import { AdminEditTourRequestDialog } from "@/features/tour-requests/components/admin-edit-tour-request-dialog";
 
 import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
+
+/**
+ * =========================================================
+ * Request workflow
+ * =========================================================
+ */
+
+const STATUS_ORDER: TourRequestStatus[] = [
+  "PENDING_REVIEW",
+  "UNDER_DISCUSSION",
+  "READY_FOR_QUOTATION",
+  "QUOTATION_SENT",
+  "ACCEPTED",
+  "BOOKED",
+];
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -58,6 +83,10 @@ function formatStatus(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getProgressIndex(status: TourRequestStatus) {
+  return STATUS_ORDER.indexOf(status);
+}
+
 export default function AdminTourRequestDetailsPage() {
   const params = useParams<{
     id: string;
@@ -66,6 +95,12 @@ export default function AdminTourRequestDetailsPage() {
   const requestId = params.id;
 
   const queryClient = useQueryClient();
+
+  /**
+   * =========================================================
+   * Request
+   * =========================================================
+   */
 
   const {
     data: request,
@@ -79,6 +114,12 @@ export default function AdminTourRequestDetailsPage() {
     enabled: Boolean(requestId),
   });
 
+  /**
+   * =========================================================
+   * Quotations
+   * =========================================================
+   */
+
   const {
     data: quotations,
     isLoading: areQuotationsLoading,
@@ -90,6 +131,31 @@ export default function AdminTourRequestDetailsPage() {
 
     enabled: Boolean(requestId),
   });
+
+  /**
+   * =========================================================
+   * Related package
+   * =========================================================
+   */
+
+  const packageSlug =
+    request?.requestType === "PACKAGE_BASED"
+      ? request.travelPackage?.slug
+      : undefined;
+
+  const { data: fullPackage, isLoading: isPackageLoading } = useQuery({
+    queryKey: ["admin", "tour-request", requestId, "package", packageSlug],
+
+    queryFn: () => getPackageBySlug(packageSlug!),
+
+    enabled: Boolean(packageSlug),
+  });
+
+  /**
+   * =========================================================
+   * Status update
+   * =========================================================
+   */
 
   const statusMutation = useMutation({
     mutationFn: (status: TourRequestStatus) =>
@@ -103,8 +169,18 @@ export default function AdminTourRequestDetailsPage() {
       await queryClient.invalidateQueries({
         queryKey: ["admin", "tour-requests"],
       });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["tour-request", requestId],
+      });
     },
   });
+
+  /**
+   * =========================================================
+   * Loading
+   * =========================================================
+   */
 
   if (isLoading) {
     return (
@@ -113,6 +189,12 @@ export default function AdminTourRequestDetailsPage() {
       </main>
     );
   }
+
+  /**
+   * =========================================================
+   * Error
+   * =========================================================
+   */
 
   if (isError || !request) {
     return (
@@ -137,6 +219,12 @@ export default function AdminTourRequestDetailsPage() {
     );
   }
 
+  /**
+   * =========================================================
+   * Derived values
+   * =========================================================
+   */
+
   const title =
     request.travelPackage?.title ?? request.title ?? "Custom Tour Request";
 
@@ -149,20 +237,38 @@ export default function AdminTourRequestDetailsPage() {
 
   const preferredGuide = request.preferredGuide;
 
+  const progressIndex = getProgressIndex(request.status);
+
+  const isTerminalStatus =
+    request.status === "REJECTED" || request.status === "CANCELLED";
+
+  const packagePrimaryImage = fullPackage
+    ? (fullPackage.images.find((image) => image.isPrimary) ??
+      fullPackage.images[0])
+    : null;
+
+  const packageImageUrl = packagePrimaryImage
+    ? getPackageImageUrl(packagePrimaryImage.imageUrl)
+    : null;
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      {/* =====================================================
+          PAGE HEADER
+      ===================================================== */}
+
       <div className="mb-8">
         <Link
           href="/admin/tour-requests"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to tour requests
         </Link>
 
-        <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="mt-5 flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-primary">
+            <p className="text-sm font-medium uppercase tracking-[0.15em] text-primary">
               {request.requestType === "PACKAGE_BASED"
                 ? "Package Based Request"
                 : "Custom Tour Request"}
@@ -173,18 +279,120 @@ export default function AdminTourRequestDetailsPage() {
             </h1>
 
             <p className="mt-2 text-sm text-muted-foreground">
+              Review the traveler&apos;s requirements, manage the request
+              workflow and prepare quotations.
+            </p>
+
+            <p className="mt-2 text-xs text-muted-foreground">
               Request ID: {request.id}
             </p>
           </div>
 
-          <span className="rounded-full border px-4 py-2 text-sm font-medium">
+          <span className="rounded-full border bg-background px-4 py-2 text-sm font-medium shadow-sm">
             {formatStatus(request.status)}
           </span>
         </div>
       </div>
 
+      {/* =====================================================
+          SELECTED PACKAGE
+      ===================================================== */}
+
+      {request.requestType === "PACKAGE_BASED" && request.travelPackage && (
+        <section className="mb-8 overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="grid md:grid-cols-[300px_1fr]">
+            {/* Package image */}
+
+            <div className="relative min-h-[220px] bg-muted">
+              {isPackageLoading ? (
+                <div className="flex size-full min-h-[220px] items-center justify-center">
+                  <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : packagePrimaryImage && packageImageUrl ? (
+                <Image
+                  src={packageImageUrl}
+                  alt={
+                    packagePrimaryImage.altText ?? request.travelPackage.title
+                  }
+                  fill
+                  unoptimized
+                  sizes="(max-width: 768px) 100vw, 300px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex size-full min-h-[220px] items-center justify-center p-6 text-sm text-muted-foreground">
+                  No package image available
+                </div>
+              )}
+            </div>
+
+            {/* Package information */}
+
+            <div className="flex flex-col justify-center p-6 sm:p-7">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Selected package
+              </p>
+
+              <h2 className="mt-2 text-2xl font-bold">
+                {request.travelPackage.title}
+              </h2>
+
+              <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="size-4" />
+
+                  {request.travelPackage.destination}
+                </span>
+
+                <span className="flex items-center gap-1.5">
+                  <Clock3 className="size-4" />
+                  {request.travelPackage.durationDays}{" "}
+                  {request.travelPackage.durationDays === 1 ? "day" : "days"}
+                </span>
+              </div>
+
+              <p className="mt-4 line-clamp-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                {request.travelPackage.description}
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t pt-5">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Starting package price
+                  </p>
+
+                  <p className="mt-1 text-xl font-bold">
+                    ${request.travelPackage.price}
+                  </p>
+                </div>
+
+                <Link
+                  href={`/packages/${request.travelPackage.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-semibold"
+                >
+                  View package
+                  <ArrowUpRight className="size-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* =====================================================
+          MAIN WORKSPACE
+      ===================================================== */}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* ===================================================
+            LEFT
+        =================================================== */}
+
         <div className="space-y-6">
+          {/* Tourist details */}
+
           <Card>
             <CardHeader>
               <CardTitle>Tourist details</CardTitle>
@@ -248,6 +456,8 @@ export default function AdminTourRequestDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Travel details */}
 
           <Card>
             <CardHeader>
@@ -317,6 +527,8 @@ export default function AdminTourRequestDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* Preferences */}
+
           <Card>
             <CardHeader>
               <CardTitle>Preferences</CardTitle>
@@ -338,14 +550,18 @@ export default function AdminTourRequestDetailsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Transport preference
-                  </p>
+                <div className="flex gap-3">
+                  <Route className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
-                  <p className="mt-1 font-medium">
-                    {request.transportPreference || "Not specified"}
-                  </p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Transport preference
+                    </p>
+
+                    <p className="mt-1 font-medium">
+                      {request.transportPreference || "Not specified"}
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -374,6 +590,8 @@ export default function AdminTourRequestDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* Custom trip */}
+
           {request.requestType === "CUSTOM" && (
             <Card>
               <CardHeader>
@@ -391,6 +609,10 @@ export default function AdminTourRequestDetailsPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* =================================================
+              QUOTATIONS
+          ================================================= */}
 
           <Card>
             <CardHeader>
@@ -420,15 +642,114 @@ export default function AdminTourRequestDetailsPage() {
               ) : request.status === "READY_FOR_QUOTATION" ? (
                 <CreateQuotationForm request={request} requestId={requestId} />
               ) : (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  No quotations have been created for this request yet.
-                </p>
+                <div className="rounded-xl border border-dashed p-5">
+                  <p className="font-medium">No quotations yet</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Move this request to Ready for Quotation before preparing
+                    the first quotation.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
         </div>
 
+        {/* ===================================================
+            RIGHT SIDEBAR
+        =================================================== */}
+
         <aside className="space-y-6">
+          {/* =================================================
+              REQUEST WORKFLOW
+          ================================================= */}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Request workflow</CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {isTerminalStatus ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="font-medium">{formatStatus(request.status)}</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    This request is no longer progressing through the normal
+                    booking workflow.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  {STATUS_ORDER.map((status, index) => {
+                    const completed = index <= progressIndex;
+
+                    const current = index === progressIndex;
+
+                    const isLast = index === STATUS_ORDER.length - 1;
+
+                    return (
+                      <div
+                        key={status}
+                        className="relative flex gap-3 pb-6 last:pb-0"
+                      >
+                        {/* Connecting line */}
+
+                        {!isLast && (
+                          <div
+                            className={`absolute left-[9px] top-5 h-[calc(100%-4px)] w-px ${
+                              index < progressIndex
+                                ? "bg-foreground"
+                                : "bg-border"
+                            }`}
+                          />
+                        )}
+
+                        {/* Status icon */}
+
+                        <div className="relative z-10 bg-background">
+                          {completed ? (
+                            <CircleCheck
+                              className={`size-5 shrink-0 ${
+                                current ? "text-primary" : ""
+                              }`}
+                            />
+                          ) : (
+                            <Circle className="size-5 shrink-0 text-muted-foreground" />
+                          )}
+                        </div>
+
+                        {/* Status */}
+
+                        <div className="-mt-0.5">
+                          <p
+                            className={
+                              completed
+                                ? "font-medium"
+                                : "text-muted-foreground"
+                            }
+                          >
+                            {formatStatus(status)}
+                          </p>
+
+                          {current && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Current stage
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* =================================================
+              REQUEST MANAGEMENT
+          ================================================= */}
+
           <Card>
             <CardHeader>
               <CardTitle>Request management</CardTitle>
@@ -461,36 +782,44 @@ export default function AdminTourRequestDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* =================================================
+              ADMIN ACTIONS
+          ================================================= */}
+
           <Card>
             <CardHeader>
               <CardTitle>Admin actions</CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
+              {/* PENDING */}
+
               {request.status === "PENDING_REVIEW" && (
-                <Button
-                  className="w-full"
-                  disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate("UNDER_DISCUSSION")}
-                >
-                  {statusMutation.isPending
-                    ? "Starting discussion..."
-                    : "Start discussion"}
-                </Button>
+                <div className="space-y-3">
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Review the tourist&apos;s submitted information before
+                    beginning discussions.
+                  </p>
+
+                  <Button
+                    className="w-full"
+                    disabled={statusMutation.isPending}
+                    onClick={() => statusMutation.mutate("UNDER_DISCUSSION")}
+                  >
+                    {statusMutation.isPending
+                      ? "Starting discussion..."
+                      : "Start discussion"}
+                  </Button>
+                </div>
               )}
 
-              {statusMutation.isError && (
-                <p className="text-sm text-destructive">
-                  Unable to update the request status.
-                </p>
-              )}
+              {/* UNDER DISCUSSION */}
 
               {request.status === "UNDER_DISCUSSION" && (
                 <div className="space-y-3">
                   <p className="text-sm leading-6 text-muted-foreground">
-                    This request is currently under discussion. Review and edit
-                    the tourist&apos;s requirements before preparing the
-                    quotation.
+                    Review and edit the tourist&apos;s requirements before
+                    preparing the quotation.
                   </p>
 
                   <AdminEditTourRequestDialog
@@ -510,26 +839,46 @@ export default function AdminTourRequestDetailsPage() {
                 </div>
               )}
 
+              {/* READY */}
+
               {request.status === "READY_FOR_QUOTATION" && (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  This request is ready for quotation. Create or manage the
-                  quotation from the Quotations section.
-                </p>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="font-medium">Ready for quotation</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Prepare the quotation using the Quotations section on this
+                    page.
+                  </p>
+                </div>
               )}
+
+              {/* SENT */}
 
               {request.status === "QUOTATION_SENT" && (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  The quotation has been sent to the tourist and is waiting for
-                  their response.
-                </p>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="font-medium">Waiting for tourist</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    The quotation has been sent and is waiting for the
+                    tourist&apos;s response.
+                  </p>
+                </div>
               )}
 
+              {/* ACCEPTED */}
+
               {request.status === "ACCEPTED" && (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  The tourist has accepted the quotation. The request can now
-                  continue to the payment stage.
-                </p>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="font-medium">Quotation accepted</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    The tourist accepted the quotation. Continue to the payment
+                    and booking stage.
+                  </p>
+                </div>
               )}
+
+              {/* REJECTED */}
 
               {request.status === "REJECTED" && (
                 <p className="text-sm leading-6 text-muted-foreground">
@@ -537,16 +886,32 @@ export default function AdminTourRequestDetailsPage() {
                 </p>
               )}
 
+              {/* CANCELLED */}
+
               {request.status === "CANCELLED" && (
                 <p className="text-sm leading-6 text-muted-foreground">
                   This request has been cancelled.
                 </p>
               )}
 
+              {/* BOOKED */}
+
               {request.status === "BOOKED" && (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  This request has completed the quotation and payment process
-                  and is now booked.
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="font-medium">Booking completed</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    This request has completed the quotation and payment process
+                    and is now booked.
+                  </p>
+                </div>
+              )}
+
+              {/* Mutation error */}
+
+              {statusMutation.isError && (
+                <p className="text-sm text-destructive">
+                  Unable to update the request status.
                 </p>
               )}
             </CardContent>
