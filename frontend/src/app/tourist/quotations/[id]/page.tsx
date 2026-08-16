@@ -24,8 +24,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   acceptQuotation,
   getQuotationById,
-  rejectQuotation,
 } from "@/features/quotations/quotation.api";
+
+import { RejectQuotationDialog } from "@/features/quotations/components/reject-quotation-dialog";
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -70,32 +71,6 @@ export default function TouristQuotationPage() {
 
   const acceptMutation = useMutation({
     mutationFn: () => acceptQuotation(quotationId),
-
-    onSuccess: async (updatedQuotation) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["quotation", quotationId],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: [
-          "tour-request",
-          updatedQuotation.tourRequestId,
-          "quotations",
-        ],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ["tour-request", updatedQuotation.tourRequestId],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ["tour-requests", "me"],
-      });
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: () => rejectQuotation(quotationId),
 
     onSuccess: async (updatedQuotation) => {
       await queryClient.invalidateQueries({
@@ -447,9 +422,7 @@ export default function TouristQuotationPage() {
 
                 <Button
                   className="w-full"
-                  disabled={
-                    acceptMutation.isPending || rejectMutation.isPending
-                  }
+                  disabled={acceptMutation.isPending}
                   onClick={() => acceptMutation.mutate()}
                 >
                   <CircleCheck className="size-4" />
@@ -459,24 +432,14 @@ export default function TouristQuotationPage() {
                     : "Accept quotation"}
                 </Button>
 
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  disabled={
-                    acceptMutation.isPending || rejectMutation.isPending
-                  }
-                  onClick={() => rejectMutation.mutate()}
-                >
-                  <X className="size-4" />
+                <RejectQuotationDialog
+                  quotationId={quotation.id}
+                  tourRequestId={quotation.tourRequestId}
+                />
 
-                  {rejectMutation.isPending
-                    ? "Rejecting..."
-                    : "Reject quotation"}
-                </Button>
-
-                {(acceptMutation.isError || rejectMutation.isError) && (
+                {acceptMutation.isError && (
                   <p className="text-sm text-destructive">
-                    Unable to process your response. Please try again.
+                    Unable to accept the quotation. Please try again.
                   </p>
                 )}
               </CardContent>
