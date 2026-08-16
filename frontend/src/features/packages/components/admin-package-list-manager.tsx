@@ -181,27 +181,33 @@ export function AdminPackageListManager({
 
   return (
     <section className="rounded-2xl border bg-white p-6 shadow-sm">
-      {/* Header */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {isInclusion ? (
-              <Check className="size-5 text-green-600" />
+              <Check className="size-5 shrink-0 text-green-600" />
             ) : (
-              <X className="size-5 text-muted-foreground" />
+              <X className="size-5 shrink-0 text-muted-foreground" />
             )}
 
             <h2 className="text-xl font-semibold">{sectionTitle}</h2>
           </div>
 
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
             {description}
           </p>
         </div>
 
         {!isFormOpen && (
-          <Button type="button" onClick={openCreateForm}>
+          <Button
+            type="button"
+            onClick={openCreateForm}
+            className="shrink-0 self-start"
+          >
             <Plus className="size-4" />
 
             {addLabel}
@@ -209,7 +215,9 @@ export function AdminPackageListManager({
         )}
       </div>
 
-      {/* Error */}
+      {/* =====================================================
+          ERROR
+      ===================================================== */}
 
       {error && (
         <div className="mt-5 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -217,7 +225,9 @@ export function AdminPackageListManager({
         </div>
       )}
 
-      {/* Form */}
+      {/* =====================================================
+          FORM
+      ===================================================== */}
 
       {isFormOpen && (
         <form
@@ -289,7 +299,9 @@ export function AdminPackageListManager({
         </form>
       )}
 
-      {/* Items */}
+      {/* =====================================================
+          ITEMS
+      ===================================================== */}
 
       <div className="mt-6">
         {items.length === 0 ? (
