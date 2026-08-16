@@ -1,23 +1,16 @@
-import {
-  DestinationGrid,
-} from "@/components/public/destination-grid";
+import { CustomTripCta } from "@/components/public/custom-trip-cta";
 
-import {
-  FeaturedPackages,
-} from "@/components/public/featured-packages";
+import { DestinationGrid } from "@/components/public/destination-grid";
 
-import {
-  HomeHero,
-} from "@/components/public/home-hero";
+import { FeaturedPackages } from "@/components/public/featured-packages";
 
-import {
-  HowItWorks,
-} from "@/components/public/how-it-works";
+import { HomeHero } from "@/components/public/home-hero";
 
-import {
-  WhyTravora,
-} from "@/components/public/why-travora";
+import { HowItWorks } from "@/components/public/how-it-works";
 
+import { LocalGuides } from "@/components/public/local-guides";
+
+import { WhyTravora } from "@/components/public/why-travora";
 
 export default function HomePage() {
   return (
@@ -31,6 +24,10 @@ export default function HomePage() {
       <WhyTravora />
 
       <HowItWorks />
+
+      <LocalGuides />
+
+      <CustomTripCta />
     </>
   );
 }
