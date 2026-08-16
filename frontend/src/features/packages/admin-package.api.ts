@@ -227,3 +227,131 @@ export async function deleteAdminPackageItinerary(
 ): Promise<void> {
   await apiClient.delete(`/packages/${packageId}/itineraries/${itineraryId}`);
 }
+
+/**
+ * =========================================================
+ * Package Inclusions
+ * =========================================================
+ */
+
+export interface AdminPackageInclusionPayload {
+  title: string;
+}
+
+export async function addAdminPackageInclusion(
+  packageId: number,
+  data: AdminPackageInclusionPayload,
+) {
+  const response = await apiClient.post(
+    `/packages/${packageId}/inclusions`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function updateAdminPackageInclusion(
+  packageId: number,
+  inclusionId: number,
+  data: AdminPackageInclusionPayload,
+) {
+  const response = await apiClient.patch(
+    `/packages/${packageId}/inclusions/${inclusionId}`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function deleteAdminPackageInclusion(
+  packageId: number,
+  inclusionId: number,
+): Promise<void> {
+  await apiClient.delete(`/packages/${packageId}/inclusions/${inclusionId}`);
+}
+
+/**
+ * =========================================================
+ * Package Exclusions
+ * =========================================================
+ */
+
+export interface AdminPackageExclusionPayload {
+  title: string;
+}
+
+export async function addAdminPackageExclusion(
+  packageId: number,
+  data: AdminPackageExclusionPayload,
+) {
+  const response = await apiClient.post(
+    `/packages/${packageId}/exclusions`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function updateAdminPackageExclusion(
+  packageId: number,
+  exclusionId: number,
+  data: AdminPackageExclusionPayload,
+) {
+  const response = await apiClient.patch(
+    `/packages/${packageId}/exclusions/${exclusionId}`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function deleteAdminPackageExclusion(
+  packageId: number,
+  exclusionId: number,
+): Promise<void> {
+  await apiClient.delete(`/packages/${packageId}/exclusions/${exclusionId}`);
+}
+
+/**
+ * =========================================================
+ * Package FAQs
+ * =========================================================
+ */
+
+export interface CreateAdminPackageFaqPayload {
+  question: string;
+  answer: string;
+  displayOrder?: number;
+}
+
+export type UpdateAdminPackageFaqPayload =
+  Partial<CreateAdminPackageFaqPayload>;
+
+export async function addAdminPackageFaq(
+  packageId: number,
+  data: CreateAdminPackageFaqPayload,
+) {
+  const response = await apiClient.post(`/packages/${packageId}/faqs`, data);
+
+  return response.data.data;
+}
+
+export async function updateAdminPackageFaq(
+  packageId: number,
+  faqId: number,
+  data: UpdateAdminPackageFaqPayload,
+) {
+  const response = await apiClient.patch(
+    `/packages/${packageId}/faqs/${faqId}`,
+    data,
+  );
+
+  return response.data.data;
+}
+
+export async function deleteAdminPackageFaq(
+  packageId: number,
+  faqId: number,
+): Promise<void> {
+  await apiClient.delete(`/packages/${packageId}/faqs/${faqId}`);
+}

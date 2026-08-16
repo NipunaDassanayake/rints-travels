@@ -19,6 +19,10 @@ import { AdminPackageImages } from "@/features/packages/components/admin-package
 
 import { AdminPackageItinerary } from "@/features/packages/components/admin-package-itinerary";
 
+import { AdminPackageListManager } from "@/features/packages/components/admin-package-list-manager";
+
+import { AdminPackageFaqs } from "@/features/packages/components/admin-package-faqs";
+
 import {
   getAdminPackageById,
   updateAdminPackage,
@@ -161,8 +165,8 @@ export default function EditAdminPackagePage() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-muted-foreground">
-              Update package information, images, itinerary, pricing, visibility
-              and travel content.
+              Update package information, images, itinerary, inclusions,
+              exclusions, FAQs, pricing, visibility and travel content.
             </p>
           </div>
 
@@ -239,6 +243,35 @@ export default function EditAdminPackagePage() {
       </div>
 
       {/* =====================================================
+          PACKAGE INCLUSIONS / EXCLUSIONS
+      ===================================================== */}
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-2">
+        <AdminPackageListManager
+          packageId={travelPackage.id}
+          mode="inclusions"
+          initialItems={travelPackage.inclusions}
+        />
+
+        <AdminPackageListManager
+          packageId={travelPackage.id}
+          mode="exclusions"
+          initialItems={travelPackage.exclusions}
+        />
+      </div>
+
+      {/* =====================================================
+          PACKAGE FAQS
+      ===================================================== */}
+
+      <div className="mt-8">
+        <AdminPackageFaqs
+          packageId={travelPackage.id}
+          initialFaqs={travelPackage.faqs}
+        />
+      </div>
+
+      {/* =====================================================
           PACKAGE CONTENT SUMMARY
       ===================================================== */}
 
@@ -246,8 +279,8 @@ export default function EditAdminPackagePage() {
         <h2 className="text-lg font-semibold">Package content</h2>
 
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Images and itinerary are now manageable here. Inclusions, exclusions
-          and FAQs will be added next.
+          Images, itinerary, inclusions, exclusions and FAQs are all manageable
+          from this package workspace.
         </p>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
