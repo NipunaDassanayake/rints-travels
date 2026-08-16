@@ -1,8 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { ArrowRight, Clock3, MapPin } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+
+import { getPackageImageUrl } from "@/features/packages/admin-package.api";
 
 import { getPackages } from "@/features/packages/package.api";
 
@@ -54,6 +57,10 @@ export async function FeaturedPackages() {
               travelPackage.images.find((image) => image.isPrimary) ??
               travelPackage.images[0];
 
+            const imageSrc = primaryImage
+              ? getPackageImageUrl(primaryImage.imageUrl)
+              : null;
+
             return (
               <article
                 key={travelPackage.id}
@@ -64,11 +71,14 @@ export async function FeaturedPackages() {
                   className="block"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                    {primaryImage ? (
-                      <img
-                        src={primaryImage.imageUrl}
+                    {primaryImage && imageSrc ? (
+                      <Image
+                        src={imageSrc}
                         alt={primaryImage.altText ?? travelPackage.title}
-                        className="size-full object-cover transition duration-700 group-hover:scale-105"
+                        fill
+                        unoptimized
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition duration-700 group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
@@ -78,7 +88,7 @@ export async function FeaturedPackages() {
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
 
-                    <div className="absolute bottom-4 left-4">
+                    <div className="absolute bottom-4 left-4 z-10">
                       <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-slate-950 shadow-sm">
                         {travelPackage.durationDays}{" "}
                         {travelPackage.durationDays === 1 ? "day" : "days"}
@@ -95,13 +105,13 @@ export async function FeaturedPackages() {
 
                     <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="size-4" />
+                        <MapPin className="size-4 shrink-0" />
 
                         {travelPackage.destination}
                       </span>
 
                       <span className="flex items-center gap-1.5">
-                        <Clock3 className="size-4" />
+                        <Clock3 className="size-4 shrink-0" />
                         {travelPackage.durationDays} days
                       </span>
                     </div>

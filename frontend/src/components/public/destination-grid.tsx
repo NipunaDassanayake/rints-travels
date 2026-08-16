@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { ArrowUpRight, MapPin } from "lucide-react";
@@ -10,7 +11,6 @@ const destinations = [
       "Misty mountains, tea estates, scenic rail journeys and unforgettable viewpoints.",
     image: "/images/home/destinations/ella.jpg",
     href: "/packages?destination=Ella",
-    className: "md:col-span-1 lg:col-span-1",
   },
   {
     name: "Kandy",
@@ -19,7 +19,6 @@ const destinations = [
       "Sacred temples, lush hills and one of Sri Lanka’s most important cultural cities.",
     image: "/images/home/destinations/kandy.jpg",
     href: "/packages?destination=Kandy",
-    className: "md:col-span-1 lg:col-span-1",
   },
   {
     name: "Sigiriya",
@@ -28,7 +27,6 @@ const destinations = [
       "Explore the iconic rock fortress and discover Sri Lanka’s ancient kingdoms.",
     image: "/images/home/destinations/sigiriya.jpg",
     href: "/packages?destination=Sigiriya",
-    className: "",
   },
   {
     name: "Galle",
@@ -37,7 +35,6 @@ const destinations = [
       "Colonial charm, tropical beaches and the historic streets of Galle Fort.",
     image: "/images/home/destinations/galle.jpg",
     href: "/packages?destination=Galle",
-    className: "",
   },
   {
     name: "Nuwara Eliya",
@@ -46,7 +43,6 @@ const destinations = [
       "Cool mountain air, endless tea plantations and beautiful highland landscapes.",
     image: "/images/home/destinations/nuwara-eliya.jpg",
     href: "/packages?destination=Nuwara%20Eliya",
-    className: "",
   },
 ];
 
@@ -114,15 +110,21 @@ function DestinationCard({ destination, large = false }: DestinationCardProps) {
         large ? "min-h-[360px] sm:min-h-[420px]" : "min-h-[320px]"
       }`}
     >
-      <img
+      <Image
         src={destination.image}
         alt={`${destination.name}, Sri Lanka`}
-        className="absolute inset-0 size-full object-cover transition duration-700 ease-out group-hover:scale-105"
+        fill
+        sizes={
+          large
+            ? "(max-width: 768px) 100vw, 50vw"
+            : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        }
+        className="object-cover transition duration-700 ease-out group-hover:scale-105"
       />
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/5" />
 
-      <div className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
+      <div className="absolute inset-x-0 bottom-0 z-10 p-6 sm:p-7">
         <div className="flex items-start justify-between gap-5">
           <div>
             <div className="flex items-center gap-2 text-white/75">

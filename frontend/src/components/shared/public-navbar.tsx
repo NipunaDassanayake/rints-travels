@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { ChevronDown, Compass, Map, Menu, Route } from "lucide-react";
+import { Compass, Menu, Route } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 
@@ -45,10 +45,12 @@ export function PublicNavbar() {
 
           <nav className="hidden items-center gap-1 lg:flex">
             {navigationItems.map((item) => {
+              const baseHref = item.href.split("#")[0];
+
               const isActive =
                 item.href === "/"
                   ? pathname === "/"
-                  : pathname.startsWith(item.href.split("#")[0]);
+                  : baseHref !== "/" && pathname.startsWith(baseHref);
 
               return (
                 <Link
