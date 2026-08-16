@@ -1,15 +1,21 @@
 const prisma = require("../../config/prisma");
+
 const packageInclude = require("./packages.include");
 
 const findPackages = async ({ skip, take, filters, orderBy }) => {
   return prisma.travelPackage.findMany({
     where: {
       ...filters,
+
       deletedAt: null,
     },
+
     include: packageInclude,
+
     orderBy,
+
     skip,
+
     take,
   });
 };
@@ -18,6 +24,7 @@ const countPackages = async (filters) => {
   return prisma.travelPackage.count({
     where: {
       ...filters,
+
       deletedAt: null,
     },
   });
@@ -26,6 +33,8 @@ const countPackages = async (filters) => {
 const createPackage = async (data) => {
   return prisma.travelPackage.create({
     data,
+
+    include: packageInclude,
   });
 };
 
@@ -33,8 +42,10 @@ const findPackageById = async (id) => {
   return prisma.travelPackage.findFirst({
     where: {
       id: Number(id),
+
       deletedAt: null,
     },
+
     include: packageInclude,
   });
 };
@@ -44,7 +55,10 @@ const updatePackage = async (id, data) => {
     where: {
       id: Number(id),
     },
+
     data,
+
+    include: packageInclude,
   });
 };
 
@@ -53,23 +67,37 @@ const deletePackage = async (id) => {
     where: {
       id: Number(id),
     },
+
     data: {
       status: "INACTIVE",
+
       deletedAt: new Date(),
     },
+
+    include: packageInclude,
   });
 };
 
-//find package by slug
+/**
+ * Find package by slug
+ */
 const findPackageBySlug = async (slug) => {
   return prisma.travelPackage.findFirst({
     where: {
       slug,
+
       deletedAt: null,
     },
+
     include: packageInclude,
   });
 };
+
+/**
+ * =========================================================
+ * Package Images
+ * =========================================================
+ */
 
 const createPackageImage = async (data) => {
   return prisma.packageImage.create({
@@ -81,6 +109,7 @@ const findPackageImageById = async (packageId, imageId) => {
   return prisma.packageImage.findFirst({
     where: {
       id: Number(imageId),
+
       packageId: Number(packageId),
     },
   });
@@ -91,6 +120,7 @@ const updatePackageImage = async (imageId, data) => {
     where: {
       id: Number(imageId),
     },
+
     data,
   });
 };
@@ -107,53 +137,54 @@ const unsetPrimaryPackageImages = async (packageId) => {
   return prisma.packageImage.updateMany({
     where: {
       packageId: Number(packageId),
+
       isPrimary: true,
     },
+
     data: {
       isPrimary: false,
     },
   });
 };
 
-// Package Itineraries
+/**
+ * =========================================================
+ * Package Itineraries
+ * =========================================================
+ */
+
 const createPackageItinerary = async (data) => {
   return prisma.packageItinerary.create({
     data,
   });
 };
 
-const findPackageItineraryById = async (
-  packageId,
-  itineraryId
-) => {
+const findPackageItineraryById = async (packageId, itineraryId) => {
   return prisma.packageItinerary.findFirst({
     where: {
       id: Number(itineraryId),
+
       packageId: Number(packageId),
     },
   });
 };
 
-const findPackageItineraryByDayNumber = async (
-  packageId,
-  dayNumber
-) => {
+const findPackageItineraryByDayNumber = async (packageId, dayNumber) => {
   return prisma.packageItinerary.findFirst({
     where: {
       packageId: Number(packageId),
+
       dayNumber,
     },
   });
 };
 
-const updatePackageItinerary = async (
-  itineraryId,
-  data
-) => {
+const updatePackageItinerary = async (itineraryId, data) => {
   return prisma.packageItinerary.update({
     where: {
       id: Number(itineraryId),
     },
+
     data,
   });
 };
@@ -166,33 +197,34 @@ const deletePackageItinerary = async (itineraryId) => {
   });
 };
 
-// Package Inclusions
+/**
+ * =========================================================
+ * Package Inclusions
+ * =========================================================
+ */
+
 const createPackageInclusion = async (data) => {
   return prisma.packageInclusion.create({
     data,
   });
 };
 
-const findPackageInclusionById = async (
-  packageId,
-  inclusionId
-) => {
+const findPackageInclusionById = async (packageId, inclusionId) => {
   return prisma.packageInclusion.findFirst({
     where: {
       id: Number(inclusionId),
+
       packageId: Number(packageId),
     },
   });
 };
 
-const updatePackageInclusion = async (
-  inclusionId,
-  data
-) => {
+const updatePackageInclusion = async (inclusionId, data) => {
   return prisma.packageInclusion.update({
     where: {
       id: Number(inclusionId),
     },
+
     data,
   });
 };
@@ -205,33 +237,34 @@ const deletePackageInclusion = async (inclusionId) => {
   });
 };
 
-// Package Exclusions
+/**
+ * =========================================================
+ * Package Exclusions
+ * =========================================================
+ */
+
 const createPackageExclusion = async (data) => {
   return prisma.packageExclusion.create({
     data,
   });
 };
 
-const findPackageExclusionById = async (
-  packageId,
-  exclusionId
-) => {
+const findPackageExclusionById = async (packageId, exclusionId) => {
   return prisma.packageExclusion.findFirst({
     where: {
       id: Number(exclusionId),
+
       packageId: Number(packageId),
     },
   });
 };
 
-const updatePackageExclusion = async (
-  exclusionId,
-  data
-) => {
+const updatePackageExclusion = async (exclusionId, data) => {
   return prisma.packageExclusion.update({
     where: {
       id: Number(exclusionId),
     },
+
     data,
   });
 };
@@ -244,8 +277,12 @@ const deletePackageExclusion = async (exclusionId) => {
   });
 };
 
+/**
+ * =========================================================
+ * Package FAQs
+ * =========================================================
+ */
 
-// Package FAQs
 const createPackageFaq = async (data) => {
   return prisma.packageFAQ.create({
     data,
@@ -256,6 +293,7 @@ const findPackageFaqById = async (packageId, faqId) => {
   return prisma.packageFAQ.findFirst({
     where: {
       id: Number(faqId),
+
       packageId: Number(packageId),
     },
   });
@@ -266,6 +304,7 @@ const updatePackageFaq = async (faqId, data) => {
     where: {
       id: Number(faqId),
     },
+
     data,
   });
 };
@@ -281,6 +320,7 @@ const deletePackageFaq = async (faqId) => {
 module.exports = {
   findPackages,
   countPackages,
+
   createPackage,
   findPackageById,
   updatePackage,

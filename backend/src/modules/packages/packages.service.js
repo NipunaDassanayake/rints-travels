@@ -1,41 +1,92 @@
 const packagesRepository = require("./packages.repository");
+
 const { NotFoundError, ConflictError } = require("../../utils/AppError");
+
 const { buildPackageQueryOptions } = require("./packages.query");
 
-const getAllPackages = async (query) => {
-  const options = buildPackageQueryOptions(query);
-
+const buildPaginatedResponse = async (options) => {
   const [packages, total] = await Promise.all([
     packagesRepository.findPackages(options),
+
     packagesRepository.countPackages(options.filters),
   ]);
 
   return {
     items: packages,
+
     pagination: {
       page: options.page,
+
       limit: options.limit,
+
       total,
+
       totalPages: Math.ceil(total / options.limit),
     },
   };
 };
 
+/**
+ * Public package list.
+ *
+ * Always returns ACTIVE packages only.
+ */
+const getAllPackages = async (query) => {
+  const options = buildPackageQueryOptions(query);
+
+  options.filters = {
+    ...options.filters,
+
+    status: "ACTIVE",
+  };
+
+  return buildPaginatedResponse(options);
+};
+
+/**
+ * Admin package list.
+ *
+ * Admin can view both ACTIVE and INACTIVE packages.
+ *
+ * Optional filters such as status, destination
+ * and title are preserved.
+ */
+const getAllPackagesAdmin = async (query) => {
+  const options = buildPackageQueryOptions(query);
+
+  return buildPaginatedResponse(options);
+};
+
 const createPackage = async (packageData) => {
-  const existingPackage =
-    await packagesRepository.findPackageBySlug(packageData.slug);
+  const existingPackage = await packagesRepository.findPackageBySlug(
+    packageData.slug,
+  );
 
   if (existingPackage) {
-    throw new ConflictError(
-      "A travel package with this slug already exists"
-    );
+    throw new ConflictError("A travel package with this slug already exists");
   }
 
   return packagesRepository.createPackage(packageData);
 };
 
 const getPackageById = async (id) => {
-  return packagesRepository.findPackageById(id);
+  const travelPackage = await packagesRepository.findPackageById(id);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  return travelPackage;
+};
+
+const getPackageBySlug = async (slug) => {
+  const travelPackage = await packagesRepository.findPackageBySlug(slug);
+
+  if (!travelPackage) {
+    throw new NotFoundError("Travel package not found");
+  }
+
+  return travelPackage;
 };
 
 const updatePackage = async (id, packageData) => {
@@ -43,6 +94,19 @@ const updatePackage = async (id, packageData) => {
 
   if (!existingPackage) {
     throw new NotFoundError("Travel package not found");
+  }
+
+  if (
+    packageData.slug !== undefined &&
+    packageData.slug !== existingPackage.slug
+  ) {
+    const existingSlugPackage = await packagesRepository.findPackageBySlug(
+      packageData.slug,
+    );
+
+    if (existingSlugPackage && existingSlugPackage.id !== existingPackage.id) {
+      throw new ConflictError("A travel package with this slug already exists");
+    }
   }
 
   return packagesRepository.updatePackage(id, packageData);
@@ -58,10 +122,14 @@ const deletePackage = async (id) => {
   return packagesRepository.deletePackage(id);
 };
 
-// Package Images
+/**
+ * =========================================================
+ * Package Images
+ * =========================================================
+ */
+
 const addPackageImage = async (packageId, imageData) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
@@ -73,60 +141,51 @@ const addPackageImage = async (packageId, imageData) => {
 
   return packagesRepository.createPackageImage({
     packageId: Number(packageId),
+
     imageUrl: imageData.imageUrl,
+
     altText: imageData.altText || null,
+
     isPrimary: imageData.isPrimary || false,
-    displayOrder: imageData.displayOrder || 0,
+
+    displayOrder: imageData.displayOrder ?? 0,
   });
 };
 
-const updatePackageImage = async (
-  packageId,
-  imageId,
-  imageData
-) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+const updatePackageImage = async (packageId, imageId, imageData) => {
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
   }
 
-  const existingImage =
-    await packagesRepository.findPackageImageById(
-      packageId,
-      imageId
-    );
+  const existingImage = await packagesRepository.findPackageImageById(
+    packageId,
+    imageId,
+  );
 
   if (!existingImage) {
     throw new NotFoundError("Package image not found");
   }
 
   if (imageData.isPrimary === true) {
-    await packagesRepository.unsetPrimaryPackageImages(
-      packageId
-    );
+    await packagesRepository.unsetPrimaryPackageImages(packageId);
   }
 
-  return packagesRepository.updatePackageImage(
-    imageId,
-    imageData
-  );
+  return packagesRepository.updatePackageImage(imageId, imageData);
 };
 
 const deletePackageImage = async (packageId, imageId) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
   }
 
-  const existingImage =
-    await packagesRepository.findPackageImageById(
-      packageId,
-      imageId
-    );
+  const existingImage = await packagesRepository.findPackageImageById(
+    packageId,
+    imageId,
+  );
 
   if (!existingImage) {
     throw new NotFoundError("Package image not found");
@@ -135,32 +194,33 @@ const deletePackageImage = async (packageId, imageId) => {
   return packagesRepository.deletePackageImage(imageId);
 };
 
-// Package Itineraries
-const addPackageItinerary = async (
-  packageId,
-  itineraryData
-) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+/**
+ * =========================================================
+ * Package Itineraries
+ * =========================================================
+ */
+
+const addPackageItinerary = async (packageId, itineraryData) => {
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
   }
 
-  const existingDay =
-    await packagesRepository.findPackageItineraryByDayNumber(
-      packageId,
-      itineraryData.dayNumber
-    );
+  const existingDay = await packagesRepository.findPackageItineraryByDayNumber(
+    packageId,
+    itineraryData.dayNumber,
+  );
 
   if (existingDay) {
     throw new ConflictError(
-      `Day ${itineraryData.dayNumber} already exists for this package`
+      `Day ${itineraryData.dayNumber} already exists for this package`,
     );
   }
 
   return packagesRepository.createPackageItinerary({
     packageId: Number(packageId),
+
     ...itineraryData,
   });
 };
@@ -168,78 +228,64 @@ const addPackageItinerary = async (
 const updatePackageItinerary = async (
   packageId,
   itineraryId,
-  itineraryData
+  itineraryData,
 ) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
   }
 
-  const existingItinerary =
-    await packagesRepository.findPackageItineraryById(
-      packageId,
-      itineraryId
-    );
+  const existingItinerary = await packagesRepository.findPackageItineraryById(
+    packageId,
+    itineraryId,
+  );
 
   if (!existingItinerary) {
-    throw new NotFoundError(
-      "Package itinerary item not found"
-    );
+    throw new NotFoundError("Package itinerary item not found");
   }
 
   if (
-    itineraryData.dayNumber &&
+    itineraryData.dayNumber !== undefined &&
     itineraryData.dayNumber !== existingItinerary.dayNumber
   ) {
     const existingDay =
       await packagesRepository.findPackageItineraryByDayNumber(
         packageId,
-        itineraryData.dayNumber
+        itineraryData.dayNumber,
       );
 
     if (existingDay) {
       throw new ConflictError(
-        `Day ${itineraryData.dayNumber} already exists for this package`
+        `Day ${itineraryData.dayNumber} already exists for this package`,
       );
     }
   }
 
-  return packagesRepository.updatePackageItinerary(
-    itineraryId,
-    itineraryData
-  );
+  return packagesRepository.updatePackageItinerary(itineraryId, itineraryData);
 };
 
-const deletePackageItinerary = async (
-  packageId,
-  itineraryId
-) => {
-  const existingItinerary =
-    await packagesRepository.findPackageItineraryById(
-      packageId,
-      itineraryId
-    );
+const deletePackageItinerary = async (packageId, itineraryId) => {
+  const existingItinerary = await packagesRepository.findPackageItineraryById(
+    packageId,
+    itineraryId,
+  );
 
   if (!existingItinerary) {
-    throw new NotFoundError(
-      "Package itinerary item not found"
-    );
+    throw new NotFoundError("Package itinerary item not found");
   }
 
-  return packagesRepository.deletePackageItinerary(
-    itineraryId
-  );
+  return packagesRepository.deletePackageItinerary(itineraryId);
 };
 
-// Package Inclusions
-const addPackageInclusion = async (
-  packageId,
-  inclusionData
-) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+/**
+ * =========================================================
+ * Package Inclusions
+ * =========================================================
+ */
+
+const addPackageInclusion = async (packageId, inclusionData) => {
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
@@ -247,6 +293,7 @@ const addPackageInclusion = async (
 
   return packagesRepository.createPackageInclusion({
     packageId: Number(packageId),
+
     title: inclusionData.title,
   });
 };
@@ -254,54 +301,41 @@ const addPackageInclusion = async (
 const updatePackageInclusion = async (
   packageId,
   inclusionId,
-  inclusionData
+  inclusionData,
 ) => {
-  const existingInclusion =
-    await packagesRepository.findPackageInclusionById(
-      packageId,
-      inclusionId
-    );
-
-  if (!existingInclusion) {
-    throw new NotFoundError(
-      "Package inclusion not found"
-    );
-  }
-
-  return packagesRepository.updatePackageInclusion(
+  const existingInclusion = await packagesRepository.findPackageInclusionById(
+    packageId,
     inclusionId,
-    inclusionData
   );
-};
-
-const deletePackageInclusion = async (
-  packageId,
-  inclusionId
-) => {
-  const existingInclusion =
-    await packagesRepository.findPackageInclusionById(
-      packageId,
-      inclusionId
-    );
 
   if (!existingInclusion) {
-    throw new NotFoundError(
-      "Package inclusion not found"
-    );
+    throw new NotFoundError("Package inclusion not found");
   }
 
-  return packagesRepository.deletePackageInclusion(
-    inclusionId
-  );
+  return packagesRepository.updatePackageInclusion(inclusionId, inclusionData);
 };
 
-// Package Exclusions
-const addPackageExclusion = async (
-  packageId,
-  exclusionData
-) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+const deletePackageInclusion = async (packageId, inclusionId) => {
+  const existingInclusion = await packagesRepository.findPackageInclusionById(
+    packageId,
+    inclusionId,
+  );
+
+  if (!existingInclusion) {
+    throw new NotFoundError("Package inclusion not found");
+  }
+
+  return packagesRepository.deletePackageInclusion(inclusionId);
+};
+
+/**
+ * =========================================================
+ * Package Exclusions
+ * =========================================================
+ */
+
+const addPackageExclusion = async (packageId, exclusionData) => {
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
@@ -309,6 +343,7 @@ const addPackageExclusion = async (
 
   return packagesRepository.createPackageExclusion({
     packageId: Number(packageId),
+
     title: exclusionData.title,
   });
 };
@@ -316,52 +351,41 @@ const addPackageExclusion = async (
 const updatePackageExclusion = async (
   packageId,
   exclusionId,
-  exclusionData
+  exclusionData,
 ) => {
-  const existingExclusion =
-    await packagesRepository.findPackageExclusionById(
-      packageId,
-      exclusionId
-    );
-
-  if (!existingExclusion) {
-    throw new NotFoundError(
-      "Package exclusion not found"
-    );
-  }
-
-  return packagesRepository.updatePackageExclusion(
+  const existingExclusion = await packagesRepository.findPackageExclusionById(
+    packageId,
     exclusionId,
-    exclusionData
   );
-};
-
-const deletePackageExclusion = async (
-  packageId,
-  exclusionId
-) => {
-  const existingExclusion =
-    await packagesRepository.findPackageExclusionById(
-      packageId,
-      exclusionId
-    );
 
   if (!existingExclusion) {
-    throw new NotFoundError(
-      "Package exclusion not found"
-    );
+    throw new NotFoundError("Package exclusion not found");
   }
 
-  return packagesRepository.deletePackageExclusion(
-    exclusionId
-  );
+  return packagesRepository.updatePackageExclusion(exclusionId, exclusionData);
 };
 
+const deletePackageExclusion = async (packageId, exclusionId) => {
+  const existingExclusion = await packagesRepository.findPackageExclusionById(
+    packageId,
+    exclusionId,
+  );
 
-// Package FAQs
+  if (!existingExclusion) {
+    throw new NotFoundError("Package exclusion not found");
+  }
+
+  return packagesRepository.deletePackageExclusion(exclusionId);
+};
+
+/**
+ * =========================================================
+ * Package FAQs
+ * =========================================================
+ */
+
 const addPackageFaq = async (packageId, faqData) => {
-  const travelPackage =
-    await packagesRepository.findPackageById(packageId);
+  const travelPackage = await packagesRepository.findPackageById(packageId);
 
   if (!travelPackage) {
     throw new NotFoundError("Travel package not found");
@@ -369,42 +393,33 @@ const addPackageFaq = async (packageId, faqData) => {
 
   return packagesRepository.createPackageFaq({
     packageId: Number(packageId),
+
     question: faqData.question,
+
     answer: faqData.answer,
+
     displayOrder: faqData.displayOrder ?? 0,
   });
 };
 
-const updatePackageFaq = async (
-  packageId,
-  faqId,
-  faqData
-) => {
-  const existingFaq =
-    await packagesRepository.findPackageFaqById(
-      packageId,
-      faqId
-    );
+const updatePackageFaq = async (packageId, faqId, faqData) => {
+  const existingFaq = await packagesRepository.findPackageFaqById(
+    packageId,
+    faqId,
+  );
 
   if (!existingFaq) {
     throw new NotFoundError("Package FAQ not found");
   }
 
-  return packagesRepository.updatePackageFaq(
-    faqId,
-    faqData
-  );
+  return packagesRepository.updatePackageFaq(faqId, faqData);
 };
 
-const deletePackageFaq = async (
-  packageId,
-  faqId
-) => {
-  const existingFaq =
-    await packagesRepository.findPackageFaqById(
-      packageId,
-      faqId
-    );
+const deletePackageFaq = async (packageId, faqId) => {
+  const existingFaq = await packagesRepository.findPackageFaqById(
+    packageId,
+    faqId,
+  );
 
   if (!existingFaq) {
     throw new NotFoundError("Package FAQ not found");
@@ -413,30 +428,21 @@ const deletePackageFaq = async (
   return packagesRepository.deletePackageFaq(faqId);
 };
 
-
-const getPackageBySlug = async (slug) => {
-  const travelPackage =
-    await packagesRepository.findPackageBySlug(slug);
-
-  if (!travelPackage) {
-    throw new NotFoundError(
-      "Travel package not found"
-    );
-  }
-
-  return travelPackage;
-};
-
 module.exports = {
   getAllPackages,
+  getAllPackagesAdmin,
+
   createPackage,
+
   getPackageById,
+  getPackageBySlug,
+
   updatePackage,
   deletePackage,
+
   addPackageImage,
   updatePackageImage,
   deletePackageImage,
-  getPackageBySlug,
 
   addPackageItinerary,
   updatePackageItinerary,

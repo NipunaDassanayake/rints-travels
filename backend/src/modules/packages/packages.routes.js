@@ -3,268 +3,303 @@ const express = require("express");
 const packagesController = require("./packages.controller");
 
 const validateRequest = require("../../middlewares/validateRequest");
+
 const authenticate = require("../../middlewares/authenticate");
+
 const authorize = require("../../middlewares/authorize");
+
+const uploadPackageImage = require("../../middlewares/uploadPackageImage");
 
 const {
   createPackageSchema,
   updatePackageSchema,
+
   createPackageImageSchema,
   updatePackageImageSchema,
+
   createPackageItinerarySchema,
   updatePackageItinerarySchema,
+
   createPackageInclusionSchema,
   updatePackageInclusionSchema,
+
   createPackageExclusionSchema,
   updatePackageExclusionSchema,
+
   createPackageFaqSchema,
   updatePackageFaqSchema,
 } = require("./packages.validation");
 
-const {
-  USER_ROLES,
-} = require("../../core/constants/auth.constants");
+const { USER_ROLES } = require("../../core/constants/auth.constants");
 
 const router = express.Router();
 
 /**
+ * =========================================================
  * Public Package Routes
+ * =========================================================
  */
 
-// Get all active travel packages
-router.get(
-  "/",
-  packagesController.getAllPackages
-);
-
 /**
- * Package Image Management
- * ADMIN / SYSTEM_ADMIN only
+ * Public - Get active travel packages
  */
-
-// Add package image
-router.post(
-  "/:packageId/images",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  validateRequest(createPackageImageSchema),
-  packagesController.addPackageImage
-);
-
-// Update package image
-router.patch(
-  "/:packageId/images/:imageId",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  validateRequest(updatePackageImageSchema),
-  packagesController.updatePackageImage
-);
-
-// Delete package image
-router.delete(
-  "/:packageId/images/:imageId",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackageImage
-);
+router.get("/", packagesController.getAllPackages);
 
 /**
+ * Public - Get package by slug
+ *
+ * Keep this before the generic /:id route.
+ */
+router.get("/slug/:slug", packagesController.getPackageBySlug);
+
+/**
+ * =========================================================
  * Admin Package Management
+ * =========================================================
  */
 
-// Create travel package
+/**
+ * Admin - Get all packages
+ *
+ * Includes ACTIVE and INACTIVE packages.
+ * Soft-deleted packages remain excluded.
+ */
+router.get(
+  "/admin",
+  authenticate,
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.getAllPackagesAdmin,
+);
+
+/**
+ * Admin - Create package
+ */
 router.post(
   "/",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(createPackageSchema),
-  packagesController.createPackage
+  packagesController.createPackage,
 );
 
-// Update travel package
+/**
+ * Admin - Update package
+ */
 router.put(
   "/:id",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(updatePackageSchema),
-  packagesController.updatePackage
-);
-
-// Soft delete travel package
-router.delete(
-  "/:id",
-  authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackage
+  packagesController.updatePackage,
 );
 
 /**
- * Public Package Detail Route
- *
- * Keep generic parameter routes near the bottom so that
- * more specific routes can be declared above them.
+ * Admin - Soft delete package
  */
-
-// Get travel package by ID
-router.get(
+router.delete(
   "/:id",
-  packagesController.getPackageById
+  authenticate,
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.deletePackage,
 );
 
-// Get travel package by slug
+/**
+ * =========================================================
+ * Package Image Management
+ * =========================================================
+ */
+
+/**
+ * Admin - Upload package image from PC
+ *
+ * multipart/form-data
+ *
+ * Fields:
+ * image        -> file
+ * altText      -> optional string
+ * isPrimary    -> optional boolean-like string
+ * displayOrder -> optional number-like string
+ */
+router.post(
+  "/:packageId/images/upload",
+  authenticate,
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  uploadPackageImage.single("image"),
+  packagesController.uploadPackageImage,
+);
+
+/**
+ * Admin - Add package image using image URL
+ *
+ * We can keep this temporarily.
+ * Later, if you want, we can remove it completely
+ * and support uploads only.
+ */
+router.post(
+  "/:packageId/images",
+  authenticate,
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  validateRequest(createPackageImageSchema),
+  packagesController.addPackageImage,
+);
+
+/**
+ * Admin - Update package image metadata
+ */
+router.patch(
+  "/:packageId/images/:imageId",
+  authenticate,
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  validateRequest(updatePackageImageSchema),
+  packagesController.updatePackageImage,
+);
+
+/**
+ * Admin - Delete package image
+ */
+router.delete(
+  "/:packageId/images/:imageId",
+  authenticate,
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.deletePackageImage,
+);
+
+/**
+ * =========================================================
+ * Package Itinerary Management
+ * =========================================================
+ */
+
+/**
+ * Admin - Add itinerary item
+ */
 router.post(
   "/:packageId/itineraries",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(createPackageItinerarySchema),
-  packagesController.addPackageItinerary
+  packagesController.addPackageItinerary,
 );
 
+/**
+ * Admin - Update itinerary item
+ */
 router.patch(
   "/:packageId/itineraries/:itineraryId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(updatePackageItinerarySchema),
-  packagesController.updatePackageItinerary
+  packagesController.updatePackageItinerary,
 );
 
+/**
+ * Admin - Delete itinerary item
+ */
 router.delete(
   "/:packageId/itineraries/:itineraryId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackageItinerary
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.deletePackageItinerary,
 );
 
-// Package Inclusions
+/**
+ * =========================================================
+ * Package Inclusion Management
+ * =========================================================
+ */
+
 router.post(
   "/:packageId/inclusions",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(createPackageInclusionSchema),
-  packagesController.addPackageInclusion
+  packagesController.addPackageInclusion,
 );
 
 router.patch(
   "/:packageId/inclusions/:inclusionId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(updatePackageInclusionSchema),
-  packagesController.updatePackageInclusion
+  packagesController.updatePackageInclusion,
 );
 
 router.delete(
   "/:packageId/inclusions/:inclusionId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackageInclusion
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.deletePackageInclusion,
 );
 
+/**
+ * =========================================================
+ * Package Exclusion Management
+ * =========================================================
+ */
 
 router.post(
   "/:packageId/exclusions",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(createPackageExclusionSchema),
-  packagesController.addPackageExclusion
+  packagesController.addPackageExclusion,
 );
 
 router.patch(
   "/:packageId/exclusions/:exclusionId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(updatePackageExclusionSchema),
-  packagesController.updatePackageExclusion
+  packagesController.updatePackageExclusion,
 );
 
 router.delete(
   "/:packageId/exclusions/:exclusionId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackageExclusion
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.deletePackageExclusion,
 );
 
+/**
+ * =========================================================
+ * Package FAQ Management
+ * =========================================================
+ */
 
-// Package FAQs
 router.post(
   "/:packageId/faqs",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(createPackageFaqSchema),
-  packagesController.addPackageFaq
+  packagesController.addPackageFaq,
 );
 
 router.patch(
   "/:packageId/faqs/:faqId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
   validateRequest(updatePackageFaqSchema),
-  packagesController.updatePackageFaq
+  packagesController.updatePackageFaq,
 );
 
 router.delete(
   "/:packageId/faqs/:faqId",
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
-  packagesController.deletePackageFaq
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+  packagesController.deletePackageFaq,
 );
 
-router.get(
-  "/slug/:slug",
-  packagesController.getPackageBySlug
-);
+/**
+ * =========================================================
+ * Generic Public Detail Route
+ * =========================================================
+ */
+
+/**
+ * Public - Get package by ID
+ *
+ * Keep the generic /:id route near the bottom.
+ */
+router.get("/:id", packagesController.getPackageById);
 
 module.exports = router;
