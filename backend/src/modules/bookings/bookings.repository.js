@@ -2,6 +2,7 @@ const prisma = require("../../config/prisma");
 
 const bookingInclude = {
   tourRequest: true,
+
   quotation: {
     include: {
       guide: {
@@ -15,9 +16,21 @@ const bookingInclude = {
           },
         },
       },
+
+      itineraries: {
+        orderBy: {
+          dayNumber: "asc",
+        },
+      },
+
+      inclusions: true,
+
+      exclusions: true,
     },
   },
+
   payment: true,
+
   tourist: {
     select: {
       id: true,
@@ -58,10 +71,7 @@ const findBookingsByTouristId = async (touristId) => {
   });
 };
 
-const confirmBookingFromPayment = async ({
-  paymentId,
-  bookingReference,
-}) => {
+const confirmBookingFromPayment = async ({ paymentId, bookingReference }) => {
   return prisma.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({
       where: {

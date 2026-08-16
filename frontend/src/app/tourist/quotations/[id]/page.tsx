@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 
 import { useParams } from "next/navigation";
@@ -27,6 +29,10 @@ import {
 } from "@/features/quotations/quotation.api";
 
 import { RejectQuotationDialog } from "@/features/quotations/components/reject-quotation-dialog";
+
+import { InitiatePaymentCard } from "@/features/payments/components/initiate-payment-card";
+
+import type { Payment } from "@/features/payments/payment.types";
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -56,6 +62,8 @@ export default function TouristQuotationPage() {
   const quotationId = params.id;
 
   const queryClient = useQueryClient();
+
+  const [payment, setPayment] = useState<Payment | null>(null);
 
   const {
     data: quotation,
@@ -447,22 +455,82 @@ export default function TouristQuotationPage() {
           )}
 
           {isAccepted && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex gap-3">
-                  <CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" />
+            <>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex gap-3">
+                    <CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" />
 
-                  <div>
-                    <p className="font-semibold">Quotation accepted</p>
+                    <div>
+                      <p className="font-semibold">Quotation accepted</p>
 
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      You have accepted this quotation. The next step is
-                      payment.
-                    </p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        You have accepted this quotation. You can now continue
+                        to payment.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {!payment ? (
+                <InitiatePaymentCard
+                  quotationId={quotation.id}
+                  amount={quotation.totalAmount}
+                  currency={quotation.currency}
+                  onPaymentCreated={setPayment}
+                />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Payment initiated</CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Payment reference
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {payment.paymentReference}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Payment method
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {formatStatus(payment.paymentMethod)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+
+                      <p className="mt-1 font-medium">
+                        {formatStatus(payment.status)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-muted-foreground">Amount</p>
+
+                      <p className="mt-1 text-xl font-semibold">
+                        {payment.currency} {payment.amount}
+                      </p>
+                    </div>
+
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      The payment has been created and is waiting for
+                      confirmation.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           {isRejected && (
@@ -508,18 +576,20 @@ export default function TouristQuotationPage() {
             </Card>
           )}
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex gap-3">
-                <Wallet className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+          {!isAccepted && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex gap-3">
+                  <Wallet className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Payment becomes available only after the quotation has been
-                  accepted.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Payment becomes available only after the quotation has been
+                    accepted.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </aside>
       </div>
     </main>
