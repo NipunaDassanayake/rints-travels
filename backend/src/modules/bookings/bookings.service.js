@@ -19,6 +19,16 @@ const generateBookingReference = () => {
     .toUpperCase()}`;
 };
 
+const BOOKING_STATUS_TRANSITIONS = {
+  CONFIRMED: ["IN_PROGRESS", "CANCELLED"],
+
+  IN_PROGRESS: ["COMPLETED", "CANCELLED"],
+
+  COMPLETED: [],
+
+  CANCELLED: [],
+};
+
 const createBookingFromPayment = async (paymentId) => {
   const existing = await bookingsRepository.findBookingByPaymentId(paymentId);
 
@@ -79,15 +89,13 @@ const createBookingFromPayment = async (paymentId) => {
 
     tourRequestId: booking.tourRequestId,
 
-    guideId: booking.guideId,
-
     totalAmount: booking.totalAmount,
 
     currency: booking.currency,
 
     status: booking.status,
 
-    bookedAt: booking.bookedAt,
+    confirmedAt: booking.confirmedAt,
   });
 
   return booking;
@@ -95,6 +103,14 @@ const createBookingFromPayment = async (paymentId) => {
 
 const getMyBookings = async (touristId) => {
   return bookingsRepository.findBookingsByTouristId(touristId);
+};
+
+const getAllBookings = async (query = {}) => {
+  return bookingsRepository.findAllBookings({
+    status: query.status,
+
+    touristId: query.touristId,
+  });
 };
 
 const getBookingById = async (bookingId, currentUser) => {
@@ -117,8 +133,57 @@ const getBookingById = async (bookingId, currentUser) => {
   return booking;
 };
 
+const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
+  const booking = await bookingsRepository.findBookingById(bookingId);
+
+  if (!booking) {
+    throw new NotFoundError("Booking not found");
+  }
+
+  const allowedStatuses = BOOKING_STATUS_TRANSITIONS[booking.status] || [];
+
+  if (!allowedStatuses.includes(newStatus)) {
+    throw new BadRequestError(
+      `Cannot change booking status from ${booking.status} to ${newStatus}`,
+    );
+  }
+
+  const updatedBooking = await bookingsRepository.updateBookingStatus(
+    bookingId,
+    newStatus,
+  );
+
+  logger.info({
+    event: "BOOKING_STATUS_CHANGED",
+
+    bookingId: updatedBooking.id,
+
+    bookingReference: updatedBooking.bookingReference,
+
+    touristId: updatedBooking.touristId,
+
+    tourRequestId: updatedBooking.tourRequestId,
+
+    quotationId: updatedBooking.quotationId,
+
+    paymentId: updatedBooking.paymentId,
+
+    previousStatus: booking.status,
+
+    newStatus: updatedBooking.status,
+
+    changedByUserId: currentUser.id,
+
+    changedByRole: currentUser.role,
+  });
+
+  return updatedBooking;
+};
+
 module.exports = {
   createBookingFromPayment,
   getMyBookings,
+  getAllBookings,
   getBookingById,
+  updateBookingStatus,
 };
