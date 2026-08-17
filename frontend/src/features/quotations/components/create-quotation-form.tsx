@@ -1,43 +1,22 @@
 "use client";
 
-import {
-  useMemo,
-  useState,
-} from "react";
+import { useMemo, useState } from "react";
 
-import {
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import {
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { FileText, LoaderCircle, Plus, Trash2 } from "lucide-react";
 
-import {
-  Button,
-} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
-import {
-  Input,
-} from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 
-import {
-  Label,
-} from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
 
-import {
-  Textarea,
-} from "@/components/ui/textarea";
+import { Textarea } from "@/components/ui/textarea";
 
-import {
-  createQuotation,
-} from "@/features/quotations/quotation.api";
+import { createQuotation } from "@/features/quotations/quotation.api";
 
-import type {
-  TourRequest,
-} from "@/features/tour-requests/tour-request.types";
+import type { TourRequest } from "@/features/tour-requests/tour-request.types";
 
 interface CreateQuotationFormProps {
   request: TourRequest;
@@ -50,9 +29,7 @@ interface ItineraryFormItem {
   description: string;
 }
 
-function toDateInputValue(
-  value: string | null
-) {
+function toDateInputValue(value: string | null) {
   if (!value) {
     return "";
   }
@@ -60,219 +37,130 @@ function toDateInputValue(
   return value.slice(0, 10);
 }
 
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unable to create the quotation.";
+}
+
 export function CreateQuotationForm({
   request,
   requestId,
 }: CreateQuotationFormProps) {
-  const queryClient =
-    useQueryClient();
+  const queryClient = useQueryClient();
 
   const defaultTitle =
-    request.travelPackage?.title ??
-    request.title ??
-    "Custom Sri Lanka Tour";
+    request.travelPackage?.title ?? request.title ?? "Custom Sri Lanka Tour";
 
   const defaultDescription =
-    request.travelPackage?.description ??
-    request.destinationPreferences ??
-    "";
+    request.travelPackage?.description ?? request.destinationPreferences ?? "";
 
-  const [
-    isOpen,
-    setIsOpen,
-  ] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const [
-    guideId,
-    setGuideId,
-  ] = useState(
-    request.preferredGuideId ?? ""
+  const [guideId, setGuideId] = useState(request.preferredGuideId ?? "");
+
+  const [title, setTitle] = useState(defaultTitle);
+
+  const [description, setDescription] = useState(defaultDescription);
+
+  const [startDate, setStartDate] = useState(
+    toDateInputValue(request.preferredStartDate),
   );
 
-  const [
-    title,
-    setTitle,
-  ] = useState(
-    defaultTitle
+  const [endDate, setEndDate] = useState(
+    toDateInputValue(request.preferredEndDate),
   );
 
-  const [
-    description,
-    setDescription,
-  ] = useState(
-    defaultDescription
-  );
+  const [adultCount, setAdultCount] = useState(String(request.adultCount));
 
-  const [
-    startDate,
-    setStartDate,
-  ] = useState(
-    toDateInputValue(
-      request.preferredStartDate
-    )
-  );
+  const [childCount, setChildCount] = useState(String(request.childCount));
 
-  const [
-    endDate,
-    setEndDate,
-  ] = useState(
-    toDateInputValue(
-      request.preferredEndDate
-    )
-  );
+  const [subtotal, setSubtotal] = useState("");
 
-  const [
-    adultCount,
-    setAdultCount,
-  ] = useState(
-    String(
-      request.adultCount
-    )
-  );
+  const [discountAmount, setDiscountAmount] = useState("0");
 
-  const [
-    childCount,
-    setChildCount,
-  ] = useState(
-    String(
-      request.childCount
-    )
-  );
+  const [taxAmount, setTaxAmount] = useState("0");
 
-  const [
-    subtotal,
-    setSubtotal,
-  ] = useState("");
+  const [currency, setCurrency] = useState(request.currency);
 
-  const [
-    discountAmount,
-    setDiscountAmount,
-  ] = useState("0");
+  const [notes, setNotes] = useState("");
 
-  const [
-    taxAmount,
-    setTaxAmount,
-  ] = useState("0");
+  const [termsConditions, setTermsConditions] = useState("");
 
-  const [
-    currency,
-    setCurrency,
-  ] = useState(
-    request.currency
-  );
+  const [validUntil, setValidUntil] = useState("");
 
-  const [
-    notes,
-    setNotes,
-  ] = useState("");
+  const [itineraries, setItineraries] = useState<ItineraryFormItem[]>([]);
 
-  const [
-    termsConditions,
-    setTermsConditions,
-  ] = useState("");
+  const [inclusionInput, setInclusionInput] = useState("");
 
-  const [
-    validUntil,
-    setValidUntil,
-  ] = useState("");
+  const [inclusions, setInclusions] = useState<string[]>([]);
 
-  const [
-    itineraries,
-    setItineraries,
-  ] = useState<
-    ItineraryFormItem[]
-  >([]);
+  const [exclusionInput, setExclusionInput] = useState("");
 
-  const [
-    inclusionInput,
-    setInclusionInput,
-  ] = useState("");
+  const [exclusions, setExclusions] = useState<string[]>([]);
 
-  const [
-    inclusions,
-    setInclusions,
-  ] = useState<string[]>([]);
+  /**
+   * =========================================================
+   * Pricing
+   * =========================================================
+   */
 
-  const [
-    exclusionInput,
-    setExclusionInput,
-  ] = useState("");
+  const totalAmount = useMemo(() => {
+    const subtotalValue = Number(subtotal) || 0;
 
-  const [
-    exclusions,
-    setExclusions,
-  ] = useState<string[]>([]);
+    const discountValue = Number(discountAmount) || 0;
 
-  const totalAmount =
-    useMemo(() => {
-      const subtotalValue =
-        Number(subtotal) || 0;
+    const taxValue = Number(taxAmount) || 0;
 
-      const discountValue =
-        Number(
-          discountAmount
-        ) || 0;
+    return Math.max(subtotalValue - discountValue + taxValue, 0);
+  }, [subtotal, discountAmount, taxAmount]);
 
-      const taxValue =
-        Number(taxAmount) || 0;
-
-      return Math.max(
-        subtotalValue -
-          discountValue +
-          taxValue,
-        0
-      );
-    }, [
-      subtotal,
-      discountAmount,
-      taxAmount,
-    ]);
+  /**
+   * =========================================================
+   * Reset / Open
+   * =========================================================
+   */
 
   const openForm = () => {
-    setGuideId(
-      request.preferredGuideId ??
-        ""
-    );
+    setGuideId(request.preferredGuideId ?? "");
 
     setTitle(
-      request.travelPackage?.title ??
-        request.title ??
-        "Custom Sri Lanka Tour"
+      request.travelPackage?.title ?? request.title ?? "Custom Sri Lanka Tour",
     );
 
     setDescription(
       request.travelPackage?.description ??
         request.destinationPreferences ??
-        ""
+        "",
     );
 
-    setStartDate(
-      toDateInputValue(
-        request.preferredStartDate
-      )
-    );
+    setStartDate(toDateInputValue(request.preferredStartDate));
 
-    setEndDate(
-      toDateInputValue(
-        request.preferredEndDate
-      )
-    );
+    setEndDate(toDateInputValue(request.preferredEndDate));
 
-    setAdultCount(
-      String(
-        request.adultCount
-      )
-    );
+    setAdultCount(String(request.adultCount));
 
-    setChildCount(
-      String(
-        request.childCount
-      )
-    );
+    setChildCount(String(request.childCount));
 
-    setCurrency(
-      request.currency
-    );
+    setCurrency(request.currency);
 
     setSubtotal("");
     setDiscountAmount("0");
@@ -292,427 +180,334 @@ export function CreateQuotationForm({
     setIsOpen(true);
   };
 
-  const mutation =
-    useMutation({
-      mutationFn: () =>
-        createQuotation(
-          requestId,
-          {
-            guideId:
-              guideId || null,
+  /**
+   * =========================================================
+   * Create Mutation
+   * =========================================================
+   */
 
-            title:
-              title.trim(),
+  const mutation = useMutation({
+    mutationFn: () =>
+      createQuotation(requestId, {
+        guideId: guideId.trim() || null,
 
-            description:
-              description.trim() ||
-              null,
+        title: title.trim(),
 
-            startDate,
-            endDate,
+        description: description.trim() || null,
 
-            adultCount:
-              Number(
-                adultCount
-              ),
+        startDate,
 
-            childCount:
-              Number(
-                childCount
-              ),
+        endDate,
 
-            subtotal:
-              Number(
-                subtotal
-              ),
+        adultCount: Number(adultCount),
 
-            discountAmount:
-              Number(
-                discountAmount
-              ) || 0,
+        childCount: Number(childCount),
 
-            taxAmount:
-              Number(
-                taxAmount
-              ) || 0,
+        subtotal: Number(subtotal),
 
-            totalAmount,
+        discountAmount: Number(discountAmount) || 0,
 
-            currency:
-              currency
-                .trim()
-                .toUpperCase(),
+        taxAmount: Number(taxAmount) || 0,
 
-            notes:
-              notes.trim() ||
-              null,
+        totalAmount,
 
-            termsConditions:
-              termsConditions.trim() ||
-              null,
+        currency: currency.trim().toUpperCase(),
 
-            validUntil:
-              validUntil ||
-              null,
+        notes: notes.trim() || null,
 
-            itineraries,
+        termsConditions: termsConditions.trim() || null,
 
-            inclusions,
+        validUntil: validUntil || null,
 
-            exclusions,
-          }
-        ),
+        itineraries,
 
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: [
-            "admin",
-            "tour-request",
-            requestId,
-          ],
-        });
+        inclusions,
 
-        await queryClient.invalidateQueries({
-          queryKey: [
-            "tour-request",
-            requestId,
-            "quotations",
-          ],
-        });
+        exclusions,
+      }),
 
-        setIsOpen(false);
-      },
-    });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "tour-request", requestId],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["tour-request", requestId, "quotations"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "tour-requests"],
+      });
+
+      setIsOpen(false);
+    },
+  });
+
+  /**
+   * =========================================================
+   * Itinerary
+   * =========================================================
+   */
 
   const addItineraryItem = () => {
-    setItineraries(
-      (current) => [
-        ...current,
-        {
-          dayNumber:
-            current.length + 1,
-          title: "",
-          description: "",
-        },
-      ]
-    );
+    setItineraries((current) => [
+      ...current,
+      {
+        dayNumber: current.length + 1,
+
+        title: "",
+
+        description: "",
+      },
+    ]);
   };
 
   const updateItineraryItem = (
     index: number,
-    field:
-      | "dayNumber"
-      | "title"
-      | "description",
-    value: string
+    field: "dayNumber" | "title" | "description",
+    value: string,
   ) => {
-    setItineraries(
-      (current) =>
-        current.map(
-          (
-            item,
-            itemIndex
-          ) =>
-            itemIndex === index
-              ? {
-                  ...item,
-
-                  [field]:
-                    field ===
-                    "dayNumber"
-                      ? Number(
-                          value
-                        )
-                      : value,
-                }
-              : item
-        )
-    );
-  };
-
-  const removeItineraryItem = (
-    index: number
-  ) => {
-    setItineraries(
-      (current) =>
-        current
-          .filter(
-            (
-              _,
-              itemIndex
-            ) =>
-              itemIndex !==
-              index
-          )
-          .map(
-            (
-              item,
-              itemIndex
-            ) => ({
+    setItineraries((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
               ...item,
-              dayNumber:
-                itemIndex + 1,
-            })
-          )
+
+              [field]: field === "dayNumber" ? Number(value) : value,
+            }
+          : item,
+      ),
     );
   };
+
+  const removeItineraryItem = (index: number) => {
+    setItineraries((current) =>
+      current
+        .filter((_, itemIndex) => itemIndex !== index)
+        .map((item, itemIndex) => ({
+          ...item,
+
+          dayNumber: itemIndex + 1,
+        })),
+    );
+  };
+
+  /**
+   * =========================================================
+   * Inclusions / Exclusions
+   * =========================================================
+   */
 
   const addInclusion = () => {
-    const value =
-      inclusionInput.trim();
+    const value = inclusionInput.trim();
 
-    if (!value) {
+    if (value.length < 2) {
       return;
     }
 
-    setInclusions(
-      (current) => [
-        ...current,
-        value,
-      ]
-    );
+    setInclusions((current) => [...current, value]);
 
     setInclusionInput("");
   };
 
   const addExclusion = () => {
-    const value =
-      exclusionInput.trim();
+    const value = exclusionInput.trim();
 
-    if (!value) {
+    if (value.length < 2) {
       return;
     }
 
-    setExclusions(
-      (current) => [
-        ...current,
-        value,
-      ]
-    );
+    setExclusions((current) => [...current, value]);
 
     setExclusionInput("");
   };
 
+  /**
+   * =========================================================
+   * Validation
+   * =========================================================
+   */
+
+  const hasInvalidItinerary = itineraries.some(
+    (item) =>
+      item.dayNumber < 1 ||
+      item.title.trim().length < 3 ||
+      item.description.trim().length < 5,
+  );
+
   const isInvalid =
     !title.trim() ||
+    title.trim().length < 3 ||
     !startDate ||
     !endDate ||
+    endDate < startDate ||
     !adultCount ||
     Number(adultCount) < 1 ||
     Number(childCount) < 0 ||
     !subtotal ||
     Number(subtotal) <= 0 ||
     totalAmount <= 0 ||
-    !currency.trim();
+    !currency.trim() ||
+    hasInvalidItinerary;
 
   if (!isOpen) {
     return (
-      <Button
-        className="w-full"
-        onClick={openForm}
-      >
+      <Button className="w-full" onClick={openForm}>
+        <FileText className="size-4" />
         Create quotation
       </Button>
     );
   }
 
   return (
-    <div className="space-y-6 rounded-xl border p-4">
-      <div>
-        <h3 className="text-lg font-semibold">
-          Create quotation
-        </h3>
+    <div className="space-y-7 rounded-xl border bg-background p-5">
+      {/* Header */}
 
-        <p className="mt-1 text-sm text-muted-foreground">
-          Prepare a customized quotation for this tour request.
+      <div>
+        <h3 className="text-lg font-semibold">Create quotation</h3>
+
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          Prepare the final customized itinerary, pricing and terms for the
+          tourist.
         </p>
       </div>
 
+      {/* Basic details */}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="quotation-title">
-            Title
-          </Label>
+          <Label htmlFor="quotation-title">Title</Label>
 
           <Input
             id="quotation-title"
             value={title}
-            onChange={(event) =>
-              setTitle(
-                event.target.value
-              )
-            }
+            onChange={(event) => setTitle(event.target.value)}
           />
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="quotation-description">
-            Description
-          </Label>
+          <Label htmlFor="quotation-description">Description</Label>
 
           <Textarea
             id="quotation-description"
             rows={4}
             value={description}
-            onChange={(event) =>
-              setDescription(
-                event.target.value
-              )
-            }
+            onChange={(event) => setDescription(event.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="quotation-start-date">
-            Start date
-          </Label>
+          <Label htmlFor="quotation-start-date">Start date</Label>
 
           <Input
             id="quotation-start-date"
             type="date"
             value={startDate}
-            onChange={(event) =>
-              setStartDate(
-                event.target.value
-              )
-            }
+            onChange={(event) => setStartDate(event.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="quotation-end-date">
-            End date
-          </Label>
+          <Label htmlFor="quotation-end-date">End date</Label>
 
           <Input
             id="quotation-end-date"
             type="date"
+            min={startDate || undefined}
             value={endDate}
-            onChange={(event) =>
-              setEndDate(
-                event.target.value
-              )
-            }
+            onChange={(event) => setEndDate(event.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="quotation-adults">
-            Adults
-          </Label>
+          <Label htmlFor="quotation-adults">Adults</Label>
 
           <Input
             id="quotation-adults"
             type="number"
             min="1"
             value={adultCount}
-            onChange={(event) =>
-              setAdultCount(
-                event.target.value
-              )
-            }
+            onChange={(event) => setAdultCount(event.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="quotation-children">
-            Children
-          </Label>
+          <Label htmlFor="quotation-children">Children</Label>
 
           <Input
             id="quotation-children"
             type="number"
             min="0"
             value={childCount}
-            onChange={(event) =>
-              setChildCount(
-                event.target.value
-              )
-            }
+            onChange={(event) => setChildCount(event.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="quotation-guide">
-            Guide ID
-          </Label>
+          <Label htmlFor="quotation-guide">Guide ID</Label>
 
           <Input
             id="quotation-guide"
             placeholder="Optional guide UUID"
             value={guideId}
-            onChange={(event) =>
-              setGuideId(
-                event.target.value
-              )
-            }
+            onChange={(event) => setGuideId(event.target.value)}
           />
+
+          <p className="text-xs text-muted-foreground">
+            Leave blank when no specific guide is assigned.
+          </p>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="quotation-valid-until">
-            Valid until
-          </Label>
+          <Label htmlFor="quotation-valid-until">Valid until</Label>
 
           <Input
             id="quotation-valid-until"
             type="date"
             value={validUntil}
-            onChange={(event) =>
-              setValidUntil(
-                event.target.value
-              )
-            }
+            onChange={(event) => setValidUntil(event.target.value)}
           />
         </div>
       </div>
 
-      <div className="space-y-4 rounded-xl border p-4">
-        <h4 className="font-semibold">
-          Pricing
-        </h4>
+      {/* Pricing */}
+
+      <div className="space-y-4 rounded-xl border p-5">
+        <div>
+          <h4 className="font-semibold">Pricing</h4>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            The total is calculated automatically.
+          </p>
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="quotation-subtotal">
-              Subtotal
-            </Label>
+            <Label htmlFor="quotation-subtotal">Subtotal</Label>
 
             <Input
               id="quotation-subtotal"
               type="number"
-              min="0"
+              min="0.01"
               step="0.01"
               value={subtotal}
-              onChange={(event) =>
-                setSubtotal(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setSubtotal(event.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quotation-currency">
-              Currency
-            </Label>
+            <Label htmlFor="quotation-currency">Currency</Label>
 
             <Input
               id="quotation-currency"
               value={currency}
               maxLength={10}
-              onChange={(event) =>
-                setCurrency(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setCurrency(event.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quotation-discount">
-              Discount
-            </Label>
+            <Label htmlFor="quotation-discount">Discount</Label>
 
             <Input
               id="quotation-discount"
@@ -720,18 +515,12 @@ export function CreateQuotationForm({
               min="0"
               step="0.01"
               value={discountAmount}
-              onChange={(event) =>
-                setDiscountAmount(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setDiscountAmount(event.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quotation-tax">
-              Tax
-            </Label>
+            <Label htmlFor="quotation-tax">Tax</Label>
 
             <Input
               id="quotation-tax"
@@ -739,353 +528,267 @@ export function CreateQuotationForm({
               min="0"
               step="0.01"
               value={taxAmount}
-              onChange={(event) =>
-                setTaxAmount(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setTaxAmount(event.target.value)}
             />
           </div>
         </div>
 
         <div className="rounded-lg bg-muted p-4">
-          <p className="text-sm text-muted-foreground">
-            Total
-          </p>
+          <p className="text-sm text-muted-foreground">Final total</p>
 
           <p className="mt-1 text-2xl font-bold">
-            {currency || "USD"}{" "}
-            {totalAmount.toFixed(
-              2
-            )}
+            {currency || "USD"} {totalAmount.toFixed(2)}
+          </p>
+
+          <p className="mt-2 text-xs text-muted-foreground">
+            Subtotal − discount + tax
           </p>
         </div>
       </div>
 
+      {/* Itinerary */}
+
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h4 className="font-semibold">
-              Itinerary
-            </h4>
+            <h4 className="font-semibold">Itinerary</h4>
 
             <p className="text-sm text-muted-foreground">
-              Add the customized day-by-day plan.
+              Add the customized day-by-day journey.
             </p>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={
-              addItineraryItem
-            }
-          >
+          <Button type="button" variant="outline" onClick={addItineraryItem}>
             <Plus className="size-4" />
             Add day
           </Button>
         </div>
 
-        {itineraries.length ===
-          0 && (
+        {itineraries.length === 0 && (
           <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            No itinerary items added yet.
+            No itinerary items added yet. The quotation can still be created
+            without an itinerary.
           </p>
         )}
 
-        {itineraries.map(
-          (
-            item,
-            index
-          ) => (
-            <div
-              key={index}
-              className="space-y-4 rounded-xl border p-4"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <h5 className="font-medium">
-                  Day{" "}
-                  {
-                    item.dayNumber
-                  }
-                </h5>
+        {itineraries.map((item, index) => (
+          <div key={index} className="space-y-4 rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-4">
+              <h5 className="font-medium">Day {item.dayNumber}</h5>
+
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => removeItineraryItem(index)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Title</Label>
+
+              <Input
+                value={item.title}
+                placeholder="Example: Arrival in Colombo"
+                onChange={(event) =>
+                  updateItineraryItem(index, "title", event.target.value)
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+
+              <Textarea
+                rows={3}
+                value={item.description}
+                placeholder="Describe the day's activities..."
+                onChange={(event) =>
+                  updateItineraryItem(index, "description", event.target.value)
+                }
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Inclusion / Exclusion */}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-4 rounded-xl border p-4">
+          <div>
+            <h4 className="font-semibold">Inclusions</h4>
+
+            <p className="text-sm text-muted-foreground">
+              Services covered by the quotation.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Input
+              value={inclusionInput}
+              placeholder="Airport pickup"
+              onChange={(event) => setInclusionInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+
+                  addInclusion();
+                }
+              }}
+            />
+
+            <Button type="button" variant="outline" onClick={addInclusion}>
+              Add
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {inclusions.map((item, index) => (
+              <div
+                key={`${item}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+              >
+                <span>{item}</span>
 
                 <Button
                   type="button"
                   size="icon"
                   variant="ghost"
                   onClick={() =>
-                    removeItineraryItem(
-                      index
+                    setInclusions((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
                     )
                   }
                 >
                   <Trash2 className="size-4" />
                 </Button>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="space-y-2">
-                <Label>
-                  Title
-                </Label>
-
-                <Input
-                  value={
-                    item.title
-                  }
-                  onChange={(event) =>
-                    updateItineraryItem(
-                      index,
-                      "title",
-                      event.target.value
-                    )
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>
-                  Description
-                </Label>
-
-                <Textarea
-                  rows={3}
-                  value={
-                    item.description
-                  }
-                  onChange={(event) =>
-                    updateItineraryItem(
-                      index,
-                      "description",
-                      event.target.value
-                    )
-                  }
-                />
-              </div>
-            </div>
-          )
-        )}
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-4">
+        <div className="space-y-4 rounded-xl border p-4">
           <div>
-            <h4 className="font-semibold">
-              Inclusions
-            </h4>
+            <h4 className="font-semibold">Exclusions</h4>
 
             <p className="text-sm text-muted-foreground">
-              What is included in the quotation.
+              Services the tourist must arrange separately.
             </p>
           </div>
 
           <div className="flex gap-2">
             <Input
-              value={
-                inclusionInput
-              }
-              placeholder="Example: Airport pickup"
-              onChange={(event) =>
-                setInclusionInput(
-                  event.target.value
-                )
-              }
+              value={exclusionInput}
+              placeholder="International airfare"
+              onChange={(event) => setExclusionInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+
+                  addExclusion();
+                }
+              }}
             />
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={
-                addInclusion
-              }
-            >
+            <Button type="button" variant="outline" onClick={addExclusion}>
               Add
             </Button>
           </div>
 
           <div className="space-y-2">
-            {inclusions.map(
-              (
-                item,
-                index
-              ) => (
-                <div
-                  key={`${item}-${index}`}
-                  className="flex items-center justify-between rounded-lg border p-3 text-sm"
+            {exclusions.map((item, index) => (
+              <div
+                key={`${item}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+              >
+                <span>{item}</span>
+
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() =>
+                    setExclusions((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
                 >
-                  <span>
-                    {item}
-                  </span>
-
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() =>
-                      setInclusions(
-                        (current) =>
-                          current.filter(
-                            (
-                              _,
-                              itemIndex
-                            ) =>
-                              itemIndex !==
-                              index
-                          )
-                      )
-                    }
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              )
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <h4 className="font-semibold">
-              Exclusions
-            </h4>
-
-            <p className="text-sm text-muted-foreground">
-              What is not included in the quotation.
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              value={
-                exclusionInput
-              }
-              placeholder="Example: International flights"
-              onChange={(event) =>
-                setExclusionInput(
-                  event.target.value
-                )
-              }
-            />
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={
-                addExclusion
-              }
-            >
-              Add
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            {exclusions.map(
-              (
-                item,
-                index
-              ) => (
-                <div
-                  key={`${item}-${index}`}
-                  className="flex items-center justify-between rounded-lg border p-3 text-sm"
-                >
-                  <span>
-                    {item}
-                  </span>
-
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() =>
-                      setExclusions(
-                        (current) =>
-                          current.filter(
-                            (
-                              _,
-                              itemIndex
-                            ) =>
-                              itemIndex !==
-                              index
-                          )
-                      )
-                    }
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              )
-            )}
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* Notes */}
 
       <div className="space-y-2">
-        <Label htmlFor="quotation-notes">
-          Notes
-        </Label>
+        <Label htmlFor="quotation-notes">Notes</Label>
 
         <Textarea
           id="quotation-notes"
           rows={4}
           value={notes}
-          onChange={(event) =>
-            setNotes(
-              event.target.value
-            )
-          }
+          placeholder="Additional information for the tourist..."
+          onChange={(event) => setNotes(event.target.value)}
         />
       </div>
 
+      {/* Terms */}
+
       <div className="space-y-2">
-        <Label htmlFor="quotation-terms">
-          Terms & conditions
-        </Label>
+        <Label htmlFor="quotation-terms">Terms &amp; conditions</Label>
 
         <Textarea
           id="quotation-terms"
           rows={5}
-          value={
-            termsConditions
-          }
-          onChange={(event) =>
-            setTermsConditions(
-              event.target.value
-            )
-          }
+          value={termsConditions}
+          placeholder="Example: Subject to hotel and guide availability..."
+          onChange={(event) => setTermsConditions(event.target.value)}
         />
       </div>
 
+      {/* Error */}
+
       {mutation.isError && (
-        <p className="text-sm text-destructive">
-          Unable to create the quotation. Please check the entered values.
-        </p>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <p className="font-medium text-destructive">
+            Unable to create quotation
+          </p>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            {getErrorMessage(mutation.error)}
+          </p>
+        </div>
       )}
+
+      {/* Actions */}
 
       <div className="flex flex-wrap gap-3">
         <Button
           className="flex-1"
-          disabled={
-            mutation.isPending ||
-            isInvalid
-          }
-          onClick={() =>
-            mutation.mutate()
-          }
+          disabled={mutation.isPending || isInvalid}
+          onClick={() => mutation.mutate()}
         >
-          {mutation.isPending
-            ? "Creating..."
-            : "Create draft quotation"}
+          {mutation.isPending ? (
+            <>
+              <LoaderCircle className="size-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            "Create draft quotation"
+          )}
         </Button>
 
         <Button
           type="button"
           variant="outline"
-          disabled={
-            mutation.isPending
-          }
-          onClick={() =>
-            setIsOpen(false)
-          }
+          disabled={mutation.isPending}
+          onClick={() => setIsOpen(false)}
         >
           Cancel
         </Button>

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { CalendarDays, Send } from "lucide-react";
+import { CalendarDays, LoaderCircle, Pencil, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +41,30 @@ function toDateInputValue(value: string | null | undefined) {
   return value.slice(0, 10);
 }
 
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Something went wrong.";
+}
+
 export function AdminQuotationCard({
   quotation,
   requestId,
@@ -71,8 +95,6 @@ export function AdminQuotationCard({
 
   const [taxAmount, setTaxAmount] = useState(quotation.taxAmount);
 
-  const [totalAmount, setTotalAmount] = useState(quotation.totalAmount);
-
   const [currency, setCurrency] = useState(quotation.currency);
 
   const [notes, setNotes] = useState(quotation.notes ?? "");
@@ -84,6 +106,19 @@ export function AdminQuotationCard({
   const [validUntil, setValidUntil] = useState(
     toDateInputValue(quotation.validUntil),
   );
+
+  /**
+   * Recalculate instead of manually editing total.
+   */
+  const calculatedTotal = useMemo(() => {
+    const subtotalValue = Number(subtotal) || 0;
+
+    const discountValue = Number(discountAmount) || 0;
+
+    const taxValue = Number(taxAmount) || 0;
+
+    return Math.max(subtotalValue - discountValue + taxValue, 0);
+  }, [subtotal, discountAmount, taxAmount]);
 
   const resetEditValues = () => {
     setTitle(quotation.title);
@@ -103,8 +138,6 @@ export function AdminQuotationCard({
     setDiscountAmount(quotation.discountAmount);
 
     setTaxAmount(quotation.taxAmount);
-
-    setTotalAmount(quotation.totalAmount);
 
     setCurrency(quotation.currency);
 
@@ -127,6 +160,10 @@ export function AdminQuotationCard({
     await queryClient.invalidateQueries({
       queryKey: ["admin", "tour-requests"],
     });
+
+    await queryClient.invalidateQueries({
+      queryKey: ["tour-request", requestId],
+    });
   };
 
   const updateMutation = useMutation({
@@ -137,6 +174,7 @@ export function AdminQuotationCard({
         description: description.trim() || null,
 
         startDate,
+
         endDate,
 
         adultCount: Number(adultCount),
@@ -149,7 +187,7 @@ export function AdminQuotationCard({
 
         taxAmount: Number(taxAmount) || 0,
 
-        totalAmount: Number(totalAmount),
+        totalAmount: calculatedTotal,
 
         currency: currency.trim().toUpperCase(),
 
@@ -177,9 +215,27 @@ export function AdminQuotationCard({
 
   const isDraft = quotation.status === "DRAFT";
 
+  const isUpdateInvalid =
+    !title.trim() ||
+    title.trim().length < 3 ||
+    !startDate ||
+    !endDate ||
+    endDate < startDate ||
+    Number(adultCount) < 1 ||
+    Number(childCount) < 0 ||
+    Number(subtotal) <= 0 ||
+    calculatedTotal <= 0 ||
+    !currency.trim();
+
+  /**
+   * =========================================================
+   * Editing
+   * =========================================================
+   */
+
   if (isEditing) {
     return (
-      <div className="space-y-5 rounded-xl border p-4">
+      <div className="space-y-5 rounded-xl border p-5">
         <div>
           <h3 className="font-semibold">Edit quotation</h3>
 
@@ -223,6 +279,7 @@ export function AdminQuotationCard({
 
             <Input
               type="date"
+              min={startDate || undefined}
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
             />
@@ -258,7 +315,7 @@ export function AdminQuotationCard({
             <Input
               type="number"
               step="0.01"
-              min="0"
+              min="0.01"
               value={subtotal}
               onChange={(event) => setSubtotal(event.target.value)}
             />
@@ -268,6 +325,7 @@ export function AdminQuotationCard({
             <Label>Currency</Label>
 
             <Input
+              maxLength={10}
               value={currency}
               onChange={(event) => setCurrency(event.target.value)}
             />
@@ -296,18 +354,14 @@ export function AdminQuotationCard({
               onChange={(event) => setTaxAmount(event.target.value)}
             />
           </div>
+        </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Total</Label>
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-sm text-muted-foreground">Total</p>
 
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={totalAmount}
-              onChange={(event) => setTotalAmount(event.target.value)}
-            />
-          </div>
+          <p className="mt-1 text-2xl font-bold">
+            {currency || "USD"} {calculatedTotal.toFixed(2)}
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -331,7 +385,7 @@ export function AdminQuotationCard({
         </div>
 
         <div className="space-y-2">
-          <Label>Terms & conditions</Label>
+          <Label>Terms &amp; conditions</Label>
 
           <Textarea
             rows={4}
@@ -341,18 +395,27 @@ export function AdminQuotationCard({
         </div>
 
         {updateMutation.isError && (
-          <p className="text-sm text-destructive">
-            Unable to update the quotation.
-          </p>
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+            <p className="text-sm text-destructive">
+              {getErrorMessage(updateMutation.error)}
+            </p>
+          </div>
         )}
 
         <div className="flex gap-3">
           <Button
             className="flex-1"
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || isUpdateInvalid}
             onClick={() => updateMutation.mutate()}
           >
-            {updateMutation.isPending ? "Saving..." : "Save quotation"}
+            {updateMutation.isPending ? (
+              <>
+                <LoaderCircle className="size-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save quotation"
+            )}
           </Button>
 
           <Button
@@ -361,6 +424,7 @@ export function AdminQuotationCard({
             disabled={updateMutation.isPending}
             onClick={() => {
               resetEditValues();
+
               setIsEditing(false);
             }}
           >
@@ -371,15 +435,21 @@ export function AdminQuotationCard({
     );
   }
 
+  /**
+   * =========================================================
+   * Card
+   * =========================================================
+   */
+
   return (
-    <div className="space-y-4 rounded-xl border p-4">
+    <div className="space-y-4 rounded-xl border p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {quotation.quotationNumber}
           </p>
 
-          <h3 className="mt-1 font-semibold">{quotation.title}</h3>
+          <h3 className="mt-1 text-lg font-semibold">{quotation.title}</h3>
 
           <p className="mt-1 text-xs text-muted-foreground">
             Revision {quotation.revisionNumber}
@@ -403,12 +473,38 @@ export function AdminQuotationCard({
         </span>
       </div>
 
-      <div>
-        <p className="text-sm text-muted-foreground">Total</p>
+      <div className="rounded-lg bg-muted/40 p-4">
+        <p className="text-sm text-muted-foreground">Total quotation</p>
 
-        <p className="text-2xl font-bold">
+        <p className="mt-1 text-2xl font-bold">
           {quotation.currency} {quotation.totalAmount}
         </p>
+
+        <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-muted-foreground">
+          <div>
+            <p>Subtotal</p>
+
+            <p className="mt-1 font-medium text-foreground">
+              {quotation.subtotal}
+            </p>
+          </div>
+
+          <div>
+            <p>Discount</p>
+
+            <p className="mt-1 font-medium text-foreground">
+              {quotation.discountAmount}
+            </p>
+          </div>
+
+          <div>
+            <p>Tax</p>
+
+            <p className="mt-1 font-medium text-foreground">
+              {quotation.taxAmount}
+            </p>
+          </div>
+        </div>
       </div>
 
       {quotation.validUntil && (
@@ -424,32 +520,48 @@ export function AdminQuotationCard({
             className="w-full"
             onClick={() => {
               resetEditValues();
+
               setIsEditing(true);
             }}
           >
+            <Pencil className="size-4" />
             Edit quotation
           </Button>
 
           <Button
             className="w-full"
             disabled={sendMutation.isPending}
-            onClick={() => sendMutation.mutate()}
+            onClick={() => {
+              const confirmed = window.confirm(
+                "Send this quotation to the tourist? Once sent, this draft can no longer be edited.",
+              );
+
+              if (confirmed) {
+                sendMutation.mutate();
+              }
+            }}
           >
-            <Send className="size-4" />
+            {sendMutation.isPending ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
 
             {sendMutation.isPending ? "Sending..." : "Send quotation"}
           </Button>
 
           {sendMutation.isError && (
-            <p className="text-sm text-destructive">
-              Unable to send the quotation.
-            </p>
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+              <p className="text-sm text-destructive">
+                {getErrorMessage(sendMutation.error)}
+              </p>
+            </div>
           )}
         </div>
       )}
 
       {!isDraft && (
-        <p className="border-t pt-4 text-sm text-muted-foreground">
+        <p className="border-t pt-4 text-sm leading-6 text-muted-foreground">
           This quotation is no longer editable because its status is{" "}
           <span className="font-medium text-foreground">
             {formatStatus(quotation.status)}
