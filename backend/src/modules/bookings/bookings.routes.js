@@ -10,48 +10,93 @@ const validateRequest = require("../../middlewares/validateRequest");
 
 const { USER_ROLES } = require("../../core/constants/auth.constants");
 
-const { updateBookingStatusSchema } = require("./bookings.validation");
+const {
+  updateBookingStatusSchema,
+  assignBookingGuideSchema,
+} = require("./bookings.validation");
 
 const router = express.Router();
 
 /**
- * Tourist - Own bookings
+ * =========================================================
+ * Tourist - Own Bookings
+ * =========================================================
  */
 
 router.get(
   "/me",
+
   authenticate,
+
   authorize(USER_ROLES.TOURIST),
+
   bookingsController.getMyBookings,
 );
 
 /**
- * Admin - All bookings
+ * =========================================================
+ * Admin - All Bookings
+ * =========================================================
  */
 
 router.get(
   "/",
+
   authenticate,
+
   authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+
   bookingsController.getAllBookings,
 );
 
 /**
- * Admin - Update booking status
+ * =========================================================
+ * Admin - Assign Tour Guide
+ * =========================================================
+ */
+
+router.patch(
+  "/:id/guide",
+
+  authenticate,
+
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+
+  validateRequest(assignBookingGuideSchema),
+
+  bookingsController.assignBookingGuide,
+);
+
+/**
+ * =========================================================
+ * Admin - Update Booking Status
+ * =========================================================
  */
 
 router.patch(
   "/:id/status",
+
   authenticate,
+
   authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+
   validateRequest(updateBookingStatusSchema),
+
   bookingsController.updateBookingStatus,
 );
 
 /**
- * Tourist owner or Admin - Booking details
+ * =========================================================
+ * Tourist Owner / Admin - Booking Details
+ * =========================================================
  */
 
-router.get("/:id", authenticate, bookingsController.getBookingById);
+router.get(
+  "/:id",
+
+  authenticate,
+
+  bookingsController.getBookingById,
+);
 
 module.exports = router;

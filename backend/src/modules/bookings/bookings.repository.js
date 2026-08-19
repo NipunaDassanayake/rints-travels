@@ -1,5 +1,11 @@
 const prisma = require("../../config/prisma");
 
+/**
+ * =========================================================
+ * Shared Booking Include
+ * =========================================================
+ */
+
 const bookingInclude = {
   tourRequest: true,
 
@@ -41,6 +47,12 @@ const bookingInclude = {
   },
 };
 
+/**
+ * =========================================================
+ * Find Booking
+ * =========================================================
+ */
+
 const findBookingByPaymentId = async (paymentId) => {
   return prisma.booking.findUnique({
     where: {
@@ -61,6 +73,12 @@ const findBookingById = async (id) => {
   });
 };
 
+/**
+ * =========================================================
+ * Tourist Bookings
+ * =========================================================
+ */
+
 const findBookingsByTouristId = async (touristId) => {
   return prisma.booking.findMany({
     where: {
@@ -76,12 +94,11 @@ const findBookingsByTouristId = async (touristId) => {
 };
 
 /**
- * Admin - Find all bookings
- *
- * Optional filters:
- * - status
- * - touristId
+ * =========================================================
+ * Admin - All Bookings
+ * =========================================================
  */
+
 const findAllBookings = async ({ status, touristId } = {}) => {
   const where = {};
 
@@ -105,32 +122,28 @@ const findAllBookings = async ({ status, touristId } = {}) => {
 };
 
 /**
- * Admin - Update booking lifecycle status
+ * =========================================================
+ * Update Booking Status
+ * =========================================================
  */
+
 const updateBookingStatus = async (id, status) => {
   const data = {
     status,
   };
 
-  /**
-   * Keep lifecycle timestamps
-   * synchronized with booking status.
-   */
   if (status === "IN_PROGRESS") {
     data.completedAt = null;
-
     data.cancelledAt = null;
   }
 
   if (status === "COMPLETED") {
     data.completedAt = new Date();
-
     data.cancelledAt = null;
   }
 
   if (status === "CANCELLED") {
     data.cancelledAt = new Date();
-
     data.completedAt = null;
   }
 
@@ -144,6 +157,121 @@ const updateBookingStatus = async (id, status) => {
     include: bookingInclude,
   });
 };
+
+/**
+ * =========================================================
+ * Assign Guide To Booking
+ * =========================================================
+ *
+ * At the moment the operational guide assignment is stored
+ * in TourQuotation.guideId.
+ *
+ * Booking details already expose the guide through:
+ *
+ * booking.quotation.guide
+ */
+
+const assignGuideToBooking = async (bookingId, guideId) => {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: {
+        id: bookingId,
+      },
+
+      select: {
+        id: true,
+        quotationId: true,
+      },
+    });
+
+    if (!booking) {
+      return null;
+    }
+
+    await tx.tourQuotation.update({
+      where: {
+        id: booking.quotationId,
+      },
+
+      data: {
+        guideId,
+      },
+    });
+
+    return tx.booking.findUnique({
+      where: {
+        id: bookingId,
+      },
+
+      include: bookingInclude,
+    });
+  });
+};
+
+/**
+ * =========================================================
+ * Find Active Booking Conflict For Guide
+ * =========================================================
+ *
+ * Prevents assigning the same guide to overlapping bookings.
+ */
+
+const findGuideBookingConflict = async ({
+  guideId,
+  startDate,
+  endDate,
+  excludeBookingId,
+}) => {
+  return prisma.booking.findFirst({
+    where: {
+      id: excludeBookingId
+        ? {
+            not: excludeBookingId,
+          }
+        : undefined,
+
+      status: {
+        in: ["CONFIRMED", "IN_PROGRESS"],
+      },
+
+      quotation: {
+        guideId,
+      },
+
+      startDate: {
+        lte: endDate,
+      },
+
+      endDate: {
+        gte: startDate,
+      },
+    },
+
+    include: {
+      quotation: {
+        include: {
+          guide: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+};
+
+/**
+ * =========================================================
+ * Create Booking From Successful Payment
+ * =========================================================
+ */
 
 const confirmBookingFromPayment = async ({ paymentId, bookingReference }) => {
   return prisma.$transaction(async (tx) => {
@@ -234,8 +362,15 @@ const confirmBookingFromPayment = async ({ paymentId, bookingReference }) => {
 module.exports = {
   findBookingByPaymentId,
   findBookingById,
+
   findBookingsByTouristId,
+
   findAllBookings,
+
   updateBookingStatus,
+
+  assignGuideToBooking,
+  findGuideBookingConflict,
+
   confirmBookingFromPayment,
 };

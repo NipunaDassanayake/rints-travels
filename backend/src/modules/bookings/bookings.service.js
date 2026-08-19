@@ -4,13 +4,22 @@ const logger = require("../../config/logger");
 
 const bookingsRepository = require("./bookings.repository");
 
+const tourGuidesRepository = require("../tour-guides/tourGuides.repository");
+
 const {
   NotFoundError,
   ForbiddenError,
   BadRequestError,
+  ConflictError,
 } = require("../../utils/AppError");
 
 const { USER_ROLES } = require("../../core/constants/auth.constants");
+
+/**
+ * =========================================================
+ * Booking Reference
+ * =========================================================
+ */
 
 const generateBookingReference = () => {
   return `BKG-${Date.now()}-${crypto
@@ -18,6 +27,12 @@ const generateBookingReference = () => {
     .toString("hex")
     .toUpperCase()}`;
 };
+
+/**
+ * =========================================================
+ * Booking Lifecycle
+ * =========================================================
+ */
 
 const BOOKING_STATUS_TRANSITIONS = {
   CONFIRMED: ["IN_PROGRESS", "CANCELLED"],
@@ -28,6 +43,12 @@ const BOOKING_STATUS_TRANSITIONS = {
 
   CANCELLED: [],
 };
+
+/**
+ * =========================================================
+ * Create Booking
+ * =========================================================
+ */
 
 const createBookingFromPayment = async (paymentId) => {
   const existing = await bookingsRepository.findBookingByPaymentId(paymentId);
@@ -101,9 +122,21 @@ const createBookingFromPayment = async (paymentId) => {
   return booking;
 };
 
+/**
+ * =========================================================
+ * Tourist Bookings
+ * =========================================================
+ */
+
 const getMyBookings = async (touristId) => {
   return bookingsRepository.findBookingsByTouristId(touristId);
 };
+
+/**
+ * =========================================================
+ * Admin Bookings
+ * =========================================================
+ */
 
 const getAllBookings = async (query = {}) => {
   return bookingsRepository.findAllBookings({
@@ -112,6 +145,12 @@ const getAllBookings = async (query = {}) => {
     touristId: query.touristId,
   });
 };
+
+/**
+ * =========================================================
+ * Get Booking
+ * =========================================================
+ */
 
 const getBookingById = async (bookingId, currentUser) => {
   const booking = await bookingsRepository.findBookingById(bookingId);
@@ -133,6 +172,12 @@ const getBookingById = async (bookingId, currentUser) => {
   return booking;
 };
 
+/**
+ * =========================================================
+ * Update Booking Status
+ * =========================================================
+ */
+
 const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
   const booking = await bookingsRepository.findBookingById(bookingId);
 
@@ -146,6 +191,18 @@ const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
     throw new BadRequestError(
       `Cannot change booking status from ${booking.status} to ${newStatus}`,
     );
+  }
+
+  /**
+   * Don't allow a tour to start without a guide.
+   *
+   * We can relax this rule later for self-guided tours,
+   * but for Travora's guided-tour flow it protects us
+   * from starting an incomplete booking.
+   */
+
+  if (newStatus === "IN_PROGRESS" && !booking.quotation.guideId) {
+    throw new BadRequestError("Assign a tour guide before starting the tour");
   }
 
   const updatedBooking = await bookingsRepository.updateBookingStatus(
@@ -180,10 +237,112 @@ const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
   return updatedBooking;
 };
 
+/**
+ * =========================================================
+ * Assign Guide
+ * =========================================================
+ */
+
+const assignBookingGuide = async (bookingId, guideId, currentUser) => {
+  const booking = await bookingsRepository.findBookingById(bookingId);
+
+  if (!booking) {
+    throw new NotFoundError("Booking not found");
+  }
+
+  /**
+   * Completed/cancelled bookings should be immutable.
+   */
+
+  if (["COMPLETED", "CANCELLED"].includes(booking.status)) {
+    throw new BadRequestError(
+      `Cannot assign a guide to a ${booking.status.toLowerCase()} booking`,
+    );
+  }
+
+  /**
+   * Validate guide.
+   */
+
+  const guide = await tourGuidesRepository.findTourGuideById(guideId);
+
+  if (!guide) {
+    throw new NotFoundError("Tour guide not found");
+  }
+
+  if (!guide.isAvailable) {
+    throw new BadRequestError("This tour guide is currently unavailable");
+  }
+
+  /**
+   * If the same guide is already assigned,
+   * simply return the existing booking.
+   */
+
+  if (booking.quotation.guideId === guideId) {
+    return booking;
+  }
+
+  /**
+   * Prevent overlapping assignments.
+   */
+
+  const conflict = await bookingsRepository.findGuideBookingConflict({
+    guideId,
+
+    startDate: booking.startDate,
+
+    endDate: booking.endDate,
+
+    excludeBookingId: booking.id,
+  });
+
+  if (conflict) {
+    throw new ConflictError(
+      `This guide is already assigned to another booking from ${conflict.startDate.toISOString().slice(0, 10)} to ${conflict.endDate.toISOString().slice(0, 10)}`,
+    );
+  }
+
+  const updatedBooking = await bookingsRepository.assignGuideToBooking(
+    bookingId,
+    guideId,
+  );
+
+  if (!updatedBooking) {
+    throw new NotFoundError("Booking not found");
+  }
+
+  logger.info({
+    event: "BOOKING_GUIDE_ASSIGNED",
+
+    bookingId: updatedBooking.id,
+
+    bookingReference: updatedBooking.bookingReference,
+
+    quotationId: updatedBooking.quotationId,
+
+    previousGuideId: booking.quotation.guideId,
+
+    guideId,
+
+    assignedByUserId: currentUser.id,
+
+    assignedByRole: currentUser.role,
+  });
+
+  return updatedBooking;
+};
+
 module.exports = {
   createBookingFromPayment,
+
   getMyBookings,
+
   getAllBookings,
+
   getBookingById,
+
   updateBookingStatus,
+
+  assignBookingGuide,
 };
