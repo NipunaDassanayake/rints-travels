@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { useState } from "react";
+
 import { useParams } from "next/navigation";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,8 +14,11 @@ import {
   Check,
   CheckCircle2,
   CreditCard,
+  Languages,
   LoaderCircle,
   Mail,
+  MapPin,
+  Star,
   UserRound,
   Users,
   Wallet,
@@ -25,9 +30,12 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import {
+  assignBookingGuide,
   getAdminBookingById,
   updateBookingStatus,
 } from "@/features/bookings/admin-booking.api";
+
+import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
 
 import type { BookingStatus } from "@/features/bookings/booking.types";
 
@@ -65,6 +73,30 @@ function formatStatus(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Something went wrong.";
+}
+
 export default function AdminBookingDetailsPage() {
   const params = useParams<{
     id: string;
@@ -73,6 +105,14 @@ export default function AdminBookingDetailsPage() {
   const bookingId = params.id;
 
   const queryClient = useQueryClient();
+
+  const [selectedGuideId, setSelectedGuideId] = useState("");
+
+  /**
+   * =========================================================
+   * Booking
+   * =========================================================
+   */
 
   const {
     data: booking,
@@ -85,6 +125,28 @@ export default function AdminBookingDetailsPage() {
 
     enabled: Boolean(bookingId),
   });
+
+  /**
+   * =========================================================
+   * Tour Guides
+   * =========================================================
+   */
+
+  const {
+    data: guides = [],
+    isLoading: areGuidesLoading,
+    isError: areGuidesError,
+  } = useQuery({
+    queryKey: ["tour-guides"],
+
+    queryFn: getTourGuides,
+  });
+
+  /**
+   * =========================================================
+   * Status Mutation
+   * =========================================================
+   */
 
   const statusMutation = useMutation({
     mutationFn: (status: BookingStatus) =>
@@ -105,6 +167,38 @@ export default function AdminBookingDetailsPage() {
     },
   });
 
+  /**
+   * =========================================================
+   * Guide Assignment Mutation
+   * =========================================================
+   */
+
+  const guideMutation = useMutation({
+    mutationFn: (guideId: string) => assignBookingGuide(bookingId, guideId),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "booking", bookingId],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "bookings"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["bookings", "me"],
+      });
+
+      setSelectedGuideId("");
+    },
+  });
+
+  /**
+   * =========================================================
+   * Loading
+   * =========================================================
+   */
+
   if (isLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center">
@@ -112,6 +206,12 @@ export default function AdminBookingDetailsPage() {
       </main>
     );
   }
+
+  /**
+   * =========================================================
+   * Error
+   * =========================================================
+   */
 
   if (isError || !booking) {
     return (
@@ -136,6 +236,12 @@ export default function AdminBookingDetailsPage() {
     );
   }
 
+  /**
+   * =========================================================
+   * Derived Values
+   * =========================================================
+   */
+
   const touristName = `${booking.tourist.firstName} ${booking.tourist.lastName}`;
 
   const guide = booking.quotation.guide;
@@ -144,8 +250,21 @@ export default function AdminBookingDetailsPage() {
     ? `${guide.user.firstName} ${guide.user.lastName}`
     : "Not assigned";
 
+  const availableGuides = guides.filter((tourGuide) => tourGuide.isAvailable);
+
+  const selectedGuide = guides.find(
+    (tourGuide) => tourGuide.id === selectedGuideId,
+  );
+
+  const canAssignGuide =
+    booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS";
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <div className="mb-8">
         <Link
           href="/admin/bookings"
@@ -183,8 +302,18 @@ export default function AdminBookingDetailsPage() {
         </div>
       </div>
 
+      {/* =====================================================
+          MAIN GRID
+      ===================================================== */}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* ===================================================
+            LEFT
+        =================================================== */}
+
         <div className="space-y-6">
+          {/* Tourist details */}
+
           <Card>
             <CardHeader>
               <CardTitle>Tourist details</CardTitle>
@@ -212,6 +341,8 @@ export default function AdminBookingDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Trip details */}
 
           <Card>
             <CardHeader>
@@ -275,6 +406,8 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* Itinerary */}
+
           <Card>
             <CardHeader>
               <CardTitle>Itinerary</CardTitle>
@@ -309,6 +442,8 @@ export default function AdminBookingDetailsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Included / Not included */}
 
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
@@ -361,7 +496,198 @@ export default function AdminBookingDetailsPage() {
           </div>
         </div>
 
+        {/* ===================================================
+            RIGHT SIDEBAR
+        =================================================== */}
+
         <aside className="space-y-6">
+          {/* =================================================
+              TOUR GUIDE
+          ================================================= */}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tour guide</CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              <div>
+                <p className="text-sm text-muted-foreground">Current guide</p>
+
+                <p className="mt-1 text-lg font-semibold">{guideName}</p>
+              </div>
+
+              {/* Current guide details */}
+
+              {guide && (
+                <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="size-4 text-muted-foreground" />
+
+                    <span>{guide.location || "Location not specified"}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="size-4 text-muted-foreground" />
+
+                    <span>
+                      {guide.experienceYears}{" "}
+                      {guide.experienceYears === 1 ? "year" : "years"}{" "}
+                      experience
+                    </span>
+                  </div>
+
+                  {guide.languages.length > 0 && (
+                    <div className="flex items-start gap-2 text-sm">
+                      <Languages className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+
+                      <span>{guide.languages.join(", ")}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <Star className="size-4 text-muted-foreground" />
+
+                    <span>
+                      {Number(guide.averageRating).toFixed(1)}
+
+                      {guide.totalReviews > 0
+                        ? ` (${guide.totalReviews} reviews)`
+                        : " · No reviews yet"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Guide assignment */}
+
+              {canAssignGuide ? (
+                <>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="booking-guide"
+                      className="text-sm font-medium"
+                    >
+                      {guide ? "Change guide" : "Assign guide"}
+                    </label>
+
+                    {areGuidesLoading ? (
+                      <div className="flex h-11 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+                        <LoaderCircle className="size-4 animate-spin" />
+                        Loading guides...
+                      </div>
+                    ) : areGuidesError ? (
+                      <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                        Unable to load tour guides.
+                      </div>
+                    ) : (
+                      <select
+                        id="booking-guide"
+                        value={selectedGuideId}
+                        onChange={(event) =>
+                          setSelectedGuideId(event.target.value)
+                        }
+                        className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="">Select an available guide</option>
+
+                        {availableGuides.map((tourGuide) => (
+                          <option key={tourGuide.id} value={tourGuide.id}>
+                            {tourGuide.user.firstName} {tourGuide.user.lastName}
+                            {" — "}
+                            {tourGuide.experienceYears} yrs
+                            {tourGuide.location
+                              ? ` — ${tourGuide.location}`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Selected guide preview */}
+
+                  {selectedGuide && (
+                    <div className="rounded-xl border p-4">
+                      <p className="font-medium">
+                        {selectedGuide.user.firstName}{" "}
+                        {selectedGuide.user.lastName}
+                      </p>
+
+                      <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                        <p>
+                          {selectedGuide.experienceYears}{" "}
+                          {selectedGuide.experienceYears === 1
+                            ? "year"
+                            : "years"}{" "}
+                          experience
+                        </p>
+
+                        {selectedGuide.location && (
+                          <p>{selectedGuide.location}</p>
+                        )}
+
+                        {selectedGuide.languages.length > 0 && (
+                          <p>{selectedGuide.languages.join(", ")}</p>
+                        )}
+
+                        {selectedGuide.dailyRate && (
+                          <p>Daily rate: ${selectedGuide.dailyRate}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    disabled={!selectedGuideId || guideMutation.isPending}
+                    onClick={() => guideMutation.mutate(selectedGuideId)}
+                  >
+                    {guideMutation.isPending ? (
+                      <>
+                        <LoaderCircle className="size-4 animate-spin" />
+                        Assigning...
+                      </>
+                    ) : guide ? (
+                      "Change guide"
+                    ) : (
+                      "Assign guide"
+                    )}
+                  </Button>
+
+                  {guideMutation.isError && (
+                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                      <p className="text-sm text-destructive">
+                        {getErrorMessage(guideMutation.error)}
+                      </p>
+                    </div>
+                  )}
+
+                  {availableGuides.length === 0 &&
+                    !areGuidesLoading &&
+                    !areGuidesError && (
+                      <p className="text-sm text-muted-foreground">
+                        No available tour guides found.
+                      </p>
+                    )}
+                </>
+              ) : (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Guide assignment is no longer available because this booking
+                  is{" "}
+                  <span className="font-medium text-foreground">
+                    {formatStatus(booking.status)}
+                  </span>
+                  .
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* =================================================
+              BOOKING STATUS
+          ================================================= */}
+
           <Card>
             <CardHeader>
               <CardTitle>Booking status</CardTitle>
@@ -406,6 +732,10 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* =================================================
+              PAYMENT
+          ================================================= */}
+
           <Card>
             <CardHeader>
               <CardTitle>Payment</CardTitle>
@@ -446,6 +776,10 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* =================================================
+              ADMIN ACTIONS
+          ================================================= */}
+
           <Card>
             <CardHeader>
               <CardTitle>Admin actions</CardTitle>
@@ -454,9 +788,15 @@ export default function AdminBookingDetailsPage() {
             <CardContent className="space-y-3">
               {booking.status === "CONFIRMED" && (
                 <>
+                  {!guide && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      Assign a tour guide before starting this tour.
+                    </div>
+                  )}
+
                   <Button
                     className="w-full"
-                    disabled={statusMutation.isPending}
+                    disabled={statusMutation.isPending || !guide}
                     onClick={() => statusMutation.mutate("IN_PROGRESS")}
                   >
                     {statusMutation.isPending ? "Updating..." : "Start tour"}
@@ -466,7 +806,15 @@ export default function AdminBookingDetailsPage() {
                     variant="destructive"
                     className="w-full"
                     disabled={statusMutation.isPending}
-                    onClick={() => statusMutation.mutate("CANCELLED")}
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        "Are you sure you want to cancel this booking?",
+                      );
+
+                      if (confirmed) {
+                        statusMutation.mutate("CANCELLED");
+                      }
+                    }}
                   >
                     Cancel booking
                   </Button>
@@ -487,7 +835,15 @@ export default function AdminBookingDetailsPage() {
                     variant="destructive"
                     className="w-full"
                     disabled={statusMutation.isPending}
-                    onClick={() => statusMutation.mutate("CANCELLED")}
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        "Are you sure you want to cancel this booking?",
+                      );
+
+                      if (confirmed) {
+                        statusMutation.mutate("CANCELLED");
+                      }
+                    }}
                   >
                     Cancel booking
                   </Button>
@@ -517,9 +873,11 @@ export default function AdminBookingDetailsPage() {
               )}
 
               {statusMutation.isError && (
-                <p className="text-sm text-destructive">
-                  Unable to update the booking status.
-                </p>
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-sm text-destructive">
+                    {getErrorMessage(statusMutation.error)}
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>

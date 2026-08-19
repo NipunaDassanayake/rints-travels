@@ -45,3 +45,20 @@ export async function updateBookingStatus(
 
   return response.data.data;
 }
+
+/**
+ * =========================================================
+ * Guide Assignment
+ * =========================================================
+ */
+
+export async function assignBookingGuide(
+  bookingId: string,
+  guideId: string,
+): Promise<Booking> {
+  const response = await apiClient.patch(`/bookings/${bookingId}/guide`, {
+    guideId,
+  });
+
+  return response.data.data;
+}
