@@ -14,6 +14,7 @@ import {
   FileText,
   LoaderCircle,
   MapPin,
+  Package,
   Route,
   Users,
   WalletCards,
@@ -23,13 +24,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { buttonVariants } from "@/components/ui/button";
 
-import { getAdminTourRequests } from "@/features/tour-requests/admin-tour-request.api";
+import {
+  getAdminTourRequests,
+  type AdminTourRequest,
+} from "@/features/tour-requests/admin-tour-request.api";
 
 import { getAdminBookings } from "@/features/bookings/admin-booking.api";
 
-import type { Booking } from "@/features/bookings/booking.types";
+import { getAdminPackages } from "@/features/packages/admin-package.api";
 
-import type { AdminTourRequest } from "@/features/tour-requests/admin-tour-request.api";
+import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
+
+import type { Booking } from "@/features/bookings/booking.types";
 
 /**
  * =========================================================
@@ -92,6 +98,12 @@ function getTouristName(request: AdminTourRequest) {
  */
 
 export default function AdminDashboard() {
+  /**
+   * =======================================================
+   * Tour requests
+   * =======================================================
+   */
+
   const {
     data: requests = [],
     isLoading: requestsLoading,
@@ -102,6 +114,12 @@ export default function AdminDashboard() {
 
     queryFn: () => getAdminTourRequests(),
   });
+
+  /**
+   * =======================================================
+   * Bookings
+   * =======================================================
+   */
 
   const {
     data: bookings = [],
@@ -114,14 +132,66 @@ export default function AdminDashboard() {
     queryFn: () => getAdminBookings(),
   });
 
-  const isLoading = requestsLoading || bookingsLoading;
+  /**
+   * =======================================================
+   * Packages
+   * =======================================================
+   */
 
-  const isError = requestsError || bookingsError;
+  const {
+    data: packageData,
+    isLoading: packagesLoading,
+    isError: packagesError,
+    refetch: refetchPackages,
+  } = useQuery({
+    queryKey: ["admin", "packages", "dashboard"],
+
+    queryFn: () =>
+      getAdminPackages({
+        page: 1,
+        limit: 100,
+      }),
+  });
+
+  /**
+   * =======================================================
+   * Guides
+   * =======================================================
+   */
+
+  const {
+    data: guides = [],
+    isLoading: guidesLoading,
+    isError: guidesError,
+    refetch: refetchGuides,
+  } = useQuery({
+    queryKey: ["admin", "guides", "dashboard"],
+
+    queryFn: getTourGuides,
+  });
+
+  /**
+   * =======================================================
+   * Loading / error
+   * =======================================================
+   */
+
+  const isLoading =
+    requestsLoading || bookingsLoading || packagesLoading || guidesLoading;
+
+  const isError =
+    requestsError || bookingsError || packagesError || guidesError;
 
   if (isLoading) {
     return (
       <main className="flex min-h-[65vh] items-center justify-center">
-        <LoaderCircle className="size-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3">
+          <LoaderCircle className="size-8 animate-spin text-muted-foreground" />
+
+          <p className="text-sm text-muted-foreground">
+            Loading admin dashboard...
+          </p>
+        </div>
       </main>
     );
   }
@@ -142,7 +212,12 @@ export default function AdminDashboard() {
             type="button"
             onClick={() => {
               void refetchRequests();
+
               void refetchBookings();
+
+              void refetchPackages();
+
+              void refetchGuides();
             }}
             className={`${buttonVariants({
               variant: "outline",
@@ -154,6 +229,8 @@ export default function AdminDashboard() {
       </main>
     );
   }
+
+  const packages = packageData?.items ?? [];
 
   /**
    * =======================================================
@@ -197,6 +274,30 @@ export default function AdminDashboard() {
 
   const cancelledBookings = bookings.filter(
     (booking) => booking.status === "CANCELLED",
+  );
+
+  /**
+   * =======================================================
+   * Guide statistics
+   * =======================================================
+   */
+
+  const availableGuides = guides.filter((guide) => guide.isAvailable);
+
+  const unavailableGuides = guides.filter((guide) => !guide.isAvailable);
+
+  /**
+   * =======================================================
+   * Package statistics
+   * =======================================================
+   */
+
+  const activePackages = packages.filter(
+    (travelPackage) => travelPackage.status === "ACTIVE",
+  );
+
+  const inactivePackages = packages.filter(
+    (travelPackage) => travelPackage.status === "INACTIVE",
   );
 
   /**
@@ -251,8 +352,8 @@ export default function AdminDashboard() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            Monitor traveler requests, bookings, payments and active tour
-            operations from one place.
+            Monitor traveler requests, quotations, bookings, payments, packages
+            and guide availability from one place.
           </p>
         </div>
 
@@ -280,22 +381,25 @@ export default function AdminDashboard() {
         <DashboardMetric
           title="Total requests"
           value={requests.length}
-          description="All tourist trip requests"
+          description={`${pendingRequests.length} awaiting review`}
           icon={FileText}
+          href="/admin/tour-requests"
         />
 
         <DashboardMetric
-          title="Pending review"
-          value={pendingRequests.length}
-          description="Requests awaiting admin review"
-          icon={Clock3}
+          title="Confirmed bookings"
+          value={confirmedBookings.length}
+          description={`${inProgressBookings.length} active tours`}
+          icon={CalendarCheck2}
+          href="/admin/bookings"
         />
 
         <DashboardMetric
           title="Active tours"
           value={inProgressBookings.length}
-          description="Tours currently in progress"
+          description={`${completedBookings.length} tours completed`}
           icon={Route}
+          href="/admin/bookings?status=IN_PROGRESS"
         />
 
         <DashboardMetric
@@ -303,6 +407,44 @@ export default function AdminDashboard() {
           value={formatMoney(totalRevenue)}
           description={`${successfulBookings.length} successful payments`}
           icon={CircleDollarSign}
+        />
+      </section>
+
+      {/* =====================================================
+          BUSINESS OVERVIEW
+      ===================================================== */}
+
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DashboardMetric
+          title="Available guides"
+          value={availableGuides.length}
+          description={`${guides.length} registered guides`}
+          icon={Users}
+          href="/admin/guides"
+        />
+
+        <DashboardMetric
+          title="Active packages"
+          value={activePackages.length}
+          description={`${packages.length} total packages`}
+          icon={Package}
+          href="/admin/packages"
+        />
+
+        <DashboardMetric
+          title="Pending review"
+          value={pendingRequests.length}
+          description="Requests needing attention"
+          icon={Clock3}
+          href="/admin/tour-requests?status=PENDING_REVIEW"
+        />
+
+        <DashboardMetric
+          title="Completed tours"
+          value={completedBookings.length}
+          description="Successfully completed journeys"
+          icon={CheckCircle2}
+          href="/admin/bookings?status=COMPLETED"
         />
       </section>
 
@@ -319,6 +461,10 @@ export default function AdminDashboard() {
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
             Travel request workflow
           </h2>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            Follow tourist requests from initial review through quotation.
+          </p>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -361,6 +507,10 @@ export default function AdminDashboard() {
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
             Booking lifecycle
           </h2>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            Monitor confirmed, active, completed and cancelled tours.
+          </p>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -368,30 +518,143 @@ export default function AdminDashboard() {
             title="Confirmed"
             value={confirmedBookings.length}
             icon={CalendarCheck2}
+            href="/admin/bookings?status=CONFIRMED"
           />
 
           <StatusCard
             title="In progress"
             value={inProgressBookings.length}
             icon={Route}
+            href="/admin/bookings?status=IN_PROGRESS"
           />
 
           <StatusCard
             title="Completed"
             value={completedBookings.length}
             icon={CheckCircle2}
+            href="/admin/bookings?status=COMPLETED"
           />
 
           <StatusCard
             title="Cancelled"
             value={cancelledBookings.length}
             icon={Clock3}
+            href="/admin/bookings?status=CANCELLED"
           />
         </div>
       </section>
 
       {/* =====================================================
-          RECENT DATA
+          RESOURCE OVERVIEW
+      ===================================================== */}
+
+      <section className="mt-10">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Resources
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            Packages & guides
+          </h2>
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-5">
+                <div>
+                  <div className="flex size-11 items-center justify-center rounded-xl bg-muted">
+                    <Package className="size-5" />
+                  </div>
+
+                  <h3 className="mt-4 text-lg font-semibold">
+                    Travel packages
+                  </h3>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Manage the packages shown to travelers.
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-3xl font-bold">{packages.length}</p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">Total</p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <ResourceStat label="Active" value={activePackages.length} />
+
+                <ResourceStat
+                  label="Inactive"
+                  value={inactivePackages.length}
+                />
+              </div>
+
+              <Link
+                href="/admin/packages"
+                className={`${buttonVariants({
+                  variant: "outline",
+                })} mt-5 w-full`}
+              >
+                Manage packages
+                <ArrowRight className="size-4" />
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-5">
+                <div>
+                  <div className="flex size-11 items-center justify-center rounded-xl bg-muted">
+                    <Users className="size-5" />
+                  </div>
+
+                  <h3 className="mt-4 text-lg font-semibold">Tour guides</h3>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Monitor guide availability and profiles.
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-3xl font-bold">{guides.length}</p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">Total</p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <ResourceStat
+                  label="Available"
+                  value={availableGuides.length}
+                />
+
+                <ResourceStat
+                  label="Unavailable"
+                  value={unavailableGuides.length}
+                />
+              </div>
+
+              <Link
+                href="/admin/guides"
+                className={`${buttonVariants({
+                  variant: "outline",
+                })} mt-5 w-full`}
+              >
+                Manage guides
+                <ArrowRight className="size-4" />
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* =====================================================
+          RECENT ACTIVITY
       ===================================================== */}
 
       <div className="mt-10 grid gap-6 xl:grid-cols-2">
@@ -504,7 +767,7 @@ export default function AdminDashboard() {
                 href="/admin/packages"
                 title="Packages"
                 description="Manage travel packages"
-                icon={MapPin}
+                icon={Package}
               />
 
               <QuickAction
@@ -535,6 +798,8 @@ interface DashboardMetricProps {
   description: string;
 
   icon: typeof FileText;
+
+  href?: string;
 }
 
 function DashboardMetric({
@@ -542,9 +807,16 @@ function DashboardMetric({
   value,
   description,
   icon: Icon,
+  href,
 }: DashboardMetricProps) {
-  return (
-    <Card>
+  const content = (
+    <Card
+      className={
+        href
+          ? "h-full transition-all hover:-translate-y-0.5 hover:shadow-sm"
+          : "h-full"
+      }
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -561,6 +833,16 @@ function DashboardMetric({
         <p className="mt-4 text-xs text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
+  );
+
+  if (!href) {
+    return content;
+  }
+
+  return (
+    <Link href={href} className="block h-full">
+      {content}
+    </Link>
   );
 }
 
@@ -582,8 +864,8 @@ function PipelineCard({
   href: string;
 }) {
   return (
-    <Link href={href}>
-      <Card className="h-full transition-shadow hover:shadow-md">
+    <Link href={href} className="block">
+      <Card className="h-full transition-all hover:-translate-y-0.5 hover:shadow-md">
         <CardContent className="p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -610,25 +892,53 @@ function StatusCard({
   title,
   value,
   icon: Icon,
+  href,
 }: {
   title: string;
 
   value: number;
 
   icon: typeof Route;
+
+  href: string;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-5">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
+    <Link href={href} className="block">
+      <Card className="h-full transition-all hover:-translate-y-0.5 hover:shadow-sm">
+        <CardContent className="flex items-center justify-between p-5">
+          <div>
+            <p className="text-sm text-muted-foreground">{title}</p>
 
-          <p className="mt-2 text-3xl font-bold">{value}</p>
-        </div>
+            <p className="mt-2 text-3xl font-bold">{value}</p>
+          </div>
 
-        <Icon className="size-6 text-muted-foreground" />
-      </CardContent>
-    </Card>
+          <Icon className="size-6 text-muted-foreground" />
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+/**
+ * =========================================================
+ * Resource stat
+ * =========================================================
+ */
+
+function ResourceStat({
+  label,
+  value,
+}: {
+  label: string;
+
+  value: number;
+}) {
+  return (
+    <div className="rounded-xl bg-muted/50 p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+
+      <p className="mt-1 text-xl font-bold">{value}</p>
+    </div>
   );
 }
 
@@ -752,6 +1062,12 @@ function QuickAction({
     </Link>
   );
 }
+
+/**
+ * =========================================================
+ * Empty state
+ * =========================================================
+ */
 
 function EmptyMessage({ message }: { message: string }) {
   return (
