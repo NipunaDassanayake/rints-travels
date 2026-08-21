@@ -15,28 +15,21 @@ import {
   Wallet,
 } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import {
-  buttonVariants,
-} from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
-import {
-  getMyTourRequests,
-} from "@/features/tour-requests/tour-request.api";
+import { getMyTourRequests } from "@/features/tour-requests/tour-request.api";
 
-import type {
-  TourRequest,
-} from "@/features/tour-requests/tour-request.types";
+import type { TourRequest } from "@/features/tour-requests/tour-request.types";
 
-function formatDate(
-  value: string | null | undefined,
-) {
+/**
+ * =========================================================
+ * Helpers
+ * =========================================================
+ */
+
+function formatDate(value: string | null | undefined) {
   if (!value) {
     return "Not specified";
   }
@@ -53,40 +46,30 @@ function formatStatus(value: string) {
   return value
     .replaceAll("_", " ")
     .toLowerCase()
-    .replace(
-      /\b\w/g,
-      (char) => char.toUpperCase(),
-    );
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getRequestTitle(
-  request: TourRequest,
-) {
-  if (
-    request.requestType ===
-    "PACKAGE_BASED"
-  ) {
-    return (
-      request.travelPackage?.title ??
-      "Package based request"
-    );
+function getRequestTitle(request: TourRequest) {
+  if (request.requestType === "PACKAGE_BASED") {
+    return request.travelPackage?.title ?? "Package based request";
   }
 
-  return (
-    request.title ??
-    "Custom tour request"
-  );
+  return request.title ?? "Custom tour request";
 }
 
-function getDestination(
-  request: TourRequest,
-) {
+function getDestination(request: TourRequest) {
   return (
     request.destinationPreferences ||
     request.travelPackage?.destination ||
     "Not specified"
   );
 }
+
+/**
+ * =========================================================
+ * Tourist Requests Page
+ * =========================================================
+ */
 
 export default function TouristRequestsPage() {
   const {
@@ -95,13 +78,16 @@ export default function TouristRequestsPage() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: [
-      "tour-requests",
-      "me",
-    ],
+    queryKey: ["tour-requests", "me"],
 
     queryFn: getMyTourRequests,
   });
+
+  /**
+   * =======================================================
+   * Loading
+   * =======================================================
+   */
 
   if (isLoading) {
     return (
@@ -110,6 +96,12 @@ export default function TouristRequestsPage() {
       </main>
     );
   }
+
+  /**
+   * =======================================================
+   * Error
+   * =======================================================
+   */
 
   if (isError) {
     return (
@@ -137,36 +129,35 @@ export default function TouristRequestsPage() {
     );
   }
 
-  const pendingCount =
-    requests.filter(
-      (request) =>
-        request.status ===
-        "PENDING_REVIEW",
-    ).length;
+  /**
+   * =======================================================
+   * Summary Statistics
+   * =======================================================
+   */
 
-  const discussionCount =
-    requests.filter(
-      (request) =>
-        request.status ===
-        "UNDER_DISCUSSION",
-    ).length;
+  const pendingCount = requests.filter(
+    (request) => request.status === "PENDING_REVIEW",
+  ).length;
 
-  const quotationCount =
-    requests.filter(
-      (request) =>
-        request.status ===
-          "READY_FOR_QUOTATION" ||
-        request.status ===
-          "QUOTATION_SENT",
-    ).length;
+  const discussionCount = requests.filter(
+    (request) => request.status === "UNDER_DISCUSSION",
+  ).length;
+
+  const quotationCount = requests.filter(
+    (request) =>
+      request.status === "READY_FOR_QUOTATION" ||
+      request.status === "QUOTATION_SENT",
+  ).length;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      {/* Header */}
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-5 sm:gap-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary sm:text-sm">
             My journeys
           </p>
 
@@ -174,23 +165,22 @@ export default function TouristRequestsPage() {
             Tour requests
           </h1>
 
-          <p className="mt-3 max-w-2xl text-muted-foreground">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             Track your trip requests, discussions and quotation progress.
           </p>
         </div>
 
-        <Link
-          href="/tourist/requests/new"
-          className={buttonVariants()}
-        >
+        <Link href="/tourist/requests/new" className={buttonVariants()}>
           <Plus className="size-4" />
           Plan a new trip
         </Link>
       </div>
 
-      {/* Summary */}
+      {/* =====================================================
+          SUMMARY
+      ===================================================== */}
 
-      <section className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-4 lg:grid-cols-4">
         <SummaryCard
           title="Total requests"
           value={requests.length}
@@ -216,11 +206,13 @@ export default function TouristRequestsPage() {
         />
       </section>
 
-      {/* Requests */}
+      {/* =====================================================
+          REQUESTS
+      ===================================================== */}
 
-      <section className="mt-10">
+      <section className="mt-8 sm:mt-10">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">
+          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
             Your requests
           </h2>
 
@@ -231,23 +223,16 @@ export default function TouristRequestsPage() {
         </div>
 
         {requests.length > 0 ? (
-          <div className="mt-6 space-y-5">
-            {requests.map(
-              (request) => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                />
-              ),
-            )}
+          <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
+            {requests.map((request) => (
+              <RequestCard key={request.id} request={request} />
+            ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-2xl border border-dashed p-12 text-center">
-            <FileText className="mx-auto size-9 text-muted-foreground" />
+          <div className="mt-6 rounded-2xl border border-dashed p-8 text-center sm:p-12">
+            <FileText className="mx-auto size-8 text-muted-foreground sm:size-9" />
 
-            <h3 className="mt-4 font-semibold">
-              No tour requests yet
-            </h3>
+            <h3 className="mt-4 font-semibold">No tour requests yet</h3>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
               Start planning your Sri Lanka journey and our travel team will
@@ -268,6 +253,12 @@ export default function TouristRequestsPage() {
   );
 }
 
+/**
+ * =========================================================
+ * Summary Card
+ * =========================================================
+ */
+
 function SummaryCard({
   title,
   value,
@@ -279,135 +270,129 @@ function SummaryCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center justify-between p-5">
-        <div>
-          <p className="text-sm text-muted-foreground">
+      <CardContent className="flex min-h-[105px] items-center justify-between gap-2 p-3.5 sm:min-h-0 sm:p-5">
+        <div className="min-w-0">
+          <p className="text-xs leading-4 text-muted-foreground sm:text-sm">
             {title}
           </p>
 
-          <p className="mt-2 text-3xl font-bold">
-            {value}
-          </p>
+          <p className="mt-1 text-2xl font-bold sm:mt-2 sm:text-3xl">{value}</p>
         </div>
 
-        <div className="flex size-11 items-center justify-center rounded-xl bg-muted">
-          <Icon className="size-5" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted sm:size-11 sm:rounded-xl">
+          <Icon className="size-4 sm:size-5" />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function RequestCard({
-  request,
-}: {
-  request: TourRequest;
-}) {
-  const destination =
-    getDestination(request);
+/**
+ * =========================================================
+ * Request Card
+ * =========================================================
+ */
+
+function RequestCard({ request }: { request: TourRequest }) {
+  const destination = getDestination(request);
 
   return (
     <Card>
-      <CardHeader className="border-b">
+      {/* ===================================================
+          REQUEST HEADER
+      =================================================== */}
+
+      <CardHeader className="border-b p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {request.requestType ===
-              "PACKAGE_BASED"
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs sm:tracking-[0.16em]">
+              {request.requestType === "PACKAGE_BASED"
                 ? "Package based"
                 : "Custom request"}
             </p>
 
-            <CardTitle className="mt-2 text-xl">
+            <CardTitle className="mt-2 text-lg sm:text-xl">
               {getRequestTitle(request)}
             </CardTitle>
 
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 break-all text-[11px] leading-5 text-muted-foreground sm:text-xs">
               Request ID: {request.id}
             </p>
           </div>
 
-          <span className="rounded-full border px-3 py-1 text-xs font-medium">
-            {formatStatus(
-              request.status,
-            )}
+          <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium">
+            {formatStatus(request.status)}
           </span>
         </div>
       </CardHeader>
 
-      <CardContent className="p-6">
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ===================================================
+          REQUEST DETAILS
+      =================================================== */}
+
+      <CardContent className="p-4 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+          {/* Destination */}
+
           <div className="flex gap-3">
             <MapPin className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
-            <div>
-              <p className="text-xs text-muted-foreground">
-                Destination
-              </p>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Destination</p>
 
-              <p className="mt-1 text-sm font-medium">
+              <p className="mt-1 break-words text-sm font-medium">
                 {destination}
               </p>
             </div>
           </div>
 
+          {/* Travel dates */}
+
           <div className="flex gap-3">
             <CalendarDays className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
             <div>
-              <p className="text-xs text-muted-foreground">
-                Travel dates
-              </p>
+              <p className="text-xs text-muted-foreground">Travel dates</p>
 
               <p className="mt-1 text-sm font-medium">
-                {formatDate(
-                  request.preferredStartDate,
-                )}
+                {formatDate(request.preferredStartDate)}
 
                 {request.preferredEndDate && (
                   <>
                     {" → "}
 
-                    {formatDate(
-                      request.preferredEndDate,
-                    )}
+                    {formatDate(request.preferredEndDate)}
                   </>
                 )}
               </p>
             </div>
           </div>
 
+          {/* Travelers */}
+
           <div className="flex gap-3">
             <Users className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
             <div>
-              <p className="text-xs text-muted-foreground">
-                Travelers
-              </p>
+              <p className="text-xs text-muted-foreground">Travelers</p>
 
               <p className="mt-1 text-sm font-medium">
                 {request.adultCount} adult
-                {request.adultCount !== 1
-                  ? "s"
-                  : ""}
-
+                {request.adultCount !== 1 ? "s" : ""}
                 {" · "}
-
                 {request.childCount} child
-                {request.childCount !== 1
-                  ? "ren"
-                  : ""}
+                {request.childCount !== 1 ? "ren" : ""}
               </p>
             </div>
           </div>
+
+          {/* Budget */}
 
           <div className="flex gap-3">
             <Wallet className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
             <div>
-              <p className="text-xs text-muted-foreground">
-                Budget
-              </p>
+              <p className="text-xs text-muted-foreground">Budget</p>
 
               <p className="mt-1 text-sm font-medium">
                 {request.budget
@@ -418,19 +403,20 @@ function RequestCard({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t pt-5">
+        {/* =================================================
+            REQUEST FOOTER
+        ================================================= */}
+
+        <div className="mt-5 flex flex-col gap-4 border-t pt-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:pt-5">
           <p className="text-xs text-muted-foreground">
-            Submitted{" "}
-            {formatDate(
-              request.createdAt,
-            )}
+            Submitted {formatDate(request.createdAt)}
           </p>
 
           <Link
             href={`/tourist/requests/${request.id}`}
-            className={buttonVariants({
+            className={`${buttonVariants({
               variant: "outline",
-            })}
+            })} w-full sm:w-auto`}
           >
             View request
           </Link>
