@@ -50,11 +50,27 @@ router.get(
 
 /**
  * =========================================================
- * Tourist - Review For Booking
+ * Guide - My Reviews
  * =========================================================
  *
- * Used by the booking details page to determine
- * whether the tourist has already reviewed the tour.
+ * IMPORTANT:
+ * Keep before /guide/:guideId
+ */
+
+router.get(
+  "/guide/me",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOUR_GUIDE),
+
+  reviewsController.getMyGuideReviews,
+);
+
+/**
+ * =========================================================
+ * Tourist - Review For Booking
+ * =========================================================
  */
 
 router.get(
