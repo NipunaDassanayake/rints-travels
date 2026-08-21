@@ -11,6 +11,7 @@ import {
   LoaderCircle,
   MapPin,
   Route,
+  Star,
   UserRound,
   Users,
 } from "lucide-react";
@@ -59,7 +60,6 @@ export default function GuideDashboardPage() {
     refetch,
   } = useQuery({
     queryKey: ["guide", "bookings"],
-
     queryFn: getMyGuideBookings,
   });
 
@@ -121,19 +121,31 @@ export default function GuideDashboardPage() {
           HEADER
       ===================================================== */}
 
-      <div className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-          Tour guide portal
-        </p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+            Tour guide portal
+          </p>
 
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-          My assigned tours
-        </h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+            My assigned tours
+          </h1>
 
-        <p className="mt-3 max-w-2xl text-muted-foreground">
-          View your upcoming journeys, active tours, tourist information and
-          assigned itineraries.
-        </p>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
+            View your upcoming journeys, active tours, tourist information and
+            assigned itineraries.
+          </p>
+        </div>
+
+        <Link
+          href="/guide/reviews"
+          className={buttonVariants({
+            variant: "outline",
+          })}
+        >
+          <Star className="size-4" />
+          My reviews
+        </Link>
       </div>
 
       {/* =====================================================
