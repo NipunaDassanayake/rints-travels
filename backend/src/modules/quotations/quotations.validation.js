@@ -66,8 +66,6 @@ const createQuotationSchema = Joi.object({
  * =========================================================
  * Update Quotation
  * =========================================================
- *
- * Only DRAFT quotations can be updated.
  */
 
 const updateQuotationSchema = createQuotationSchema
@@ -90,6 +88,8 @@ const rejectQuotationSchema = Joi.object({
 
 module.exports = {
   createQuotationSchema,
+
   updateQuotationSchema,
+
   rejectQuotationSchema,
 };

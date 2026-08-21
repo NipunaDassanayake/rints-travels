@@ -20,6 +20,24 @@ const router = express.Router();
 
 /**
  * =========================================================
+ * Tourist - My Quotations
+ * =========================================================
+ *
+ * GET /api/quotations/me
+ *
+ * IMPORTANT:
+ * Keep this before /:id
+ */
+
+router.get(
+  "/me",
+  authenticate,
+  authorize(USER_ROLES.TOURIST),
+  quotationsController.getMyQuotations,
+);
+
+/**
+ * =========================================================
  * Tour Request Quotations
  * =========================================================
  */

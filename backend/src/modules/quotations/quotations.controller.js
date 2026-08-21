@@ -8,6 +8,18 @@ const HTTP_STATUS = require("../../core/constants/httpStatus");
 
 /**
  * =========================================================
+ * Tourist - My Quotations
+ * =========================================================
+ */
+
+const getMyQuotations = asyncHandler(async (req, res) => {
+  const quotations = await quotationsService.getMyQuotations(req.user.id);
+
+  return sendSuccess(res, "Quotations retrieved successfully", quotations);
+});
+
+/**
+ * =========================================================
  * Create Quotation
  * =========================================================
  */
@@ -135,12 +147,21 @@ const createRevision = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getMyQuotations,
+
   createQuotation,
+
   getTourRequestQuotations,
+
   getQuotationById,
+
   updateQuotation,
+
   sendQuotation,
+
   acceptQuotation,
+
   rejectQuotation,
+
   createRevision,
 };

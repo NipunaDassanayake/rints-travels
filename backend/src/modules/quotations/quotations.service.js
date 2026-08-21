@@ -41,6 +41,16 @@ const validateGuide = async (guideId) => {
 
 /**
  * =========================================================
+ * Tourist - My Quotations
+ * =========================================================
+ */
+
+const getMyQuotations = async (touristId) => {
+  return quotationsRepository.findQuotationsByTouristId(touristId);
+};
+
+/**
+ * =========================================================
  * Create Quotation
  * =========================================================
  */
@@ -305,18 +315,9 @@ const createRevision = async (quotationId, data) => {
     quotation.tourRequestId,
   );
 
-  /**
-   * Mark previous quotation as superseded.
-   */
-
   await quotationsRepository.updateQuotationStatus(quotation.id, {
     status: "SUPERSEDED",
   });
-
-  /**
-   * Build the new revision using supplied fields,
-   * falling back to the previous quotation.
-   */
 
   return quotationsRepository.createQuotation({
     ...data,
@@ -376,9 +377,12 @@ const createRevision = async (quotationId, data) => {
 };
 
 module.exports = {
+  getMyQuotations,
+
   createQuotation,
 
   getQuotationsByTourRequest,
+
   getQuotationById,
 
   updateQuotation,
@@ -386,6 +390,7 @@ module.exports = {
   sendQuotation,
 
   acceptQuotation,
+
   rejectQuotation,
 
   createRevision,

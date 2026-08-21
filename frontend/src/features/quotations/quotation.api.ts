@@ -4,6 +4,18 @@ import type { CreateQuotationPayload, Quotation } from "./quotation.types";
 
 /**
  * =========================================================
+ * Tourist - My Quotations
+ * =========================================================
+ */
+
+export async function getMyQuotations(): Promise<Quotation[]> {
+  const response = await apiClient.get("/quotations/me");
+
+  return response.data.data;
+}
+
+/**
+ * =========================================================
  * Tour Request Quotations
  * =========================================================
  */
@@ -44,9 +56,6 @@ export async function getQuotationById(
   return response.data.data;
 }
 
-/**
- * Only DRAFT quotations can be updated.
- */
 export async function updateQuotation(
   quotationId: string,
   data: Partial<CreateQuotationPayload>,

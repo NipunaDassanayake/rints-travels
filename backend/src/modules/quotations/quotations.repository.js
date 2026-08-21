@@ -36,6 +36,30 @@ const quotationInclude = {
 
 /**
  * =========================================================
+ * Tourist - My Quotations
+ * =========================================================
+ */
+
+const findQuotationsByTouristId = async (touristId) => {
+  return prisma.tourQuotation.findMany({
+    where: {
+      deletedAt: null,
+
+      tourRequest: {
+        touristId,
+      },
+    },
+
+    include: quotationInclude,
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+};
+
+/**
+ * =========================================================
  * Find Quotation By ID
  * =========================================================
  */
@@ -237,7 +261,7 @@ const supersedeOtherQuotations = async (tourRequestId, excludeQuotationId) => {
 const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
   return prisma.$transaction(async (tx) => {
     /**
-     * Supersede any competing quotations.
+     * Supersede competing quotations.
      */
 
     await tx.tourQuotation.updateMany({
@@ -295,13 +319,18 @@ const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
 };
 
 module.exports = {
+  findQuotationsByTouristId,
+
   findQuotationById,
+
   findQuotationsByTourRequest,
+
   getLatestRevisionNumber,
 
   createQuotation,
 
   updateQuotation,
+
   updateQuotationStatus,
 
   supersedeOtherQuotations,
