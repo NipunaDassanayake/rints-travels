@@ -8,6 +8,7 @@ const tourGuidesRoutes = require("../modules/tour-guides/tourGuides.routes");
 const quotationsRoutes = require("../modules/quotations/quotations.routes");
 const paymentsRoutes = require("../modules/payments/payments.routes");
 const bookingsRoutes = require("../modules/bookings/bookings.routes");
+const reviewsRoutes = require("../modules/reviews/reviews.routes");
 const router = express.Router();
 
 router.use("/health", healthRoutes);
@@ -18,4 +19,5 @@ router.use("/payments", paymentsRoutes);
 router.use("/quotations", quotationsRoutes);
 router.use("/tour-requests", tourRequestsRoutes);
 router.use("/tour-guides", tourGuidesRoutes);
+router.use("/reviews", reviewsRoutes);
 module.exports = router;
