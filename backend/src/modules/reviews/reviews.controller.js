@@ -37,6 +37,18 @@ const getMyReviews = asyncHandler(async (req, res) => {
 
 /**
  * =========================================================
+ * Guide - My Reviews
+ * =========================================================
+ */
+
+const getMyGuideReviews = asyncHandler(async (req, res) => {
+  const result = await reviewsService.getMyGuideReviews(req.user.id);
+
+  return sendSuccess(res, "Guide reviews retrieved successfully", result);
+});
+
+/**
+ * =========================================================
  * Public - Guide Reviews
  * =========================================================
  */
@@ -72,6 +84,8 @@ module.exports = {
   createReview,
 
   getMyReviews,
+
+  getMyGuideReviews,
 
   getGuideReviews,
 

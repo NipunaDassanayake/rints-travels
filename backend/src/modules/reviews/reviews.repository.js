@@ -98,6 +98,33 @@ const findReviewByBookingId = async (bookingId) => {
 
 /**
  * =========================================================
+ * Find Guide Profile By User ID
+ * =========================================================
+ *
+ * req.user.id is the User ID.
+ * Reviews use TourGuideProfile.id as guideId.
+ */
+
+const findGuideByUserId = async (userId) => {
+  return prisma.tourGuideProfile.findUnique({
+    where: {
+      userId,
+    },
+
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  });
+};
+
+/**
+ * =========================================================
  * Create Review + Recalculate Guide Rating
  * =========================================================
  */
@@ -110,13 +137,6 @@ const createReviewAndUpdateGuideStats = async ({
   comment,
 }) => {
   return prisma.$transaction(async (tx) => {
-    /**
-     * Create review first.
-     *
-     * bookingId has a UNIQUE constraint so the
-     * database also protects against duplicate reviews.
-     */
-
     const review = await tx.guideReview.create({
       data: {
         bookingId,
@@ -130,13 +150,6 @@ const createReviewAndUpdateGuideStats = async ({
         comment,
       },
     });
-
-    /**
-     * Recalculate rating from actual reviews.
-     *
-     * We do not increment counters manually because
-     * recalculation avoids rating drift.
-     */
 
     const stats = await tx.guideReview.aggregate({
       where: {
@@ -196,7 +209,7 @@ const findReviewsByTouristId = async (touristId) => {
 
 /**
  * =========================================================
- * Public - Reviews For Guide
+ * Reviews For Guide
  * =========================================================
  */
 
@@ -240,6 +253,8 @@ module.exports = {
   findBookingForReview,
 
   findReviewByBookingId,
+
+  findGuideByUserId,
 
   createReviewAndUpdateGuideStats,
 
