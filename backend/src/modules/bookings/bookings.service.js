@@ -30,7 +30,7 @@ const generateBookingReference = () => {
 
 /**
  * =========================================================
- * Booking Lifecycle
+ * Booking Status Transitions
  * =========================================================
  */
 
@@ -46,7 +46,7 @@ const BOOKING_STATUS_TRANSITIONS = {
 
 /**
  * =========================================================
- * Create Booking
+ * Create Booking From Payment
  * =========================================================
  */
 
@@ -124,7 +124,7 @@ const createBookingFromPayment = async (paymentId) => {
 
 /**
  * =========================================================
- * Tourist Bookings
+ * Tourist - My Bookings
  * =========================================================
  */
 
@@ -134,7 +134,17 @@ const getMyBookings = async (touristId) => {
 
 /**
  * =========================================================
- * Admin Bookings
+ * Tour Guide - My Assigned Bookings
+ * =========================================================
+ */
+
+const getMyGuideBookings = async (userId) => {
+  return bookingsRepository.findBookingsByGuideUserId(userId);
+};
+
+/**
+ * =========================================================
+ * Admin - All Bookings
  * =========================================================
  */
 
@@ -148,7 +158,7 @@ const getAllBookings = async (query = {}) => {
 
 /**
  * =========================================================
- * Get Booking
+ * Booking Details
  * =========================================================
  */
 
@@ -165,7 +175,11 @@ const getBookingById = async (bookingId, currentUser) => {
     currentUser.role === USER_ROLES.ADMIN ||
     currentUser.role === USER_ROLES.SYSTEM_ADMIN;
 
-  if (!isOwner && !isAdmin) {
+  const isAssignedGuide =
+    currentUser.role === USER_ROLES.TOUR_GUIDE &&
+    booking.quotation.guide?.userId === currentUser.id;
+
+  if (!isOwner && !isAdmin && !isAssignedGuide) {
     throw new ForbiddenError("You do not have permission to view this booking");
   }
 
@@ -192,14 +206,6 @@ const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
       `Cannot change booking status from ${booking.status} to ${newStatus}`,
     );
   }
-
-  /**
-   * Don't allow a tour to start without a guide.
-   *
-   * We can relax this rule later for self-guided tours,
-   * but for Travora's guided-tour flow it protects us
-   * from starting an incomplete booking.
-   */
 
   if (newStatus === "IN_PROGRESS" && !booking.quotation.guideId) {
     throw new BadRequestError("Assign a tour guide before starting the tour");
@@ -239,7 +245,7 @@ const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
 
 /**
  * =========================================================
- * Assign Guide
+ * Admin - Assign Guide
  * =========================================================
  */
 
@@ -250,19 +256,11 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
     throw new NotFoundError("Booking not found");
   }
 
-  /**
-   * Completed/cancelled bookings should be immutable.
-   */
-
   if (["COMPLETED", "CANCELLED"].includes(booking.status)) {
     throw new BadRequestError(
       `Cannot assign a guide to a ${booking.status.toLowerCase()} booking`,
     );
   }
-
-  /**
-   * Validate guide.
-   */
 
   const guide = await tourGuidesRepository.findTourGuideById(guideId);
 
@@ -274,18 +272,9 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
     throw new BadRequestError("This tour guide is currently unavailable");
   }
 
-  /**
-   * If the same guide is already assigned,
-   * simply return the existing booking.
-   */
-
   if (booking.quotation.guideId === guideId) {
     return booking;
   }
-
-  /**
-   * Prevent overlapping assignments.
-   */
 
   const conflict = await bookingsRepository.findGuideBookingConflict({
     guideId,
@@ -299,7 +288,9 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
 
   if (conflict) {
     throw new ConflictError(
-      `This guide is already assigned to another booking from ${conflict.startDate.toISOString().slice(0, 10)} to ${conflict.endDate.toISOString().slice(0, 10)}`,
+      `This guide is already assigned to another booking from ${conflict.startDate
+        .toISOString()
+        .slice(0, 10)} to ${conflict.endDate.toISOString().slice(0, 10)}`,
     );
   }
 
@@ -337,6 +328,7 @@ module.exports = {
   createBookingFromPayment,
 
   getMyBookings,
+  getMyGuideBookings,
 
   getAllBookings,
 

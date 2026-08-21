@@ -95,6 +95,44 @@ const findBookingsByTouristId = async (touristId) => {
 
 /**
  * =========================================================
+ * Tour Guide - Assigned Bookings
+ * =========================================================
+ *
+ * req.user.id is the User ID.
+ *
+ * The booking stores the assigned guide through:
+ *
+ * Booking
+ *   -> quotation
+ *      -> guide
+ *         -> userId
+ */
+
+const findBookingsByGuideUserId = async (userId) => {
+  return prisma.booking.findMany({
+    where: {
+      quotation: {
+        guide: {
+          userId,
+        },
+      },
+    },
+
+    include: bookingInclude,
+
+    orderBy: [
+      {
+        startDate: "asc",
+      },
+      {
+        createdAt: "desc",
+      },
+    ],
+  });
+};
+
+/**
+ * =========================================================
  * Admin - All Bookings
  * =========================================================
  */
@@ -123,7 +161,7 @@ const findAllBookings = async ({ status, touristId } = {}) => {
 
 /**
  * =========================================================
- * Update Booking Status
+ * Admin - Update Booking Status
  * =========================================================
  */
 
@@ -160,15 +198,12 @@ const updateBookingStatus = async (id, status) => {
 
 /**
  * =========================================================
- * Assign Guide To Booking
+ * Admin - Assign Guide To Booking
  * =========================================================
  *
- * At the moment the operational guide assignment is stored
- * in TourQuotation.guideId.
+ * Guide assignment is currently stored on:
  *
- * Booking details already expose the guide through:
- *
- * booking.quotation.guide
+ * TourQuotation.guideId
  */
 
 const assignGuideToBooking = async (bookingId, guideId) => {
@@ -210,10 +245,8 @@ const assignGuideToBooking = async (bookingId, guideId) => {
 
 /**
  * =========================================================
- * Find Active Booking Conflict For Guide
+ * Check Guide Booking Conflict
  * =========================================================
- *
- * Prevents assigning the same guide to overlapping bookings.
  */
 
 const findGuideBookingConflict = async ({
@@ -224,11 +257,13 @@ const findGuideBookingConflict = async ({
 }) => {
   return prisma.booking.findFirst({
     where: {
-      id: excludeBookingId
+      ...(excludeBookingId
         ? {
-            not: excludeBookingId,
+            id: {
+              not: excludeBookingId,
+            },
           }
-        : undefined,
+        : {}),
 
       status: {
         in: ["CONFIRMED", "IN_PROGRESS"],
@@ -247,23 +282,7 @@ const findGuideBookingConflict = async ({
       },
     },
 
-    include: {
-      quotation: {
-        include: {
-          guide: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: bookingInclude,
   });
 };
 
@@ -364,6 +383,7 @@ module.exports = {
   findBookingById,
 
   findBookingsByTouristId,
+  findBookingsByGuideUserId,
 
   findAllBookings,
 

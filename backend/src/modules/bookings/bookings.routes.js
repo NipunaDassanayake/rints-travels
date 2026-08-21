@@ -35,6 +35,25 @@ router.get(
 
 /**
  * =========================================================
+ * Tour Guide - Assigned Bookings
+ * =========================================================
+ *
+ * IMPORTANT:
+ * Keep this route before /:id.
+ */
+
+router.get(
+  "/guide/me",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOUR_GUIDE),
+
+  bookingsController.getMyGuideBookings,
+);
+
+/**
+ * =========================================================
  * Admin - All Bookings
  * =========================================================
  */
@@ -51,7 +70,7 @@ router.get(
 
 /**
  * =========================================================
- * Admin - Assign Tour Guide
+ * Admin - Assign Guide
  * =========================================================
  */
 
@@ -87,7 +106,7 @@ router.patch(
 
 /**
  * =========================================================
- * Tourist Owner / Admin - Booking Details
+ * Tourist Owner / Admin / Assigned Guide - Booking Details
  * =========================================================
  */
 
