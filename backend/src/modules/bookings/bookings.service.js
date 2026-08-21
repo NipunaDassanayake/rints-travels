@@ -188,7 +188,7 @@ const getBookingById = async (bookingId, currentUser) => {
 
 /**
  * =========================================================
- * Update Booking Status
+ * Admin - Update Booking Status
  * =========================================================
  */
 
@@ -324,6 +324,108 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
   return updatedBooking;
 };
 
+/**
+ * =========================================================
+ * Guide - Validate Assigned Booking
+ * =========================================================
+ */
+
+const getAssignedGuideBooking = async (bookingId, guideUserId) => {
+  const booking = await bookingsRepository.findBookingById(bookingId);
+
+  if (!booking) {
+    throw new NotFoundError("Booking not found");
+  }
+
+  const assignedGuideUserId = booking.quotation.guide?.userId;
+
+  if (!assignedGuideUserId || assignedGuideUserId !== guideUserId) {
+    throw new ForbiddenError("You are not assigned to this booking");
+  }
+
+  return booking;
+};
+
+/**
+ * =========================================================
+ * Guide - Start Tour
+ * =========================================================
+ */
+
+const startGuideTour = async (bookingId, currentUser) => {
+  const booking = await getAssignedGuideBooking(bookingId, currentUser.id);
+
+  if (booking.status !== "CONFIRMED") {
+    throw new BadRequestError(
+      `Tour cannot be started from ${booking.status} status`,
+    );
+  }
+
+  const updatedBooking = await bookingsRepository.updateBookingStatus(
+    bookingId,
+    "IN_PROGRESS",
+  );
+
+  logger.info({
+    event: "GUIDE_TOUR_STARTED",
+
+    bookingId: updatedBooking.id,
+
+    bookingReference: updatedBooking.bookingReference,
+
+    guideUserId: currentUser.id,
+
+    guideId: booking.quotation.guideId,
+
+    previousStatus: booking.status,
+
+    newStatus: updatedBooking.status,
+  });
+
+  return updatedBooking;
+};
+
+/**
+ * =========================================================
+ * Guide - Complete Tour
+ * =========================================================
+ */
+
+const completeGuideTour = async (bookingId, currentUser) => {
+  const booking = await getAssignedGuideBooking(bookingId, currentUser.id);
+
+  if (booking.status !== "IN_PROGRESS") {
+    throw new BadRequestError(
+      `Tour cannot be completed from ${booking.status} status`,
+    );
+  }
+
+  const updatedBooking = await bookingsRepository.updateBookingStatus(
+    bookingId,
+    "COMPLETED",
+  );
+
+  logger.info({
+    event: "GUIDE_TOUR_COMPLETED",
+
+    bookingId: updatedBooking.id,
+
+    bookingReference: updatedBooking.bookingReference,
+
+    guideUserId: currentUser.id,
+
+    guideId: booking.quotation.guideId,
+
+    previousStatus: booking.status,
+
+    newStatus: updatedBooking.status,
+
+    completedAt: updatedBooking.completedAt,
+  });
+
+  return updatedBooking;
+};
+
 module.exports = {
   createBookingFromPayment,
 
@@ -337,4 +439,7 @@ module.exports = {
   updateBookingStatus,
 
   assignBookingGuide,
+
+  startGuideTour,
+  completeGuideTour,
 };

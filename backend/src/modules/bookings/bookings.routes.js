@@ -37,9 +37,6 @@ router.get(
  * =========================================================
  * Tour Guide - Assigned Bookings
  * =========================================================
- *
- * IMPORTANT:
- * Keep this route before /:id.
  */
 
 router.get(
@@ -50,6 +47,38 @@ router.get(
   authorize(USER_ROLES.TOUR_GUIDE),
 
   bookingsController.getMyGuideBookings,
+);
+
+/**
+ * =========================================================
+ * Tour Guide - Start Assigned Tour
+ * =========================================================
+ */
+
+router.patch(
+  "/guide/:id/start",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOUR_GUIDE),
+
+  bookingsController.startGuideTour,
+);
+
+/**
+ * =========================================================
+ * Tour Guide - Complete Assigned Tour
+ * =========================================================
+ */
+
+router.patch(
+  "/guide/:id/complete",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOUR_GUIDE),
+
+  bookingsController.completeGuideTour,
 );
 
 /**

@@ -84,6 +84,33 @@ const assignBookingGuide = asyncHandler(async (req, res) => {
   return sendSuccess(res, "Tour guide assigned successfully", booking);
 });
 
+/**
+ * =========================================================
+ * Guide - Start Tour
+ * =========================================================
+ */
+
+const startGuideTour = asyncHandler(async (req, res) => {
+  const booking = await bookingsService.startGuideTour(req.params.id, req.user);
+
+  return sendSuccess(res, "Tour started successfully", booking);
+});
+
+/**
+ * =========================================================
+ * Guide - Complete Tour
+ * =========================================================
+ */
+
+const completeGuideTour = asyncHandler(async (req, res) => {
+  const booking = await bookingsService.completeGuideTour(
+    req.params.id,
+    req.user,
+  );
+
+  return sendSuccess(res, "Tour completed successfully", booking);
+});
+
 module.exports = {
   getMyBookings,
 
@@ -96,4 +123,7 @@ module.exports = {
   updateBookingStatus,
 
   assignBookingGuide,
+
+  startGuideTour,
+  completeGuideTour,
 };
