@@ -1,57 +1,93 @@
 export interface ReviewTourist {
   id: string;
+
   firstName: string;
   lastName: string;
 }
 
 export interface ReviewGuideUser {
   id: string;
+
   firstName: string;
   lastName: string;
 }
 
 export interface ReviewGuide {
   id: string;
+
   userId?: string;
 
   firstName?: string;
   lastName?: string;
 
   averageRating?: number | string;
+
   totalReviews?: number;
 
   user?: ReviewGuideUser;
+}
+
+export interface ReviewBookingQuotation {
+  id: string;
+
+  title: string;
+
+  quotationNumber: string;
+}
+
+export interface ReviewBooking {
+  id: string;
+
+  bookingReference: string;
+
+  status: string;
+
+  startDate: string;
+  endDate: string;
+
+  quotation: ReviewBookingQuotation;
 }
 
 export interface Review {
   id: string;
 
   bookingId: string;
+
   guideId: string;
+
   touristId: string;
 
   rating: number;
+
   comment: string | null;
 
   createdAt: string;
   updatedAt: string;
 
   tourist?: ReviewTourist;
+
   guide?: ReviewGuide;
+
+  booking?: ReviewBooking;
 }
 
 export interface CreateReviewPayload {
   bookingId: string;
+
   rating: number;
+
   comment?: string;
 }
 
 export interface GuideReviewSummary {
   guide: {
     id: string;
+
     firstName: string;
     lastName: string;
+
     averageRating: number;
+
     totalReviews: number;
   };
 

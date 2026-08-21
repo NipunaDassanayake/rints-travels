@@ -12,8 +12,6 @@ import type {
  * =========================================================
  * Tourist - Create Review
  * =========================================================
- *
- * POST /reviews
  */
 
 export async function createReview(data: CreateReviewPayload): Promise<Review> {
@@ -26,8 +24,6 @@ export async function createReview(data: CreateReviewPayload): Promise<Review> {
  * =========================================================
  * Tourist - My Reviews
  * =========================================================
- *
- * GET /reviews/me
  */
 
 export async function getMyReviews(): Promise<Review[]> {
@@ -40,12 +36,6 @@ export async function getMyReviews(): Promise<Review[]> {
  * =========================================================
  * Tourist - Review For Booking
  * =========================================================
- *
- * GET /reviews/booking/:bookingId
- *
- * If the tourist has not reviewed this booking,
- * the backend may return 404.
- * In that case we return null.
  */
 
 export async function getReviewByBooking(
@@ -68,10 +58,20 @@ export async function getReviewByBooking(
 
 /**
  * =========================================================
+ * Guide - My Reviews
+ * =========================================================
+ */
+
+export async function getMyGuideReviews(): Promise<GuideReviewSummary> {
+  const response = await apiClient.get("/reviews/guide/me");
+
+  return response.data.data;
+}
+
+/**
+ * =========================================================
  * Public - Guide Reviews
  * =========================================================
- *
- * GET /reviews/guide/:guideId
  */
 
 export async function getGuideReviews(
