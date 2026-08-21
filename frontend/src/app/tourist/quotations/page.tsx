@@ -48,6 +48,7 @@ export default function TouristQuotationsPage() {
     refetch,
   } = useQuery({
     queryKey: ["quotations", "me"],
+
     queryFn: getMyQuotations,
   });
 
@@ -96,9 +97,13 @@ export default function TouristQuotationsPage() {
   ).length;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary sm:text-sm">
           Travel proposals
         </p>
 
@@ -106,13 +111,17 @@ export default function TouristQuotationsPage() {
           My quotations
         </h1>
 
-        <p className="mt-3 max-w-2xl text-muted-foreground">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
           Review personalized travel proposals prepared for your requested
           journeys.
         </p>
       </div>
 
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* =====================================================
+          SUMMARY
+      ===================================================== */}
+
+      <section className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-4 lg:grid-cols-4">
         <SummaryCard title="Total quotations" value={quotations.length} />
 
         <SummaryCard title="Awaiting response" value={sentCount} />
@@ -120,11 +129,17 @@ export default function TouristQuotationsPage() {
         <SummaryCard title="Accepted" value={acceptedCount} />
 
         <SummaryCard title="Rejected" value={rejectedCount} />
-      </div>
+      </section>
 
-      <section className="mt-10">
+      {/* =====================================================
+          QUOTATIONS
+      ===================================================== */}
+
+      <section className="mt-8 sm:mt-10">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Your quotations</h2>
+          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+            Your quotations
+          </h2>
 
           <p className="mt-2 text-sm text-muted-foreground">
             Open a quotation to review the itinerary, pricing, guide and
@@ -133,14 +148,14 @@ export default function TouristQuotationsPage() {
         </div>
 
         {quotations.length > 0 ? (
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-2">
             {quotations.map((quotation) => (
               <QuotationCard key={quotation.id} quotation={quotation} />
             ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-2xl border border-dashed p-12 text-center">
-            <FileText className="mx-auto size-9 text-muted-foreground" />
+          <div className="mt-6 rounded-2xl border border-dashed p-8 text-center sm:p-12">
+            <FileText className="mx-auto size-8 text-muted-foreground sm:size-9" />
 
             <h3 className="mt-4 font-semibold">No quotations yet</h3>
 
@@ -164,17 +179,31 @@ export default function TouristQuotationsPage() {
   );
 }
 
+/**
+ * =========================================================
+ * Summary Card
+ * =========================================================
+ */
+
 function SummaryCard({ title, value }: { title: string; value: number }) {
   return (
     <Card>
-      <CardContent className="p-5">
-        <p className="text-sm text-muted-foreground">{title}</p>
+      <CardContent className="p-3.5 sm:p-5">
+        <p className="text-xs leading-4 text-muted-foreground sm:text-sm">
+          {title}
+        </p>
 
-        <p className="mt-2 text-3xl font-bold">{value}</p>
+        <p className="mt-1 text-2xl font-bold sm:mt-2 sm:text-3xl">{value}</p>
       </CardContent>
     </Card>
   );
 }
+
+/**
+ * =========================================================
+ * Quotation Card
+ * =========================================================
+ */
 
 function QuotationCard({ quotation }: { quotation: Quotation }) {
   const guide = quotation.guide;
@@ -185,26 +214,28 @@ function QuotationCard({ quotation }: { quotation: Quotation }) {
 
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="min-w-0">
+            <p className="break-all text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:text-xs sm:tracking-[0.16em]">
               {quotation.quotationNumber}
             </p>
 
-            <h3 className="mt-2 text-xl font-semibold">{quotation.title}</h3>
+            <h3 className="mt-2 text-lg font-semibold sm:text-xl">
+              {quotation.title}
+            </h3>
 
             <p className="mt-2 text-xs text-muted-foreground">
               Revision {quotation.revisionNumber}
             </p>
           </div>
 
-          <span className="rounded-full border px-3 py-1 text-xs font-medium">
+          <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium">
             {formatStatus(quotation.status)}
           </span>
         </div>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="mt-5 grid gap-4 sm:mt-6 sm:grid-cols-2 sm:gap-5">
           <div className="flex gap-3">
             <CalendarDays className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
@@ -244,12 +275,12 @@ function QuotationCard({ quotation }: { quotation: Quotation }) {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end border-t pt-5">
+        <div className="mt-5 flex border-t pt-4 sm:mt-6 sm:justify-end sm:pt-5">
           <Link
             href={`/tourist/quotations/${quotation.id}`}
-            className={buttonVariants({
+            className={`${buttonVariants({
               variant: "outline",
-            })}
+            })} w-full sm:w-auto`}
           >
             View quotation
           </Link>

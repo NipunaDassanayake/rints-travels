@@ -86,9 +86,7 @@ function getRequestDestination(request: TourRequest) {
 
 export default function TouristDashboard() {
   /**
-   * =======================================================
    * Tour Requests
-   * =======================================================
    */
 
   const {
@@ -98,14 +96,11 @@ export default function TouristDashboard() {
     refetch: refetchRequests,
   } = useQuery({
     queryKey: ["tour-requests", "me"],
-
     queryFn: getMyTourRequests,
   });
 
   /**
-   * =======================================================
    * Quotations
-   * =======================================================
    */
 
   const {
@@ -115,14 +110,11 @@ export default function TouristDashboard() {
     refetch: refetchQuotations,
   } = useQuery({
     queryKey: ["quotations", "me"],
-
     queryFn: getMyQuotations,
   });
 
   /**
-   * =======================================================
    * Payments
-   * =======================================================
    */
 
   const {
@@ -132,14 +124,11 @@ export default function TouristDashboard() {
     refetch: refetchPayments,
   } = useQuery({
     queryKey: ["payments", "me"],
-
     queryFn: getMyPayments,
   });
 
   /**
-   * =======================================================
    * Bookings
-   * =======================================================
    */
 
   const {
@@ -149,14 +138,11 @@ export default function TouristDashboard() {
     refetch: refetchBookings,
   } = useQuery({
     queryKey: ["bookings", "me"],
-
     queryFn: getMyBookings,
   });
 
   /**
-   * =======================================================
    * Loading
-   * =======================================================
    */
 
   const isLoading =
@@ -177,9 +163,7 @@ export default function TouristDashboard() {
   }
 
   /**
-   * =======================================================
    * Error
-   * =======================================================
    */
 
   const isError =
@@ -201,11 +185,8 @@ export default function TouristDashboard() {
             type="button"
             onClick={() => {
               void refetchRequests();
-
               void refetchQuotations();
-
               void refetchPayments();
-
               void refetchBookings();
             }}
             className={`${buttonVariants({
@@ -220,9 +201,7 @@ export default function TouristDashboard() {
   }
 
   /**
-   * =======================================================
    * Request Statistics
-   * =======================================================
    */
 
   const activeRequests = tourRequests.filter(
@@ -230,9 +209,7 @@ export default function TouristDashboard() {
   );
 
   /**
-   * =======================================================
    * Quotation Statistics
-   * =======================================================
    */
 
   const awaitingQuotations = quotations.filter(
@@ -244,9 +221,7 @@ export default function TouristDashboard() {
   );
 
   /**
-   * =======================================================
    * Payment Statistics
-   * =======================================================
    */
 
   const pendingPayments = payments.filter(
@@ -258,9 +233,7 @@ export default function TouristDashboard() {
   );
 
   /**
-   * =======================================================
    * Booking Statistics
-   * =======================================================
    */
 
   const upcomingBookings = bookings.filter(
@@ -276,9 +249,7 @@ export default function TouristDashboard() {
   );
 
   /**
-   * =======================================================
    * Recent Request
-   * =======================================================
    */
 
   const recentRequest = [...tourRequests].sort(
@@ -286,9 +257,7 @@ export default function TouristDashboard() {
   )[0];
 
   /**
-   * =======================================================
    * Next / Active Booking
-   * =======================================================
    */
 
   const nextBooking =
@@ -299,9 +268,7 @@ export default function TouristDashboard() {
     )[0];
 
   /**
-   * =======================================================
    * Recent Payment
-   * =======================================================
    */
 
   const recentPayment = [...payments].sort(
@@ -309,7 +276,7 @@ export default function TouristDashboard() {
   )[0];
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       {/* =====================================================
           HEADER
       ===================================================== */}
@@ -324,7 +291,7 @@ export default function TouristDashboard() {
             My travel dashboard
           </h1>
 
-          <p className="mt-3 max-w-2xl text-muted-foreground">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             Follow your requests, review quotations, manage payments and keep
             track of your upcoming Sri Lanka journeys.
           </p>
@@ -345,7 +312,7 @@ export default function TouristDashboard() {
           MAIN STATISTICS
       ===================================================== */}
 
-      <section className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-4 xl:grid-cols-4">
         <DashboardCard
           title="Tour requests"
           value={tourRequests.length}
@@ -385,14 +352,14 @@ export default function TouristDashboard() {
 
       {(awaitingQuotations.length > 0 || pendingPayments.length > 0) && (
         <section className="mt-8">
-          <div className="rounded-2xl border bg-muted/20 p-6">
+          <div className="rounded-2xl border bg-muted/20 p-4 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary sm:text-sm">
                   Needs your attention
                 </p>
 
-                <h2 className="mt-2 text-xl font-bold">
+                <h2 className="mt-2 text-lg font-bold sm:text-xl">
                   You have travel actions waiting
                 </h2>
 
@@ -431,11 +398,11 @@ export default function TouristDashboard() {
           CURRENT JOURNEY / RECENT REQUEST
       ===================================================== */}
 
-      <div className="mt-10 grid gap-6 xl:grid-cols-2">
+      <div className="mt-8 grid gap-5 sm:mt-10 sm:gap-6 xl:grid-cols-2">
         {/* NEXT JOURNEY */}
 
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -451,11 +418,11 @@ export default function TouristDashboard() {
                 </CardTitle>
               </div>
 
-              <Route className="size-6 text-muted-foreground" />
+              <Route className="size-5 text-muted-foreground sm:size-6" />
             </div>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
             {nextBooking ? (
               <UpcomingBooking booking={nextBooking} />
             ) : (
@@ -472,7 +439,7 @@ export default function TouristDashboard() {
         {/* RECENT REQUEST */}
 
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -482,11 +449,11 @@ export default function TouristDashboard() {
                 <CardTitle className="mt-2">Latest tour request</CardTitle>
               </div>
 
-              <FileText className="size-6 text-muted-foreground" />
+              <FileText className="size-5 text-muted-foreground sm:size-6" />
             </div>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
             {recentRequest ? (
               <RecentRequest request={recentRequest} />
             ) : (
@@ -505,18 +472,18 @@ export default function TouristDashboard() {
           TRIP PROGRESS
       ===================================================== */}
 
-      <section className="mt-10">
+      <section className="mt-8 sm:mt-10">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground sm:text-sm">
             Travel overview
           </p>
 
-          <h2 className="mt-2 text-2xl font-bold tracking-tight">
+          <h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">
             Your journey at a glance
           </h2>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 lg:grid-cols-4">
           <StatusCard
             title="Active requests"
             value={activeRequests.length}
@@ -548,9 +515,9 @@ export default function TouristDashboard() {
       ===================================================== */}
 
       {recentPayment && (
-        <section className="mt-10">
+        <section className="mt-8 sm:mt-10">
           <Card>
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -573,14 +540,14 @@ export default function TouristDashboard() {
               </div>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
               <div className="flex flex-wrap items-center justify-between gap-6">
                 <div>
                   <p className="text-sm text-muted-foreground">
                     {recentPayment.paymentReference}
                   </p>
 
-                  <p className="mt-2 text-2xl font-bold">
+                  <p className="mt-2 text-xl font-bold sm:text-2xl">
                     {recentPayment.currency} {recentPayment.amount}
                   </p>
 
@@ -589,7 +556,7 @@ export default function TouristDashboard() {
                   </p>
                 </div>
 
-                <span className="rounded-full border px-4 py-2 text-sm font-medium">
+                <span className="rounded-full border px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm">
                   {formatStatus(recentPayment.status)}
                 </span>
               </div>
@@ -602,16 +569,18 @@ export default function TouristDashboard() {
           QUICK ACTIONS
       ===================================================== */}
 
-      <section className="mt-10">
+      <section className="mt-8 sm:mt-10">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Quick actions</h2>
+          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+            Quick actions
+          </h2>
 
           <p className="mt-2 text-sm text-muted-foreground">
             Everything you need to manage your Travora journey.
           </p>
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           <QuickAction
             title="Plan a trip"
             description="Create a new personalized travel request."
@@ -659,32 +628,34 @@ function DashboardCard({
   icon: Icon,
 }: {
   title: string;
-
   value: number;
-
   description: string;
-
   href: string;
-
   icon: typeof FileText;
 }) {
   return (
     <Link href={href} className="block">
       <Card className="h-full transition-all hover:-translate-y-0.5 hover:shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">{title}</p>
+        <CardContent className="p-3.5 sm:p-6">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                {title}
+              </p>
 
-              <p className="mt-2 text-3xl font-bold">{value}</p>
+              <p className="mt-1 text-2xl font-bold sm:mt-2 sm:text-3xl">
+                {value}
+              </p>
             </div>
 
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <Icon className="size-5" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted sm:size-11 sm:rounded-xl">
+              <Icon className="size-4 sm:size-5" />
             </div>
           </div>
 
-          <p className="mt-4 text-xs text-muted-foreground">{description}</p>
+          <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-muted-foreground sm:mt-4 sm:text-xs">
+            {description}
+          </p>
         </CardContent>
       </Card>
     </Link>
@@ -703,21 +674,25 @@ function StatusCard({
   icon: Icon,
 }: {
   title: string;
-
   value: number;
-
   icon: typeof FileText;
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center justify-between p-5">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
+      <CardContent className="p-3.5 sm:p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-[11px] leading-4 text-muted-foreground sm:text-sm">
+              {title}
+            </p>
 
-          <p className="mt-2 text-3xl font-bold">{value}</p>
+            <p className="mt-1 text-2xl font-bold sm:mt-2 sm:text-3xl">
+              {value}
+            </p>
+          </div>
+
+          <Icon className="size-4 shrink-0 text-muted-foreground sm:size-6" />
         </div>
-
-        <Icon className="size-6 text-muted-foreground" />
       </CardContent>
     </Card>
   );
@@ -736,7 +711,7 @@ function UpcomingBooking({ booking }: { booking: Booking }) {
         <div>
           <h3 className="text-lg font-semibold">{booking.quotation.title}</h3>
 
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 break-all text-xs text-muted-foreground sm:text-sm">
             {booking.bookingReference}
           </p>
         </div>
@@ -746,7 +721,7 @@ function UpcomingBooking({ booking }: { booking: Booking }) {
         </span>
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-5 space-y-4 sm:mt-6">
         <div className="flex gap-3">
           <CalendarDays className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
@@ -783,7 +758,7 @@ function UpcomingBooking({ booking }: { booking: Booking }) {
         href={`/tourist/bookings/${booking.id}`}
         className={`${buttonVariants({
           variant: "outline",
-        })} mt-6`}
+        })} mt-5 sm:mt-6`}
       >
         View booking
         <ArrowRight className="size-4" />
@@ -806,9 +781,9 @@ function RecentRequest({ request }: { request: TourRequest }) {
           <h3 className="text-lg font-semibold">{getRequestTitle(request)}</h3>
 
           <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4" />
+            <MapPin className="size-4 shrink-0" />
 
-            {getRequestDestination(request)}
+            <span>{getRequestDestination(request)}</span>
           </div>
         </div>
 
@@ -825,7 +800,7 @@ function RecentRequest({ request }: { request: TourRequest }) {
         href={`/tourist/requests/${request.id}`}
         className={`${buttonVariants({
           variant: "outline",
-        })} mt-6`}
+        })} mt-5 sm:mt-6`}
       >
         View request
         <ArrowRight className="size-4" />
@@ -847,28 +822,25 @@ function QuickAction({
   icon: Icon,
 }: {
   title: string;
-
   description: string;
-
   href: string;
-
   icon: typeof FileText;
 }) {
   return (
     <Link href={href} className="group">
       <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:shadow-sm">
-        <CardContent className="p-5">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
-            <Icon className="size-5" />
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-muted sm:size-10 sm:rounded-xl">
+            <Icon className="size-4 sm:size-5" />
           </div>
 
-          <h3 className="mt-4 font-semibold">{title}</h3>
+          <h3 className="mt-3 font-semibold sm:mt-4">{title}</h3>
 
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {description}
           </p>
 
-          <div className="mt-4 flex items-center gap-1 text-sm font-medium">
+          <div className="mt-3 flex items-center gap-1 text-sm font-medium sm:mt-4">
             Open
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
           </div>
@@ -891,16 +863,13 @@ function EmptyState({
   action,
 }: {
   title: string;
-
   description: string;
-
   href: string;
-
   action: string;
 }) {
   return (
-    <div className="py-5 text-center">
-      <Route className="mx-auto size-8 text-muted-foreground" />
+    <div className="py-4 text-center sm:py-5">
+      <Route className="mx-auto size-7 text-muted-foreground sm:size-8" />
 
       <h3 className="mt-4 font-semibold">{title}</h3>
 

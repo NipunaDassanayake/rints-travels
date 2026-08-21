@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import {
+  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -22,7 +23,15 @@ import { buttonVariants } from "@/components/ui/button";
 
 import { getMyGuideBookings } from "@/features/bookings/guide-booking.api";
 
+import { getMyGuideReviews } from "@/features/reviews/review.api";
+
 import type { Booking } from "@/features/bookings/booking.types";
+
+/**
+ * =========================================================
+ * Helpers
+ * =========================================================
+ */
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -52,21 +61,61 @@ function getDestination(booking: Booking) {
   );
 }
 
+/**
+ * =========================================================
+ * Dashboard
+ * =========================================================
+ */
+
 export default function GuideDashboardPage() {
+  /**
+   * =======================================================
+   * Bookings
+   * =======================================================
+   */
+
   const {
     data: bookings = [],
-    isLoading,
-    isError,
-    refetch,
+    isLoading: bookingsLoading,
+    isError: bookingsError,
+    refetch: refetchBookings,
   } = useQuery({
     queryKey: ["guide", "bookings"],
+
     queryFn: getMyGuideBookings,
   });
+
+  /**
+   * =======================================================
+   * Reviews
+   * =======================================================
+   */
+
+  const {
+    data: reviewSummary,
+    isLoading: reviewsLoading,
+    isError: reviewsError,
+    refetch: refetchReviews,
+  } = useQuery({
+    queryKey: ["guide", "reviews"],
+
+    queryFn: getMyGuideReviews,
+  });
+
+  const isLoading = bookingsLoading || reviewsLoading;
+
+  const isError = bookingsError || reviewsError;
 
   if (isLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center">
-        <LoaderCircle className="size-7 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3">
+          <LoaderCircle className="size-7 animate-spin text-muted-foreground" />
+
+          <p className="text-sm text-muted-foreground">
+            Loading your guide dashboard...
+          </p>
+        </div>
       </main>
     );
   }
@@ -76,16 +125,19 @@ export default function GuideDashboardPage() {
       <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
         <div className="rounded-2xl border border-destructive/40 p-6">
           <h1 className="text-xl font-semibold">
-            Unable to load assigned tours
+            Unable to load guide dashboard
           </h1>
 
           <p className="mt-2 text-sm text-muted-foreground">
-            Your assigned bookings could not be loaded.
+            Some guide information could not be retrieved.
           </p>
 
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={() => {
+              void refetchBookings();
+              void refetchReviews();
+            }}
             className={`${buttonVariants({
               variant: "outline",
             })} mt-5`}
@@ -96,6 +148,12 @@ export default function GuideDashboardPage() {
       </main>
     );
   }
+
+  /**
+   * =======================================================
+   * Booking statistics
+   * =======================================================
+   */
 
   const upcomingBookings = bookings.filter(
     (booking) => booking.status === "CONFIRMED",
@@ -113,7 +171,43 @@ export default function GuideDashboardPage() {
     (booking) => booking.status === "CANCELLED",
   );
 
-  const activeBookings = [...inProgressBookings, ...upcomingBookings];
+  /**
+   * =======================================================
+   * Review statistics
+   * =======================================================
+   */
+
+  const averageRating = Number(reviewSummary?.guide.averageRating ?? 0);
+
+  const totalReviews = reviewSummary?.guide.totalReviews ?? 0;
+
+  /**
+   * =======================================================
+   * Current / next booking
+   * =======================================================
+   */
+
+  const currentBooking = inProgressBookings[0] ?? null;
+
+  const nextBooking =
+    [...upcomingBookings].sort(
+      (a, b) =>
+        new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+    )[0] ?? null;
+
+  /**
+   * =======================================================
+   * Recent completed
+   * =======================================================
+   */
+
+  const recentCompleted = [...completedBookings]
+    .sort(
+      (a, b) =>
+        new Date(b.completedAt ?? b.updatedAt).getTime() -
+        new Date(a.completedAt ?? a.updatedAt).getTime(),
+    )
+    .slice(0, 4);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -121,19 +215,19 @@ export default function GuideDashboardPage() {
           HEADER
       ===================================================== */}
 
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
             Tour guide portal
           </p>
 
           <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            My assigned tours
+            My guide dashboard
           </h1>
 
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            View your upcoming journeys, active tours, tourist information and
-            assigned itineraries.
+            Manage assigned tours, follow your upcoming journeys, and keep track
+            of traveler feedback.
           </p>
         </div>
 
@@ -152,63 +246,155 @@ export default function GuideDashboardPage() {
           SUMMARY
       ===================================================== */}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Upcoming"
           value={upcomingBookings.length}
+          description="Confirmed tours ahead"
           icon={CalendarDays}
         />
 
         <SummaryCard
           title="In progress"
           value={inProgressBookings.length}
+          description="Tours currently active"
           icon={Route}
         />
 
         <SummaryCard
           title="Completed"
           value={completedBookings.length}
+          description="Tours successfully finished"
           icon={CheckCircle2}
         />
 
         <SummaryCard
-          title="Total assigned"
-          value={bookings.length}
-          icon={UserRound}
+          title="Average rating"
+          value={averageRating > 0 ? averageRating.toFixed(1) : "—"}
+          description={`${totalReviews} ${
+            totalReviews === 1 ? "review" : "reviews"
+          }`}
+          icon={Star}
         />
-      </div>
+      </section>
 
       {/* =====================================================
-          ACTIVE / UPCOMING TOURS
+          CURRENT / NEXT TOUR
+      ===================================================== */}
+
+      <section className="mt-10">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Priority
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            Current & next tour
+          </h2>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            Focus on the tour that needs your attention first.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    Current
+                  </p>
+
+                  <CardTitle className="mt-2">Active tour</CardTitle>
+                </div>
+
+                <Route className="size-6 text-muted-foreground" />
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {currentBooking ? (
+                <PriorityBooking
+                  booking={currentBooking}
+                  actionLabel="Manage active tour"
+                />
+              ) : (
+                <EmptyState
+                  title="No active tour"
+                  description="You currently have no tour in progress."
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    Next
+                  </p>
+
+                  <CardTitle className="mt-2">Upcoming tour</CardTitle>
+                </div>
+
+                <CalendarDays className="size-6 text-muted-foreground" />
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {nextBooking ? (
+                <PriorityBooking
+                  booking={nextBooking}
+                  actionLabel="View upcoming tour"
+                />
+              ) : (
+                <EmptyState
+                  title="No upcoming tour"
+                  description="You currently have no confirmed tours scheduled."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* =====================================================
+          ASSIGNED TOURS
       ===================================================== */}
 
       <section className="mt-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
+            <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Assignments
+            </p>
+
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">
               Current & upcoming tours
             </h2>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Tours that are currently active or confirmed for the future.
+              Confirmed and active tours currently assigned to you.
             </p>
           </div>
         </div>
 
-        {activeBookings.length > 0 ? (
+        {[...inProgressBookings, ...upcomingBookings].length > 0 ? (
           <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            {activeBookings.map((booking) => (
+            {[...inProgressBookings, ...upcomingBookings].map((booking) => (
               <GuideBookingCard key={booking.id} booking={booking} />
             ))}
           </div>
         ) : (
-          <div className="mt-6 rounded-2xl border border-dashed p-8 text-center">
+          <div className="mt-6 rounded-2xl border border-dashed p-10 text-center">
             <CalendarDays className="mx-auto size-8 text-muted-foreground" />
 
-            <h3 className="mt-4 font-semibold">No active tours</h3>
+            <h3 className="mt-4 font-semibold">No assigned tours</h3>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              You currently have no upcoming or in-progress tours assigned.
+              You currently have no confirmed or active tours assigned.
             </p>
           </div>
         )}
@@ -218,28 +404,54 @@ export default function GuideDashboardPage() {
           COMPLETED TOURS
       ===================================================== */}
 
-      {completedBookings.length > 0 && (
-        <section className="mt-12">
+      <section className="mt-12">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              Completed tours
+            <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              History
+            </p>
+
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+              Recent completed tours
             </h2>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Tours you have already completed.
+              Your latest successfully completed journeys.
             </p>
           </div>
 
+          {totalReviews > 0 && (
+            <Link
+              href="/guide/reviews"
+              className="flex items-center gap-1 text-sm font-medium hover:underline"
+            >
+              View reviews
+              <ArrowRight className="size-4" />
+            </Link>
+          )}
+        </div>
+
+        {recentCompleted.length > 0 ? (
           <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            {completedBookings.map((booking) => (
+            {recentCompleted.map((booking) => (
               <GuideBookingCard key={booking.id} booking={booking} />
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed p-10 text-center">
+            <CheckCircle2 className="mx-auto size-8 text-muted-foreground" />
+
+            <h3 className="mt-4 font-semibold">No completed tours yet</h3>
+
+            <p className="mt-2 text-sm text-muted-foreground">
+              Tours you complete will appear here.
+            </p>
+          </div>
+        )}
+      </section>
 
       {/* =====================================================
-          CANCELLED TOURS
+          CANCELLED
       ===================================================== */}
 
       {cancelledBookings.length > 0 && (
@@ -250,7 +462,7 @@ export default function GuideDashboardPage() {
             </h2>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Previously assigned bookings that were cancelled.
+              Previous assignments that were cancelled.
             </p>
           </div>
 
@@ -265,29 +477,126 @@ export default function GuideDashboardPage() {
   );
 }
 
-interface SummaryCardProps {
-  title: string;
-  value: number;
-  icon: typeof CalendarDays;
-}
+/**
+ * =========================================================
+ * Summary Card
+ * =========================================================
+ */
 
-function SummaryCard({ title, value, icon: Icon }: SummaryCardProps) {
+function SummaryCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+}: {
+  title: string;
+
+  value: number | string;
+
+  description: string;
+
+  icon: typeof CalendarDays;
+}) {
   return (
     <Card>
-      <CardContent className="flex items-center justify-between p-5">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">{title}</p>
 
-          <p className="mt-2 text-3xl font-bold">{value}</p>
+            <p className="mt-2 text-3xl font-bold">{value}</p>
+          </div>
+
+          <div className="flex size-11 items-center justify-center rounded-xl bg-muted">
+            <Icon className="size-5" />
+          </div>
         </div>
 
-        <div className="flex size-11 items-center justify-center rounded-xl bg-muted">
-          <Icon className="size-5" />
-        </div>
+        <p className="mt-4 text-xs text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
 }
+
+/**
+ * =========================================================
+ * Priority Booking
+ * =========================================================
+ */
+
+function PriorityBooking({
+  booking,
+  actionLabel,
+}: {
+  booking: Booking;
+
+  actionLabel: string;
+}) {
+  const touristName = `${booking.tourist.firstName} ${booking.tourist.lastName}`;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold">{booking.quotation.title}</h3>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            {booking.bookingReference}
+          </p>
+        </div>
+
+        <span className="rounded-full border px-3 py-1 text-xs font-medium">
+          {formatStatus(booking.status)}
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="flex gap-3">
+          <CalendarDays className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+
+          <div>
+            <p className="text-xs text-muted-foreground">Travel dates</p>
+
+            <p className="mt-1 text-sm font-medium">
+              {formatDate(booking.startDate)}
+
+              {" → "}
+
+              {formatDate(booking.endDate)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <UserRound className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+
+          <div>
+            <p className="text-xs text-muted-foreground">Tourist</p>
+
+            <p className="mt-1 text-sm font-medium">{touristName}</p>
+          </div>
+        </div>
+      </div>
+
+      <Link
+        href={`/guide/bookings/${booking.id}`}
+        className={`${buttonVariants({
+          variant: "outline",
+        })} mt-6`}
+      >
+        {actionLabel}
+
+        <ArrowRight className="size-4" />
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * =========================================================
+ * Guide Booking Card
+ * =========================================================
+ */
 
 function GuideBookingCard({ booking }: { booking: Booking }) {
   const touristName = `${booking.tourist.firstName} ${booking.tourist.lastName}`;
@@ -391,5 +700,32 @@ function GuideBookingCard({ booking }: { booking: Booking }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * =========================================================
+ * Empty State
+ * =========================================================
+ */
+
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+
+  description: string;
+}) {
+  return (
+    <div className="py-6 text-center">
+      <Route className="mx-auto size-8 text-muted-foreground" />
+
+      <h3 className="mt-4 font-semibold">{title}</h3>
+
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+        {description}
+      </p>
+    </div>
   );
 }
