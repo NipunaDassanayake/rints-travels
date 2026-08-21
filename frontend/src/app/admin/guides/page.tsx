@@ -197,8 +197,6 @@ function SummaryCard({
 function GuideAdminCard({ guide }: { guide: TourGuide }) {
   const fullName = `${guide.user.firstName} ${guide.user.lastName}`;
 
-  const rating = Number(guide.averageRating) || 0;
-
   return (
     <Card className="overflow-hidden">
       <CardHeader className="border-b">

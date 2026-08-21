@@ -4,7 +4,7 @@ import Image from "next/image";
 
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getPackageImageUrl } from "@/features/packages/admin-package.api";
 
@@ -47,33 +47,44 @@ export function PackageImageGallery({
 
   const isOpen = selectedIndex !== null;
 
-  const closeGallery = () => {
+  const closeGallery = useCallback(() => {
     setSelectedIndex(null);
-  };
+  }, []);
 
-  const showPrevious = () => {
+  const showPrevious = useCallback(() => {
     setSelectedIndex((current) => {
       if (current === null) {
+        return null;
+      }
+
+      if (validImages.length === 0) {
         return null;
       }
 
       return (current - 1 + validImages.length) % validImages.length;
     });
-  };
+  }, [validImages.length]);
 
-  const showNext = () => {
+  const showNext = useCallback(() => {
     setSelectedIndex((current) => {
       if (current === null) {
         return null;
       }
 
+      if (validImages.length === 0) {
+        return null;
+      }
+
       return (current + 1) % validImages.length;
     });
-  };
+  }, [validImages.length]);
 
   /**
-   * Keyboard controls.
+   * =========================================================
+   * Keyboard controls
+   * =========================================================
    */
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -98,12 +109,14 @@ export function PackageImageGallery({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, validImages.length]);
+  }, [isOpen, closeGallery, showPrevious, showNext]);
 
   /**
-   * Prevent the page behind the
-   * lightbox from scrolling.
+   * =========================================================
+   * Prevent background scrolling while lightbox is open
+   * =========================================================
    */
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -117,6 +130,12 @@ export function PackageImageGallery({
       document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
+
+  /**
+   * =========================================================
+   * Empty gallery
+   * =========================================================
+   */
 
   if (validImages.length === 0) {
     return (
@@ -132,9 +151,9 @@ export function PackageImageGallery({
 
   return (
     <>
-      {/* ===============================
+      {/* =====================================================
           HERO GALLERY
-      =============================== */}
+      ===================================================== */}
 
       <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
         {/* Primary */}
@@ -188,8 +207,6 @@ export function PackageImageGallery({
 
                 <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
 
-                {/* Show remaining count */}
-
                 {index === 1 && validImages.length > 3 && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/35">
                     <span className="rounded-full bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur">
@@ -215,9 +232,9 @@ export function PackageImageGallery({
         </div>
       </div>
 
-      {/* ===============================
+      {/* =====================================================
           LIGHTBOX
-      =============================== */}
+      ===================================================== */}
 
       {selectedIndex !== null && (
         <div
