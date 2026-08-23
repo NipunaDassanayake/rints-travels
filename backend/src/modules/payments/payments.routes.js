@@ -1,23 +1,18 @@
 const express = require("express");
 
-const paymentsController =
-  require("./payments.controller");
+const paymentsController = require("./payments.controller");
 
-const authenticate =
-  require("../../middlewares/authenticate");
+const authenticate = require("../../middlewares/authenticate");
 
-const authorize =
-  require("../../middlewares/authorize");
+const authorize = require("../../middlewares/authorize");
 
-const validateRequest =
-  require("../../middlewares/validateRequest");
+const validateRequest = require("../../middlewares/validateRequest");
 
-const {
-  USER_ROLES,
-} = require("../../core/constants/auth.constants");
+const { USER_ROLES } = require("../../core/constants/auth.constants");
 
 const {
   initiatePaymentSchema,
+  createCheckoutSessionSchema,
   paymentSuccessSchema,
   paymentFailureSchema,
 } = require("./payments.validation");
@@ -25,61 +20,109 @@ const {
 const router = express.Router();
 
 /**
- * Tourist routes
+ * =========================================================
+ * Tourist - Stripe Checkout
+ * =========================================================
+ *
+ * POST /api/payments/checkout-session
+ */
+
+router.post(
+  "/checkout-session",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOURIST),
+
+  validateRequest(createCheckoutSessionSchema),
+
+  paymentsController.createCheckoutSession,
+);
+
+/**
+ * =========================================================
+ * Tourist - Legacy Payment Initiation
+ * =========================================================
+ *
+ * Temporary.
+ *
+ * We will remove this after Stripe is fully
+ * connected to the frontend.
  */
 
 router.post(
   "/initiate",
-  authenticate,
-  authorize(USER_ROLES.TOURIST),
-  validateRequest(initiatePaymentSchema),
-  paymentsController.initiatePayment
-);
 
-router.get(
-  "/me",
   authenticate,
+
   authorize(USER_ROLES.TOURIST),
-  paymentsController.getMyPayments
+
+  validateRequest(initiatePaymentSchema),
+
+  paymentsController.initiatePayment,
 );
 
 /**
- * Temporary gateway simulation routes.
+ * =========================================================
+ * Tourist - My Payments
+ * =========================================================
+ */
+
+router.get(
+  "/me",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOURIST),
+
+  paymentsController.getMyPayments,
+);
+
+/**
+ * =========================================================
+ * Temporary Gateway Simulation
+ * =========================================================
  *
- * In production these should be authenticated
- * gateway webhook endpoints with signature verification.
+ * These will be removed after the Stripe webhook
+ * has been fully tested.
  */
 
 router.post(
   "/:id/success",
+
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+
   validateRequest(paymentSuccessSchema),
-  paymentsController.markPaymentSuccessful
+
+  paymentsController.markPaymentSuccessful,
 );
 
 router.post(
   "/:id/fail",
+
   authenticate,
-  authorize(
-    USER_ROLES.ADMIN,
-    USER_ROLES.SYSTEM_ADMIN
-  ),
+
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+
   validateRequest(paymentFailureSchema),
-  paymentsController.markPaymentFailed
+
+  paymentsController.markPaymentFailed,
 );
 
 /**
- * Payment details
+ * =========================================================
+ * Payment Details
+ * =========================================================
  */
 
 router.get(
   "/:id",
+
   authenticate,
-  paymentsController.getPaymentById
+
+  paymentsController.getPaymentById,
 );
 
 module.exports = router;

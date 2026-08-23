@@ -1,44 +1,36 @@
 "use client";
 
-import { useState } from "react";
-
 import { useMutation } from "@tanstack/react-query";
 
-import { CreditCard, LoaderCircle } from "lucide-react";
+import { CreditCard, LoaderCircle, LockKeyhole } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { initiatePayment } from "@/features/payments/payment.api";
-
-import type { Payment, PaymentMethod } from "@/features/payments/payment.types";
+import { createCheckoutSession } from "@/features/payments/payment.api";
 
 interface InitiatePaymentCardProps {
   quotationId: string;
-  amount: string;
-  currency: string;
 
-  onPaymentCreated?: (payment: Payment) => void;
+  amount: string;
+
+  currency: string;
 }
 
 export function InitiatePaymentCard({
   quotationId,
   amount,
   currency,
-  onPaymentCreated,
 }: InitiatePaymentCardProps) {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
-
   const mutation = useMutation({
     mutationFn: () =>
-      initiatePayment({
+      createCheckoutSession({
         quotationId,
-        paymentMethod,
       }),
 
-    onSuccess: (payment) => {
-      onPaymentCreated?.(payment);
+    onSuccess: (checkout) => {
+      window.location.href = checkout.checkoutUrl;
     },
   });
 
@@ -57,38 +49,31 @@ export function InitiatePaymentCard({
           </p>
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="payment-method" className="text-sm font-medium">
-            Payment method
-          </label>
+        <div className="rounded-xl border bg-muted/30 p-4">
+          <div className="flex gap-3">
+            <LockKeyhole className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 
-          <select
-            id="payment-method"
-            value={paymentMethod}
-            onChange={(event) =>
-              setPaymentMethod(event.target.value as PaymentMethod)
-            }
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="CARD">Card</option>
+            <div>
+              <p className="font-medium">Secure card payment</p>
 
-            <option value="BANK_TRANSFER">Bank Transfer</option>
-
-            <option value="CASH">Cash</option>
-
-            <option value="OTHER">Other</option>
-          </select>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                You&apos;ll be redirected to Stripe&apos;s secure checkout page
+                to complete your payment.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <p className="text-sm leading-6 text-muted-foreground">
-          This currently creates a pending payment record. A real payment
-          gateway will be connected later.
-        </p>
-
         {mutation.isError && (
-          <p className="text-sm text-destructive">
-            Unable to initiate payment.
-          </p>
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+            <p className="text-sm font-medium text-destructive">
+              Unable to start payment
+            </p>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              Please try again in a moment.
+            </p>
+          </div>
         )}
 
         <Button
@@ -99,15 +84,19 @@ export function InitiatePaymentCard({
           {mutation.isPending ? (
             <>
               <LoaderCircle className="size-4 animate-spin" />
-              Creating payment...
+              Redirecting to Stripe...
             </>
           ) : (
             <>
               <CreditCard className="size-4" />
-              Proceed to payment
+              Pay {currency} {amount}
             </>
           )}
         </Button>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Payment is processed securely by Stripe.
+        </p>
       </CardContent>
     </Card>
   );

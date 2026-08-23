@@ -2,6 +2,10 @@ const crypto = require("crypto");
 
 const logger = require("../../config/logger");
 
+const stripe = require("../../config/stripe");
+
+const env = require("../../config/env");
+
 const paymentsRepository = require("./payments.repository");
 
 const quotationsRepository = require("../quotations/quotations.repository");
@@ -17,12 +21,44 @@ const {
 
 const { USER_ROLES } = require("../../core/constants/auth.constants");
 
+/**
+ * =========================================================
+ * Helpers
+ * =========================================================
+ */
+
 const generatePaymentReference = () => {
   return `PAY-${Date.now()}-${crypto
     .randomBytes(4)
     .toString("hex")
     .toUpperCase()}`;
 };
+
+/**
+ * Stripe expects the amount in the smallest
+ * currency unit.
+ *
+ * Example:
+ *
+ * USD 2150.00
+ * ->
+ * 215000 cents
+ */
+const convertAmountToStripeMinorUnit = (amount) => {
+  const numericAmount = Number(amount);
+
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new BadRequestError("Invalid payment amount");
+  }
+
+  return Math.round(numericAmount * 100);
+};
+
+/**
+ * =========================================================
+ * Initiate Local Payment
+ * =========================================================
+ */
 
 const initiatePayment = async (touristId, data) => {
   const quotation = await quotationsRepository.findQuotationById(
@@ -33,17 +69,31 @@ const initiatePayment = async (touristId, data) => {
     throw new NotFoundError("Quotation not found");
   }
 
+  /**
+   * Only the tourist who owns the request
+   * may pay the quotation.
+   */
   if (quotation.tourRequest.touristId !== touristId) {
     throw new ForbiddenError(
       "You do not have permission to pay for this quotation",
     );
   }
 
+  /**
+   * Payment should only become available
+   * after the tourist accepts the quotation.
+   */
   if (quotation.status !== "ACCEPTED") {
     throw new BadRequestError(
       "Payment is only allowed for an accepted quotation",
     );
   }
+
+  /**
+   * =======================================================
+   * Already Paid
+   * =======================================================
+   */
 
   const successfulPayment =
     await paymentsRepository.findSuccessfulPaymentByQuotationId(quotation.id);
@@ -65,6 +115,16 @@ const initiatePayment = async (touristId, data) => {
 
     throw new ConflictError("This quotation has already been paid");
   }
+
+  /**
+   * =======================================================
+   * Reuse Active Payment
+   * =======================================================
+   *
+   * Prevent duplicate pending payment records
+   * when the tourist clicks the payment button
+   * more than once.
+   */
 
   const activePayment = await paymentsRepository.findActivePaymentByQuotationId(
     quotation.id,
@@ -93,6 +153,12 @@ const initiatePayment = async (touristId, data) => {
 
     return activePayment;
   }
+
+  /**
+   * =======================================================
+   * Create Local Payment
+   * =======================================================
+   */
 
   const payment = await paymentsRepository.createPayment({
     quotationId: quotation.id,
@@ -133,9 +199,121 @@ const initiatePayment = async (touristId, data) => {
   return payment;
 };
 
+/**
+ * =========================================================
+ * Create Stripe Checkout Session
+ * =========================================================
+ */
+
+const createCheckoutSession = async (touristId, data) => {
+  /**
+   * Reuse the existing payment validation
+   * and local payment creation logic.
+   */
+  const payment = await initiatePayment(touristId, {
+    quotationId: data.quotationId,
+
+    paymentMethod: "CARD",
+  });
+
+  /**
+   * Stripe expects lowercase ISO
+   * currency codes.
+   */
+  const currency = payment.currency.toLowerCase();
+
+  const unitAmount = convertAmountToStripeMinorUnit(payment.amount);
+
+  /**
+   * =====================================================
+   * Stripe Checkout Session
+   * =====================================================
+   */
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    mode: "payment",
+
+    payment_method_types: ["card"],
+
+    client_reference_id: payment.id,
+
+    customer_email: payment.tourist.email,
+
+    line_items: [
+      {
+        quantity: 1,
+
+        price_data: {
+          currency,
+
+          unit_amount: unitAmount,
+
+          product_data: {
+            name: payment.quotation.title,
+
+            description: `Travora quotation ${payment.quotation.quotationNumber}`,
+          },
+        },
+      },
+    ],
+
+    metadata: {
+      paymentId: payment.id,
+
+      paymentReference: payment.paymentReference,
+
+      quotationId: payment.quotationId,
+
+      touristId: payment.touristId,
+    },
+
+    success_url: `${env.frontend.url}/tourist/payments/success?session_id={CHECKOUT_SESSION_ID}`,
+
+    cancel_url: `${env.frontend.url}/tourist/payments/cancel?paymentId=${payment.id}`,
+  });
+
+  if (!checkoutSession.url) {
+    throw new BadRequestError("Unable to create Stripe checkout URL");
+  }
+
+  logger.info({
+    event: "STRIPE_CHECKOUT_SESSION_CREATED",
+
+    paymentId: payment.id,
+
+    paymentReference: payment.paymentReference,
+
+    quotationId: payment.quotationId,
+
+    touristId: payment.touristId,
+
+    checkoutSessionId: checkoutSession.id,
+  });
+
+  return {
+    payment,
+
+    checkoutSessionId: checkoutSession.id,
+
+    checkoutUrl: checkoutSession.url,
+  };
+};
+
+/**
+ * =========================================================
+ * Get My Payments
+ * =========================================================
+ */
+
 const getMyPayments = async (touristId) => {
   return paymentsRepository.findPaymentsByTouristId(touristId);
 };
+
+/**
+ * =========================================================
+ * Get Payment By ID
+ * =========================================================
+ */
 
 const getPaymentById = async (paymentId, currentUser) => {
   const payment = await paymentsRepository.findPaymentById(paymentId);
@@ -157,6 +335,12 @@ const getPaymentById = async (paymentId, currentUser) => {
   return payment;
 };
 
+/**
+ * =========================================================
+ * Mark Payment Successful
+ * =========================================================
+ */
+
 const markPaymentSuccessful = async (paymentId, gatewayReference) => {
   const payment = await paymentsRepository.findPaymentById(paymentId);
 
@@ -164,10 +348,11 @@ const markPaymentSuccessful = async (paymentId, gatewayReference) => {
     throw new NotFoundError("Payment not found");
   }
 
-  /*
+  /**
    * Idempotency:
-   * The payment gateway may send the same
-   * SUCCESS callback more than once.
+   *
+   * Stripe may deliver the same webhook
+   * more than once.
    */
   if (payment.status === "SUCCESS") {
     logger.info({
@@ -186,10 +371,10 @@ const markPaymentSuccessful = async (paymentId, gatewayReference) => {
       status: payment.status,
     });
 
-    /*
-     * Make sure a booking exists even if a
-     * previous request updated the payment
-     * but failed before booking creation.
+    /**
+     * Ensure booking exists even when
+     * payment was previously updated but
+     * booking creation failed.
      */
     await bookingsService.createBookingFromPayment(payment.id);
 
@@ -237,10 +422,19 @@ const markPaymentSuccessful = async (paymentId, gatewayReference) => {
     status: successfulPayment.status,
   });
 
+  /**
+   * Existing booking creation logic.
+   */
   await bookingsService.createBookingFromPayment(successfulPayment.id);
 
   return successfulPayment;
 };
+
+/**
+ * =========================================================
+ * Mark Payment Failed
+ * =========================================================
+ */
 
 const markPaymentFailed = async (paymentId, data) => {
   const payment = await paymentsRepository.findPaymentById(paymentId);
@@ -249,8 +443,8 @@ const markPaymentFailed = async (paymentId, data) => {
     throw new NotFoundError("Payment not found");
   }
 
-  /*
-   * Never allow a late FAILED callback
+  /**
+   * Never allow a late failure event
    * to overwrite a successful payment.
    */
   if (payment.status === "SUCCESS") {
@@ -275,6 +469,9 @@ const markPaymentFailed = async (paymentId, data) => {
     return payment;
   }
 
+  /**
+   * Idempotent replay.
+   */
   if (payment.status === "FAILED") {
     logger.info({
       event: "PAYMENT_FAILURE_REPLAY",
@@ -339,8 +536,14 @@ const markPaymentFailed = async (paymentId, data) => {
 
 module.exports = {
   initiatePayment,
+
+  createCheckoutSession,
+
   getMyPayments,
+
   getPaymentById,
+
   markPaymentSuccessful,
+
   markPaymentFailed,
 };

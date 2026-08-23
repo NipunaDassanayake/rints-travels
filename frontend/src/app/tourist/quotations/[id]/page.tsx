@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import Link from "next/link";
 
 import { useParams } from "next/navigation";
@@ -32,8 +30,6 @@ import { RejectQuotationDialog } from "@/features/quotations/components/reject-q
 
 import { InitiatePaymentCard } from "@/features/payments/components/initiate-payment-card";
 
-import type { Payment } from "@/features/payments/payment.types";
-
 function formatDate(value: string | null | undefined) {
   if (!value) {
     return "Not specified";
@@ -63,11 +59,11 @@ export default function TouristQuotationPage() {
 
   const queryClient = useQueryClient();
 
-  const [payment, setPayment] = useState<Payment | null>(null);
-
   const {
     data: quotation,
+
     isLoading,
+
     isError,
   } = useQuery({
     queryKey: ["quotation", quotationId],
@@ -76,6 +72,12 @@ export default function TouristQuotationPage() {
 
     enabled: Boolean(quotationId),
   });
+
+  /**
+   * =========================================================
+   * Accept Quotation
+   * =========================================================
+   */
 
   const acceptMutation = useMutation({
     mutationFn: () => acceptQuotation(quotationId),
@@ -103,6 +105,12 @@ export default function TouristQuotationPage() {
     },
   });
 
+  /**
+   * =========================================================
+   * Loading
+   * =========================================================
+   */
+
   if (isLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center">
@@ -110,6 +118,12 @@ export default function TouristQuotationPage() {
       </main>
     );
   }
+
+  /**
+   * =========================================================
+   * Error
+   * =========================================================
+   */
 
   if (isError || !quotation) {
     return (
@@ -143,6 +157,10 @@ export default function TouristQuotationPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
       <div className="mb-8">
         <Link
           href={`/tourist/requests/${quotation.tourRequestId}`}
@@ -176,7 +194,13 @@ export default function TouristQuotationPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* ===================================================
+            MAIN CONTENT
+        ==================================================== */}
+
         <div className="space-y-6">
+          {/* Tour Summary */}
+
           <Card>
             <CardHeader>
               <CardTitle>Tour summary</CardTitle>
@@ -227,6 +251,8 @@ export default function TouristQuotationPage() {
             </CardContent>
           </Card>
 
+          {/* Itinerary */}
+
           {quotation.itineraries.length > 0 && (
             <Card>
               <CardHeader>
@@ -260,6 +286,8 @@ export default function TouristQuotationPage() {
             </Card>
           )}
 
+          {/* Inclusions */}
+
           <Card>
             <CardHeader>
               <CardTitle>What&apos;s included</CardTitle>
@@ -283,6 +311,8 @@ export default function TouristQuotationPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Exclusions */}
 
           <Card>
             <CardHeader>
@@ -308,6 +338,8 @@ export default function TouristQuotationPage() {
             </CardContent>
           </Card>
 
+          {/* Additional Information */}
+
           {(quotation.notes || quotation.termsConditions) && (
             <Card>
               <CardHeader>
@@ -327,7 +359,9 @@ export default function TouristQuotationPage() {
 
                 {quotation.termsConditions && (
                   <div>
-                    <p className="text-sm font-medium">Terms & conditions</p>
+                    <p className="text-sm font-medium">
+                      Terms &amp; conditions
+                    </p>
 
                     <p className="mt-2 whitespace-pre-line leading-7 text-muted-foreground">
                       {quotation.termsConditions}
@@ -339,7 +373,13 @@ export default function TouristQuotationPage() {
           )}
         </div>
 
+        {/* ===================================================
+            SIDEBAR
+        ==================================================== */}
+
         <aside className="space-y-6">
+          {/* Price Summary */}
+
           <Card>
             <CardHeader>
               <CardTitle>Price summary</CardTitle>
@@ -382,6 +422,8 @@ export default function TouristQuotationPage() {
             </CardContent>
           </Card>
 
+          {/* Quotation Details */}
+
           <Card>
             <CardHeader>
               <CardTitle>Quotation details</CardTitle>
@@ -415,6 +457,8 @@ export default function TouristQuotationPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* SENT */}
 
           {isSent && (
             <Card>
@@ -454,6 +498,8 @@ export default function TouristQuotationPage() {
             </Card>
           )}
 
+          {/* ACCEPTED */}
+
           {isAccepted && (
             <>
               <Card>
@@ -466,72 +512,22 @@ export default function TouristQuotationPage() {
 
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
                         You have accepted this quotation. You can now continue
-                        to payment.
+                        to secure payment.
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {!payment ? (
-                <InitiatePaymentCard
-                  quotationId={quotation.id}
-                  amount={quotation.totalAmount}
-                  currency={quotation.currency}
-                  onPaymentCreated={setPayment}
-                />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Payment initiated</CardTitle>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Payment reference
-                      </p>
-
-                      <p className="mt-1 font-medium">
-                        {payment.paymentReference}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Payment method
-                      </p>
-
-                      <p className="mt-1 font-medium">
-                        {formatStatus(payment.paymentMethod)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-muted-foreground">Status</p>
-
-                      <p className="mt-1 font-medium">
-                        {formatStatus(payment.status)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-muted-foreground">Amount</p>
-
-                      <p className="mt-1 text-xl font-semibold">
-                        {payment.currency} {payment.amount}
-                      </p>
-                    </div>
-
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      The payment has been created and is waiting for
-                      confirmation.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              <InitiatePaymentCard
+                quotationId={quotation.id}
+                amount={quotation.totalAmount}
+                currency={quotation.currency}
+              />
             </>
           )}
+
+          {/* REJECTED */}
 
           {isRejected && (
             <Card>
@@ -551,6 +547,8 @@ export default function TouristQuotationPage() {
             </Card>
           )}
 
+          {/* EXPIRED */}
+
           {quotation.status === "EXPIRED" && (
             <Card>
               <CardContent className="pt-6">
@@ -564,6 +562,8 @@ export default function TouristQuotationPage() {
             </Card>
           )}
 
+          {/* SUPERSEDED */}
+
           {quotation.status === "SUPERSEDED" && (
             <Card>
               <CardContent className="pt-6">
@@ -575,6 +575,8 @@ export default function TouristQuotationPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* PAYMENT LOCKED */}
 
           {!isAccepted && (
             <Card>
