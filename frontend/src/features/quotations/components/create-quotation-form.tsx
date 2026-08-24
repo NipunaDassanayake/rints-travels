@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FileText, LoaderCircle, Plus, Trash2 } from "lucide-react";
 
@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 import { createQuotation } from "@/features/quotations/quotation.api";
+
+import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
 
 import type { TourRequest } from "@/features/tour-requests/tour-request.types";
 
@@ -66,6 +68,22 @@ export function CreateQuotationForm({
   requestId,
 }: CreateQuotationFormProps) {
   const queryClient = useQueryClient();
+
+  /**
+   * =========================================================
+   * Tour Guides
+   * =========================================================
+   */
+
+  const {
+    data: guides = [],
+    isLoading: isLoadingGuides,
+    isError: isGuidesError,
+  } = useQuery({
+    queryKey: ["tour-guides"],
+
+    queryFn: getTourGuides,
+  });
 
   const defaultTitle =
     request.travelPackage?.title ?? request.title ?? "Custom Sri Lanka Tour";
@@ -119,6 +137,17 @@ export function CreateQuotationForm({
 
   /**
    * =========================================================
+   * Guide Selection
+   * =========================================================
+   */
+
+  const selectedGuide = useMemo(
+    () => guides.find((guide) => guide.id === guideId) ?? null,
+    [guides, guideId],
+  );
+
+  /**
+   * =========================================================
    * Pricing
    * =========================================================
    */
@@ -163,18 +192,25 @@ export function CreateQuotationForm({
     setCurrency(request.currency);
 
     setSubtotal("");
+
     setDiscountAmount("0");
+
     setTaxAmount("0");
 
     setNotes("");
+
     setTermsConditions("");
+
     setValidUntil("");
 
     setItineraries([]);
+
     setInclusions([]);
+
     setExclusions([]);
 
     setInclusionInput("");
+
     setExclusionInput("");
 
     setIsOpen(true);
@@ -189,7 +225,7 @@ export function CreateQuotationForm({
   const mutation = useMutation({
     mutationFn: () =>
       createQuotation(requestId, {
-        guideId: guideId.trim() || null,
+        guideId: guideId || null,
 
         title: title.trim(),
 
@@ -252,6 +288,7 @@ export function CreateQuotationForm({
   const addItineraryItem = () => {
     setItineraries((current) => [
       ...current,
+
       {
         dayNumber: current.length + 1,
 
@@ -264,7 +301,9 @@ export function CreateQuotationForm({
 
   const updateItineraryItem = (
     index: number,
+
     field: "dayNumber" | "title" | "description",
+
     value: string,
   ) => {
     setItineraries((current) =>
@@ -361,7 +400,9 @@ export function CreateQuotationForm({
 
   return (
     <div className="space-y-7 rounded-xl border bg-background p-5">
-      {/* Header */}
+      {/* =====================================================
+          Header
+      ====================================================== */}
 
       <div>
         <h3 className="text-lg font-semibold">Create quotation</h3>
@@ -372,7 +413,9 @@ export function CreateQuotationForm({
         </p>
       </div>
 
-      {/* Basic details */}
+      {/* =====================================================
+          Basic Details
+      ====================================================== */}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
@@ -443,19 +486,99 @@ export function CreateQuotationForm({
           />
         </div>
 
+        {/* ===================================================
+            Guide Selector
+        ==================================================== */}
+
         <div className="space-y-2">
-          <Label htmlFor="quotation-guide">Guide ID</Label>
+          <Label htmlFor="quotation-guide">Tour guide</Label>
 
-          <Input
+          <select
             id="quotation-guide"
-            placeholder="Optional guide UUID"
             value={guideId}
+            disabled={isLoadingGuides}
             onChange={(event) => setGuideId(event.target.value)}
-          />
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">
+              {isLoadingGuides ? "Loading tour guides..." : "No guide selected"}
+            </option>
 
-          <p className="text-xs text-muted-foreground">
-            Leave blank when no specific guide is assigned.
-          </p>
+            {guides.map((guide) => {
+              const fullName = `${guide.user.firstName} ${guide.user.lastName}`;
+
+              const location = guide.location ? ` — ${guide.location}` : "";
+
+              const experience =
+                guide.experienceYears > 0
+                  ? ` — ${guide.experienceYears} yr${guide.experienceYears === 1 ? "" : "s"} exp.`
+                  : "";
+
+              const rating =
+                Number(guide.averageRating) > 0
+                  ? ` — ★ ${Number(guide.averageRating).toFixed(1)}`
+                  : "";
+
+              const availability = guide.isAvailable ? "" : " — Unavailable";
+
+              return (
+                <option
+                  key={guide.id}
+                  value={guide.id}
+                  disabled={
+                    !guide.isAvailable && guide.id !== request.preferredGuideId
+                  }
+                >
+                  {fullName}
+                  {location}
+                  {experience}
+                  {rating}
+                  {availability}
+                </option>
+              );
+            })}
+          </select>
+
+          {isGuidesError && (
+            <p className="text-xs text-destructive">
+              Unable to load tour guides.
+            </p>
+          )}
+
+          {!isGuidesError && !isLoadingGuides && guides.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No tour guides are currently available.
+            </p>
+          )}
+
+          {!isGuidesError && guides.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Choose a guide by name. The internal guide ID is handled
+              automatically.
+            </p>
+          )}
+
+          {selectedGuide && (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+              <p className="font-medium">
+                Selected: {selectedGuide.user.firstName}{" "}
+                {selectedGuide.user.lastName}
+              </p>
+
+              <p className="mt-1 text-muted-foreground">
+                {selectedGuide.location ?? "Location not specified"}
+                {" · "}
+                {selectedGuide.experienceYears} year
+                {selectedGuide.experienceYears === 1 ? "" : "s"} experience
+                {Number(selectedGuide.averageRating) > 0 && (
+                  <>
+                    {" · ★ "}
+                    {Number(selectedGuide.averageRating).toFixed(1)}
+                  </>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -470,7 +593,9 @@ export function CreateQuotationForm({
         </div>
       </div>
 
-      {/* Pricing */}
+      {/* =====================================================
+          Pricing
+      ====================================================== */}
 
       <div className="space-y-4 rounded-xl border p-5">
         <div>
@@ -546,7 +671,9 @@ export function CreateQuotationForm({
         </div>
       </div>
 
-      {/* Itinerary */}
+      {/* =====================================================
+          Itinerary
+      ====================================================== */}
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -593,7 +720,13 @@ export function CreateQuotationForm({
                 value={item.title}
                 placeholder="Example: Arrival in Colombo"
                 onChange={(event) =>
-                  updateItineraryItem(index, "title", event.target.value)
+                  updateItineraryItem(
+                    index,
+
+                    "title",
+
+                    event.target.value,
+                  )
                 }
               />
             </div>
@@ -606,7 +739,13 @@ export function CreateQuotationForm({
                 value={item.description}
                 placeholder="Describe the day's activities..."
                 onChange={(event) =>
-                  updateItineraryItem(index, "description", event.target.value)
+                  updateItineraryItem(
+                    index,
+
+                    "description",
+
+                    event.target.value,
+                  )
                 }
               />
             </div>
@@ -614,7 +753,9 @@ export function CreateQuotationForm({
         ))}
       </div>
 
-      {/* Inclusion / Exclusion */}
+      {/* =====================================================
+          Inclusion / Exclusion
+      ====================================================== */}
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4 rounded-xl border p-4">
@@ -724,7 +865,9 @@ export function CreateQuotationForm({
         </div>
       </div>
 
-      {/* Notes */}
+      {/* =====================================================
+          Notes
+      ====================================================== */}
 
       <div className="space-y-2">
         <Label htmlFor="quotation-notes">Notes</Label>
@@ -738,7 +881,9 @@ export function CreateQuotationForm({
         />
       </div>
 
-      {/* Terms */}
+      {/* =====================================================
+          Terms
+      ====================================================== */}
 
       <div className="space-y-2">
         <Label htmlFor="quotation-terms">Terms &amp; conditions</Label>
@@ -752,7 +897,9 @@ export function CreateQuotationForm({
         />
       </div>
 
-      {/* Error */}
+      {/* =====================================================
+          Error
+      ====================================================== */}
 
       {mutation.isError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
@@ -766,7 +913,9 @@ export function CreateQuotationForm({
         </div>
       )}
 
-      {/* Actions */}
+      {/* =====================================================
+          Actions
+      ====================================================== */}
 
       <div className="flex flex-wrap gap-3">
         <Button
