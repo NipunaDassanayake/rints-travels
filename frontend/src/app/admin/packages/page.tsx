@@ -85,8 +85,7 @@ export default function AdminPackagesPage() {
       }),
   });
 
-  const packages = data?.items ?? [];
-
+  const packages = useMemo(() => data?.items ?? [], [data?.items]);
   /**
    * =========================================================
    * Destination Suggestions

@@ -7,7 +7,20 @@ import { buttonVariants } from "@/components/ui/button";
 import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
 
 export async function LocalGuides() {
-  const guides = await getTourGuides();
+  let guides = [];
+
+  try {
+    guides = await getTourGuides();
+  } catch (error) {
+    console.error("Unable to load featured tour guides:", error);
+
+    /**
+     * The homepage should still render even if
+     * the backend is temporarily unavailable
+     * during build/prerender.
+     */
+    return null;
+  }
 
   const featuredGuides = guides
     .filter((guide) => guide.isAvailable)

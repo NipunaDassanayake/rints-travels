@@ -4,16 +4,18 @@ import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   ArrowLeft,
   CalendarDays,
   Check,
+  CheckCircle2,
   Clock3,
   LoaderCircle,
   Mail,
   MapPin,
+  Play,
   Route,
   UserRound,
   Users,
@@ -21,11 +23,15 @@ import {
   X,
 } from "lucide-react";
 
+import { Button, buttonVariants } from "@/components/ui/button";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { buttonVariants } from "@/components/ui/button";
-
-import { getGuideBookingById } from "@/features/bookings/guide-booking.api";
+import {
+  completeGuideTour,
+  getGuideBookingById,
+  startGuideTour,
+} from "@/features/bookings/guide-booking.api";
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -61,12 +67,38 @@ function formatStatus(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Something went wrong.";
+}
+
 export default function GuideBookingDetailsPage() {
   const params = useParams<{
     id: string;
   }>();
 
   const bookingId = params.id;
+
+  const queryClient = useQueryClient();
 
   const {
     data: booking,
@@ -79,6 +111,50 @@ export default function GuideBookingDetailsPage() {
     queryFn: () => getGuideBookingById(bookingId),
 
     enabled: Boolean(bookingId),
+  });
+
+  const startMutation = useMutation({
+    mutationFn: () => startGuideTour(bookingId),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["guide", "booking", bookingId],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["guide", "bookings"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "bookings"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["bookings", "me"],
+      });
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: () => completeGuideTour(bookingId),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["guide", "booking", bookingId],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["guide", "bookings"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "bookings"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["bookings", "me"],
+      });
+    },
   });
 
   if (isLoading) {
@@ -131,10 +207,16 @@ export default function GuideBookingDetailsPage() {
     booking.quotation.description ||
     "Sri Lanka";
 
+  const isConfirmed = booking.status === "CONFIRMED";
+
+  const isInProgress = booking.status === "IN_PROGRESS";
+
+  const isCompleted = booking.status === "COMPLETED";
+
+  const isCancelled = booking.status === "CANCELLED";
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      {/* Header */}
-
       <div className="mb-8">
         <Link
           href="/guide"
@@ -176,12 +258,8 @@ export default function GuideBookingDetailsPage() {
         </div>
       </div>
 
-      {/* Main layout */}
-
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
-          {/* Tourist details */}
-
           <Card>
             <CardHeader>
               <CardTitle>Tourist details</CardTitle>
@@ -210,8 +288,6 @@ export default function GuideBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Trip details */}
-
           <Card>
             <CardHeader>
               <CardTitle>Trip details</CardTitle>
@@ -226,7 +302,9 @@ export default function GuideBookingDetailsPage() {
 
                   <p className="mt-1 font-medium">
                     {formatDate(booking.startDate)}
+
                     {" → "}
+
                     {formatDate(booking.endDate)}
                   </p>
                 </div>
@@ -272,8 +350,6 @@ export default function GuideBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Description */}
-
           {booking.quotation.description && (
             <Card>
               <CardHeader>
@@ -287,8 +363,6 @@ export default function GuideBookingDetailsPage() {
               </CardContent>
             </Card>
           )}
-
-          {/* Itinerary */}
 
           <Card>
             <CardHeader>
@@ -324,8 +398,6 @@ export default function GuideBookingDetailsPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* Included / excluded */}
 
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
@@ -378,10 +450,112 @@ export default function GuideBookingDetailsPage() {
           </div>
         </div>
 
-        {/* Sidebar */}
-
         <aside className="space-y-6">
-          {/* Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tour actions</CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {isConfirmed && (
+                <>
+                  <div className="rounded-xl border bg-muted/30 p-4">
+                    <p className="font-medium">Ready to begin?</p>
+
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      Start the tour when the journey officially begins.
+                    </p>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    disabled={startMutation.isPending}
+                    onClick={() => startMutation.mutate()}
+                  >
+                    {startMutation.isPending ? (
+                      <>
+                        <LoaderCircle className="size-4 animate-spin" />
+                        Starting tour...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-4" />
+                        Start tour
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+
+              {isInProgress && (
+                <>
+                  <div className="rounded-xl border bg-muted/30 p-4">
+                    <p className="font-medium">Tour in progress</p>
+
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      Mark the tour as completed after the journey has finished.
+                    </p>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    disabled={completeMutation.isPending}
+                    onClick={() => completeMutation.mutate()}
+                  >
+                    {completeMutation.isPending ? (
+                      <>
+                        <LoaderCircle className="size-4 animate-spin" />
+                        Completing tour...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="size-4" />
+                        Complete tour
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+
+              {isCompleted && (
+                <div className="flex gap-3 rounded-xl border bg-muted/30 p-4">
+                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
+
+                  <div>
+                    <p className="font-medium">Tour completed</p>
+
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      This journey has been completed successfully.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {isCancelled && (
+                <div className="flex gap-3 rounded-xl border bg-muted/30 p-4">
+                  <X className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+
+                  <div>
+                    <p className="font-medium">Booking cancelled</p>
+
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      No further tour actions are available.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {(startMutation.isError || completeMutation.isError) && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-sm text-destructive">
+                    {getErrorMessage(
+                      startMutation.error ?? completeMutation.error,
+                    )}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -427,8 +601,6 @@ export default function GuideBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Quotation */}
-
           <Card>
             <CardHeader>
               <CardTitle>Tour information</CardTitle>
@@ -464,8 +636,6 @@ export default function GuideBookingDetailsPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Notes */}
 
           {(booking.quotation.notes ||
             booking.quotation.termsConditions ||

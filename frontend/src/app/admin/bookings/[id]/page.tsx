@@ -108,12 +108,6 @@ export default function AdminBookingDetailsPage() {
 
   const [selectedGuideId, setSelectedGuideId] = useState("");
 
-  /**
-   * =========================================================
-   * Booking
-   * =========================================================
-   */
-
   const {
     data: booking,
     isLoading,
@@ -126,12 +120,6 @@ export default function AdminBookingDetailsPage() {
     enabled: Boolean(bookingId),
   });
 
-  /**
-   * =========================================================
-   * Tour Guides
-   * =========================================================
-   */
-
   const {
     data: guides = [],
     isLoading: areGuidesLoading,
@@ -143,11 +131,9 @@ export default function AdminBookingDetailsPage() {
   });
 
   /**
-   * =========================================================
-   * Status Mutation
-   * =========================================================
+   * Admin status mutation is retained
+   * only for administrative cancellation.
    */
-
   const statusMutation = useMutation({
     mutationFn: (status: BookingStatus) =>
       updateBookingStatus(bookingId, status),
@@ -164,14 +150,12 @@ export default function AdminBookingDetailsPage() {
       await queryClient.invalidateQueries({
         queryKey: ["bookings", "me"],
       });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["guide", "bookings"],
+      });
     },
   });
-
-  /**
-   * =========================================================
-   * Guide Assignment Mutation
-   * =========================================================
-   */
 
   const guideMutation = useMutation({
     mutationFn: (guideId: string) => assignBookingGuide(bookingId, guideId),
@@ -189,15 +173,13 @@ export default function AdminBookingDetailsPage() {
         queryKey: ["bookings", "me"],
       });
 
+      await queryClient.invalidateQueries({
+        queryKey: ["guide", "bookings"],
+      });
+
       setSelectedGuideId("");
     },
   });
-
-  /**
-   * =========================================================
-   * Loading
-   * =========================================================
-   */
 
   if (isLoading) {
     return (
@@ -206,12 +188,6 @@ export default function AdminBookingDetailsPage() {
       </main>
     );
   }
-
-  /**
-   * =========================================================
-   * Error
-   * =========================================================
-   */
 
   if (isError || !booking) {
     return (
@@ -236,12 +212,6 @@ export default function AdminBookingDetailsPage() {
     );
   }
 
-  /**
-   * =========================================================
-   * Derived Values
-   * =========================================================
-   */
-
   const touristName = `${booking.tourist.firstName} ${booking.tourist.lastName}`;
 
   const guide = booking.quotation.guide;
@@ -250,7 +220,9 @@ export default function AdminBookingDetailsPage() {
     ? `${guide.user.firstName} ${guide.user.lastName}`
     : "Not assigned";
 
-  const availableGuides = guides.filter((tourGuide) => tourGuide.isAvailable);
+  const availableGuides = guides.filter(
+    (tourGuide) => tourGuide.isAvailable || tourGuide.id === guide?.id,
+  );
 
   const selectedGuide = guides.find(
     (tourGuide) => tourGuide.id === selectedGuideId,
@@ -259,11 +231,12 @@ export default function AdminBookingDetailsPage() {
   const canAssignGuide =
     booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS";
 
+  const canCancelBooking =
+    booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS";
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
+      {/* Header */}
 
       <div className="mb-8">
         <Link
@@ -302,18 +275,10 @@ export default function AdminBookingDetailsPage() {
         </div>
       </div>
 
-      {/* =====================================================
-          MAIN GRID
-      ===================================================== */}
-
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        {/* ===================================================
-            LEFT
-        =================================================== */}
+        {/* Left */}
 
         <div className="space-y-6">
-          {/* Tourist details */}
-
           <Card>
             <CardHeader>
               <CardTitle>Tourist details</CardTitle>
@@ -341,8 +306,6 @@ export default function AdminBookingDetailsPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Trip details */}
 
           <Card>
             <CardHeader>
@@ -406,8 +369,6 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Itinerary */}
-
           <Card>
             <CardHeader>
               <CardTitle>Itinerary</CardTitle>
@@ -442,8 +403,6 @@ export default function AdminBookingDetailsPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* Included / Not included */}
 
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
@@ -496,15 +455,9 @@ export default function AdminBookingDetailsPage() {
           </div>
         </div>
 
-        {/* ===================================================
-            RIGHT SIDEBAR
-        =================================================== */}
+        {/* Sidebar */}
 
         <aside className="space-y-6">
-          {/* =================================================
-              TOUR GUIDE
-          ================================================= */}
-
           <Card>
             <CardHeader>
               <CardTitle>Tour guide</CardTitle>
@@ -516,8 +469,6 @@ export default function AdminBookingDetailsPage() {
 
                 <p className="mt-1 text-lg font-semibold">{guideName}</p>
               </div>
-
-              {/* Current guide details */}
 
               {guide && (
                 <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
@@ -558,8 +509,6 @@ export default function AdminBookingDetailsPage() {
                   </div>
                 </div>
               )}
-
-              {/* Guide assignment */}
 
               {canAssignGuide ? (
                 <>
@@ -604,8 +553,6 @@ export default function AdminBookingDetailsPage() {
                       </select>
                     )}
                   </div>
-
-                  {/* Selected guide preview */}
 
                   {selectedGuide && (
                     <div className="rounded-xl border p-4">
@@ -684,10 +631,6 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* =================================================
-              BOOKING STATUS
-          ================================================= */}
-
           <Card>
             <CardHeader>
               <CardTitle>Booking status</CardTitle>
@@ -732,10 +675,6 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* =================================================
-              PAYMENT
-          ================================================= */}
-
           <Card>
             <CardHeader>
               <CardTitle>Payment</CardTitle>
@@ -776,31 +715,25 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* =================================================
-              ADMIN ACTIONS
-          ================================================= */}
-
           <Card>
             <CardHeader>
               <CardTitle>Admin actions</CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-3">
-              {booking.status === "CONFIRMED" && (
+              {canCancelBooking && (
                 <>
-                  {!guide && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      Assign a tour guide before starting this tour.
-                    </div>
-                  )}
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-sm font-medium">
+                      Tour status is managed by the assigned guide
+                    </p>
 
-                  <Button
-                    className="w-full"
-                    disabled={statusMutation.isPending || !guide}
-                    onClick={() => statusMutation.mutate("IN_PROGRESS")}
-                  >
-                    {statusMutation.isPending ? "Updating..." : "Start tour"}
-                  </Button>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      The assigned guide is responsible for starting and
+                      completing the tour. Admins can manage the guide or cancel
+                      the booking when required.
+                    </p>
+                  </div>
 
                   <Button
                     variant="destructive"
@@ -816,36 +749,9 @@ export default function AdminBookingDetailsPage() {
                       }
                     }}
                   >
-                    Cancel booking
-                  </Button>
-                </>
-              )}
-
-              {booking.status === "IN_PROGRESS" && (
-                <>
-                  <Button
-                    className="w-full"
-                    disabled={statusMutation.isPending}
-                    onClick={() => statusMutation.mutate("COMPLETED")}
-                  >
-                    {statusMutation.isPending ? "Updating..." : "Complete tour"}
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    disabled={statusMutation.isPending}
-                    onClick={() => {
-                      const confirmed = window.confirm(
-                        "Are you sure you want to cancel this booking?",
-                      );
-
-                      if (confirmed) {
-                        statusMutation.mutate("CANCELLED");
-                      }
-                    }}
-                  >
-                    Cancel booking
+                    {statusMutation.isPending
+                      ? "Cancelling..."
+                      : "Cancel booking"}
                   </Button>
                 </>
               )}
@@ -855,8 +761,8 @@ export default function AdminBookingDetailsPage() {
                   <CheckCircle2 className="mt-0.5 size-5 text-primary" />
 
                   <p className="text-sm leading-6 text-muted-foreground">
-                    This tour has been completed. No further status changes are
-                    available.
+                    This tour has been completed. No further administrative
+                    status changes are available.
                   </p>
                 </div>
               )}

@@ -1,18 +1,10 @@
 import { apiClient } from "@/lib/api/client";
 
-import type { InitiatePaymentPayload, Payment } from "./payment.types";
-
-export interface CreateCheckoutSessionPayload {
-  quotationId: string;
-}
-
-export interface CheckoutSessionResponse {
-  payment: Payment;
-
-  checkoutSessionId: string;
-
-  checkoutUrl: string;
-}
+import type {
+  CheckoutSessionResponse,
+  CreateCheckoutSessionPayload,
+  Payment,
+} from "./payment.types";
 
 /**
  * =========================================================
@@ -24,25 +16,6 @@ export async function createCheckoutSession(
   data: CreateCheckoutSessionPayload,
 ): Promise<CheckoutSessionResponse> {
   const response = await apiClient.post("/payments/checkout-session", data);
-
-  return response.data.data;
-}
-
-/**
- * =========================================================
- * Legacy Payment Initiation
- * =========================================================
- *
- * Temporary.
- *
- * Remove this after the Stripe migration
- * is completely finished.
- */
-
-export async function initiatePayment(
-  data: InitiatePaymentPayload,
-): Promise<Payment> {
-  const response = await apiClient.post("/payments/initiate", data);
 
   return response.data.data;
 }
