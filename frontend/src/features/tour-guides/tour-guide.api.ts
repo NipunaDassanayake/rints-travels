@@ -1,45 +1,57 @@
-import type {
-  TourGuide,
-} from "./tour-guide.types";
+import type { TourGuide } from "./tour-guide.types";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export async function getTourGuides(): Promise<
-  TourGuide[]
-> {
-  const response = await fetch(
-    `${API_BASE_URL}/tour-guides`,
-    {
-      next: {
-        revalidate: 60,
-      },
-    }
-  );
+/**
+ * =========================================================
+ * Public - Tour Guide List
+ * =========================================================
+ *
+ * GET /api/tour-guides
+ *
+ * Returns publicly available guides.
+ */
+
+export async function getTourGuides(): Promise<TourGuide[]> {
+  if (!API_BASE_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/tour-guides`, {
+    next: {
+      revalidate: 60,
+    },
+  });
 
   if (!response.ok) {
-    throw new Error(
-      "Failed to load tour guides"
-    );
+    throw new Error("Failed to load tour guides");
   }
 
   const result = await response.json();
 
-  return result.data;
+  return result.data as TourGuide[];
 }
 
-export async function getTourGuideById(
-  id: string
-): Promise<TourGuide | null> {
+/**
+ * =========================================================
+ * Public - Tour Guide Details
+ * =========================================================
+ *
+ * GET /api/tour-guides/:id
+ */
+
+export async function getTourGuideById(id: string): Promise<TourGuide | null> {
+  if (!API_BASE_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured");
+  }
+
   const response = await fetch(
-    `${API_BASE_URL}/tour-guides/${encodeURIComponent(
-      id
-    )}`,
+    `${API_BASE_URL}/tour-guides/${encodeURIComponent(id)}`,
     {
       next: {
         revalidate: 60,
       },
-    }
+    },
   );
 
   if (response.status === 404) {
@@ -47,12 +59,10 @@ export async function getTourGuideById(
   }
 
   if (!response.ok) {
-    throw new Error(
-      "Failed to load tour guide"
-    );
+    throw new Error("Failed to load tour guide");
   }
 
   const result = await response.json();
 
-  return result.data;
+  return result.data as TourGuide;
 }

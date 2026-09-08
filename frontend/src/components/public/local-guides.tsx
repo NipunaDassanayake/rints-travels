@@ -6,8 +6,10 @@ import { buttonVariants } from "@/components/ui/button";
 
 import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
 
+import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
+
 export async function LocalGuides() {
-  let guides = [];
+  let guides: TourGuide[] = [];
 
   try {
     guides = await getTourGuides();
@@ -23,7 +25,7 @@ export async function LocalGuides() {
   }
 
   const featuredGuides = guides
-    .filter((guide) => guide.isAvailable)
+    .filter((guide: TourGuide) => guide.isAvailable)
     .slice(0, 3);
 
   if (featuredGuides.length === 0) {
@@ -62,7 +64,7 @@ export async function LocalGuides() {
         </div>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {featuredGuides.map((guide) => {
+          {featuredGuides.map((guide: TourGuide) => {
             const fullName = `${guide.user.firstName} ${guide.user.lastName}`;
 
             const rating = Number(guide.averageRating) || 0;
@@ -94,7 +96,6 @@ export async function LocalGuides() {
                       {guide.location && (
                         <span className="flex items-center gap-1.5">
                           <MapPin className="size-4" />
-
                           {guide.location}
                         </span>
                       )}
@@ -138,7 +139,7 @@ export async function LocalGuides() {
                       </div>
 
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {guide.languages.slice(0, 4).map((language) => (
+                        {guide.languages.slice(0, 4).map((language: string) => (
                           <span
                             key={language}
                             className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
@@ -159,7 +160,7 @@ export async function LocalGuides() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         {guide.specializations
                           .slice(0, 3)
-                          .map((specialization) => (
+                          .map((specialization: string) => (
                             <span
                               key={specialization}
                               className="rounded-full border px-3 py-1 text-xs text-slate-700"

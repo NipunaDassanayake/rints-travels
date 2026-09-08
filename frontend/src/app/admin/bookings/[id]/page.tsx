@@ -35,9 +35,11 @@ import {
   updateBookingStatus,
 } from "@/features/bookings/admin-booking.api";
 
-import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
+import { getAdminTourGuides } from "@/features/tour-guides/admin-tour-guide.api";
 
 import type { BookingStatus } from "@/features/bookings/booking.types";
+
+import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -108,6 +110,12 @@ export default function AdminBookingDetailsPage() {
 
   const [selectedGuideId, setSelectedGuideId] = useState("");
 
+  /**
+   * =========================================================
+   * Booking
+   * =========================================================
+   */
+
   const {
     data: booking,
     isLoading,
@@ -120,20 +128,47 @@ export default function AdminBookingDetailsPage() {
     enabled: Boolean(bookingId),
   });
 
+  /**
+   * =========================================================
+   * Admin Guide List
+   * =========================================================
+   *
+   * We deliberately use the ADMIN guide API here.
+   *
+   * Public getTourGuides() is intended for:
+   *
+   * - public guide directory
+   * - public homepage sections
+   * - tourist-facing views
+   *
+   * Admin booking assignment should use the
+   * authenticated admin endpoint.
+   */
+
   const {
     data: guides = [],
     isLoading: areGuidesLoading,
     isError: areGuidesError,
-  } = useQuery({
-    queryKey: ["tour-guides"],
+  } = useQuery<TourGuide[]>({
+    queryKey: ["admin", "tour-guides", "booking-assignment"],
 
-    queryFn: getTourGuides,
+    queryFn: () => getAdminTourGuides(),
   });
 
   /**
-   * Admin status mutation is retained
-   * only for administrative cancellation.
+   * =========================================================
+   * Admin Status Mutation
+   * =========================================================
+   *
+   * Admin status mutation is retained only
+   * for administrative cancellation.
+   *
+   * The assigned guide controls:
+   *
+   * CONFIRMED -> IN_PROGRESS
+   * IN_PROGRESS -> COMPLETED
    */
+
   const statusMutation = useMutation({
     mutationFn: (status: BookingStatus) =>
       updateBookingStatus(bookingId, status),
@@ -156,6 +191,12 @@ export default function AdminBookingDetailsPage() {
       });
     },
   });
+
+  /**
+   * =========================================================
+   * Guide Assignment
+   * =========================================================
+   */
 
   const guideMutation = useMutation({
     mutationFn: (guideId: string) => assignBookingGuide(bookingId, guideId),
@@ -181,6 +222,12 @@ export default function AdminBookingDetailsPage() {
     },
   });
 
+  /**
+   * =========================================================
+   * Loading
+   * =========================================================
+   */
+
   if (isLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center">
@@ -188,6 +235,12 @@ export default function AdminBookingDetailsPage() {
       </main>
     );
   }
+
+  /**
+   * =========================================================
+   * Booking Load Error
+   * =========================================================
+   */
 
   if (isError || !booking) {
     return (
@@ -212,6 +265,12 @@ export default function AdminBookingDetailsPage() {
     );
   }
 
+  /**
+   * =========================================================
+   * Derived Values
+   * =========================================================
+   */
+
   const touristName = `${booking.tourist.firstName} ${booking.tourist.lastName}`;
 
   const guide = booking.quotation.guide;
@@ -220,12 +279,21 @@ export default function AdminBookingDetailsPage() {
     ? `${guide.user.firstName} ${guide.user.lastName}`
     : "Not assigned";
 
+  /**
+   * Only available guides should normally be selectable.
+   *
+   * However, if the currently assigned guide later becomes
+   * unavailable, keep them in the list so the admin can
+   * still see the current assignment.
+   */
+
   const availableGuides = guides.filter(
-    (tourGuide) => tourGuide.isAvailable || tourGuide.id === guide?.id,
+    (tourGuide: TourGuide) =>
+      tourGuide.isAvailable || tourGuide.id === guide?.id,
   );
 
   const selectedGuide = guides.find(
-    (tourGuide) => tourGuide.id === selectedGuideId,
+    (tourGuide: TourGuide) => tourGuide.id === selectedGuideId,
   );
 
   const canAssignGuide =
@@ -279,6 +347,8 @@ export default function AdminBookingDetailsPage() {
         {/* Left */}
 
         <div className="space-y-6">
+          {/* Tourist */}
+
           <Card>
             <CardHeader>
               <CardTitle>Tourist details</CardTitle>
@@ -306,6 +376,8 @@ export default function AdminBookingDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Trip */}
 
           <Card>
             <CardHeader>
@@ -369,6 +441,8 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* Itinerary */}
+
           <Card>
             <CardHeader>
               <CardTitle>Itinerary</CardTitle>
@@ -403,6 +477,8 @@ export default function AdminBookingDetailsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Inclusions / Exclusions */}
 
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
@@ -458,6 +534,8 @@ export default function AdminBookingDetailsPage() {
         {/* Sidebar */}
 
         <aside className="space-y-6">
+          {/* Guide */}
+
           <Card>
             <CardHeader>
               <CardTitle>Tour guide</CardTitle>
@@ -540,7 +618,7 @@ export default function AdminBookingDetailsPage() {
                       >
                         <option value="">Select an available guide</option>
 
-                        {availableGuides.map((tourGuide) => (
+                        {availableGuides.map((tourGuide: TourGuide) => (
                           <option key={tourGuide.id} value={tourGuide.id}>
                             {tourGuide.user.firstName} {tourGuide.user.lastName}
                             {" — "}
@@ -579,7 +657,7 @@ export default function AdminBookingDetailsPage() {
                         )}
 
                         {selectedGuide.dailyRate && (
-                          <p>Daily rate: ${selectedGuide.dailyRate}</p>
+                          <p>Daily rate: USD {selectedGuide.dailyRate}</p>
                         )}
                       </div>
                     </div>
@@ -631,6 +709,8 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* Booking Status */}
+
           <Card>
             <CardHeader>
               <CardTitle>Booking status</CardTitle>
@@ -675,6 +755,8 @@ export default function AdminBookingDetailsPage() {
             </CardContent>
           </Card>
 
+          {/* Payment */}
+
           <Card>
             <CardHeader>
               <CardTitle>Payment</CardTitle>
@@ -714,6 +796,8 @@ export default function AdminBookingDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Admin Actions */}
 
           <Card>
             <CardHeader>

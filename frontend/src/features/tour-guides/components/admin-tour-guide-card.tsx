@@ -158,14 +158,16 @@ export function AdminTourGuideCard({
             <p className="text-xs text-muted-foreground">Specializations</p>
 
             <div className="mt-2 flex flex-wrap gap-2">
-              {guide.specializations.slice(0, 5).map((specialization) => (
-                <span
-                  key={specialization}
-                  className="rounded-full bg-muted px-3 py-1 text-xs"
-                >
-                  {specialization}
-                </span>
-              ))}
+              {guide.specializations
+                .slice(0, 5)
+                .map((specialization: string) => (
+                  <span
+                    key={specialization}
+                    className="rounded-full bg-muted px-3 py-1 text-xs"
+                  >
+                    {specialization}
+                  </span>
+                ))}
             </div>
           </div>
         )}
