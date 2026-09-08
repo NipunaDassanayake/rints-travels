@@ -170,7 +170,7 @@ const findAllAdminTourGuides = async ({ isAvailable, search } = {}) => {
 
 /**
  * =========================================================
- * Find Guide By ID
+ * Find Guide By ID (Admin)
  * =========================================================
  */
 
@@ -182,6 +182,35 @@ const findTourGuideById = async (id) => {
     },
 
     include: adminGuideInclude,
+  });
+};
+
+/**
+ * =========================================================
+ * Find Guide By ID (Public)
+ * =========================================================
+ *
+ * Excludes deactivated/soft-deleted/non-ACTIVE guides.
+ *
+ * Does NOT filter on isAvailable: availability governs
+ * eligibility for new work, not public visibility. An
+ * ACTIVE-but-unavailable guide's profile must still be
+ * reachable by direct URL.
+ */
+
+const findPublicTourGuideById = async (id) => {
+  return prisma.tourGuideProfile.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+
+      user: {
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+    },
+
+    include: publicGuideInclude,
   });
 };
 
@@ -352,6 +381,7 @@ module.exports = {
   findAllAdminTourGuides,
 
   findTourGuideById,
+  findPublicTourGuideById,
 
   updateTourGuide,
   updateTourGuideAvailability,

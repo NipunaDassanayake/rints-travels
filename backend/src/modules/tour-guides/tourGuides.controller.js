@@ -53,12 +53,26 @@ const getAdminTourGuides = asyncHandler(async (req, res) => {
 
 /**
  * =========================================================
- * Guide Details
+ * Guide Details (Public)
  * =========================================================
  */
 
 const getTourGuideById = asyncHandler(async (req, res) => {
   const tourGuide = await tourGuidesService.getTourGuideById(req.params.id);
+
+  return sendSuccess(res, "Tour guide retrieved successfully", tourGuide);
+});
+
+/**
+ * =========================================================
+ * Guide Details (Admin)
+ * =========================================================
+ */
+
+const getAdminTourGuideById = asyncHandler(async (req, res) => {
+  const tourGuide = await tourGuidesService.getAdminTourGuideById(
+    req.params.id,
+  );
 
   return sendSuccess(res, "Tour guide retrieved successfully", tourGuide);
 });
@@ -116,6 +130,7 @@ module.exports = {
   getAdminTourGuides,
 
   getTourGuideById,
+  getAdminTourGuideById,
 
   updateTourGuide,
 

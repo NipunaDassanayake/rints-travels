@@ -268,6 +268,10 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
     throw new NotFoundError("Tour guide not found");
   }
 
+  if (guide.user.status !== "ACTIVE") {
+    throw new BadRequestError("This tour guide's account is not active");
+  }
+
   if (!guide.isAvailable) {
     throw new BadRequestError("This tour guide is currently unavailable");
   }

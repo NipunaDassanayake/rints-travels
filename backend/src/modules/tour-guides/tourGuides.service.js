@@ -104,11 +104,27 @@ const getAdminTourGuides = async (query = {}) => {
 
 /**
  * =========================================================
- * Get Guide By ID
+ * Get Guide By ID (Public)
  * =========================================================
  */
 
 const getTourGuideById = async (id) => {
+  const tourGuide = await tourGuidesRepository.findPublicTourGuideById(id);
+
+  if (!tourGuide) {
+    throw new NotFoundError("Tour guide not found");
+  }
+
+  return tourGuide;
+};
+
+/**
+ * =========================================================
+ * Get Guide By ID (Admin)
+ * =========================================================
+ */
+
+const getAdminTourGuideById = async (id) => {
   const tourGuide = await tourGuidesRepository.findTourGuideById(id);
 
   if (!tourGuide) {
@@ -266,6 +282,7 @@ module.exports = {
   getAdminTourGuides,
 
   getTourGuideById,
+  getAdminTourGuideById,
 
   updateTourGuide,
 

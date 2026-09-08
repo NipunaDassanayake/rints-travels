@@ -13,6 +13,7 @@ import {
   Search,
   Star,
   UserRound,
+  UserRoundPlus,
   X,
 } from "lucide-react";
 
@@ -31,6 +32,30 @@ import { AdminTourGuideCard } from "@/features/tour-guides/components/admin-tour
 import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
 
 type AvailabilityFilter = "" | "available" | "unavailable";
+
+function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Something went wrong. Please try again.";
+}
 
 export default function AdminGuidesPage() {
   const queryClient = useQueryClient();
@@ -155,6 +180,16 @@ export default function AdminGuidesPage() {
               assigned guide information.
             </p>
           </div>
+
+          <Link
+            href="/admin/guides/new"
+            className={buttonVariants({
+              className: "shrink-0",
+            })}
+          >
+            <UserRoundPlus className="size-4" />
+            Add guide
+          </Link>
         </div>
       </div>
 
@@ -309,6 +344,20 @@ export default function AdminGuidesPage() {
               isDeactivating={
                 deactivateMutation.isPending &&
                 deactivateMutation.variables?.id === guide.id
+              }
+              availabilityError={
+                availabilityMutation.isError &&
+                !availabilityMutation.isPending &&
+                availabilityMutation.variables?.guide.id === guide.id
+                  ? getErrorMessage(availabilityMutation.error)
+                  : null
+              }
+              deactivateError={
+                deactivateMutation.isError &&
+                !deactivateMutation.isPending &&
+                deactivateMutation.variables?.id === guide.id
+                  ? getErrorMessage(deactivateMutation.error)
+                  : null
               }
               onAvailabilityChange={(selectedGuide, isAvailable) =>
                 availabilityMutation.mutate({

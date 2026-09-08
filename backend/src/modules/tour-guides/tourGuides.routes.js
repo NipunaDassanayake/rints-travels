@@ -65,6 +65,30 @@ router.get(
 
 /**
  * =========================================================
+ * Admin - Guide Details
+ * =========================================================
+ *
+ * IMPORTANT:
+ *
+ * This must stay BEFORE "/:id".
+ *
+ * Returns the full admin projection (email/phone/status).
+ * The public "/:id" route below returns a restricted
+ * projection and excludes deactivated/non-ACTIVE guides.
+ */
+
+router.get(
+  "/admin/:id",
+
+  authenticate,
+
+  authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
+
+  tourGuidesController.getAdminTourGuideById,
+);
+
+/**
+ * =========================================================
  * Public - Available Guides
  * =========================================================
  */
@@ -145,6 +169,10 @@ router.delete(
  * =========================================================
  *
  * This must remain after "/admin".
+ *
+ * Returns a restricted projection (no email/phone/status)
+ * and excludes deactivated/soft-deleted/non-ACTIVE guides.
+ * Unavailable-but-ACTIVE guides remain visible here.
  */
 
 router.get(

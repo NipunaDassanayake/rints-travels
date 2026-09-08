@@ -108,13 +108,19 @@ export async function getAdminTourGuides(
  * =========================================================
  * Admin - Guide Details
  * =========================================================
+ *
+ * GET /api/tour-guides/admin/:id
+ *
+ * Uses the admin-only endpoint (full projection, including
+ * email/phone/status) rather than the public guide-detail
+ * endpoint.
  */
 
 export async function getAdminTourGuideById(
   guideId: string,
 ): Promise<TourGuide> {
   const response = await apiClient.get(
-    `/tour-guides/${encodeURIComponent(guideId)}`,
+    `/tour-guides/admin/${encodeURIComponent(guideId)}`,
   );
 
   return response.data.data as TourGuide;

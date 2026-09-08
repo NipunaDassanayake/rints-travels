@@ -18,6 +18,18 @@ import { Button, buttonVariants } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
 
 interface AdminTourGuideCardProps {
@@ -26,6 +38,10 @@ interface AdminTourGuideCardProps {
   isUpdatingAvailability?: boolean;
 
   isDeactivating?: boolean;
+
+  availabilityError?: string | null;
+
+  deactivateError?: string | null;
 
   onAvailabilityChange: (guide: TourGuide, isAvailable: boolean) => void;
 
@@ -40,6 +56,8 @@ export function AdminTourGuideCard({
   guide,
   isUpdatingAvailability = false,
   isDeactivating = false,
+  availabilityError = null,
+  deactivateError = null,
   onAvailabilityChange,
   onDeactivate,
 }: AdminTourGuideCardProps) {
@@ -210,19 +228,51 @@ export function AdminTourGuideCard({
               {guide.isAvailable ? "Mark unavailable" : "Mark available"}
             </Button>
 
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isUpdatingAvailability || isDeactivating}
-              onClick={() => onDeactivate(guide)}
-            >
-              {isDeactivating && (
-                <LoaderCircle className="size-4 animate-spin" />
-              )}
-              Deactivate
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger
+                className={buttonVariants({
+                  variant: "destructive",
+                })}
+                disabled={isUpdatingAvailability || isDeactivating}
+              >
+                {isDeactivating && (
+                  <LoaderCircle className="size-4 animate-spin" />
+                )}
+                Deactivate
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Deactivate this guide?</AlertDialogTitle>
+
+                  <AlertDialogDescription>
+                    {`"${fullName}" will no longer appear publicly or be
+                    assignable to new bookings, and will lose account access.
+                    Historical bookings and reviews are preserved. This is
+                    blocked if the guide has an active (confirmed or
+                    in-progress) booking.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+
+                  <AlertDialogAction onClick={() => onDeactivate(guide)}>
+                    Deactivate guide
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
+
+        {(availabilityError || deactivateError) && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3">
+            <p className="text-sm font-medium text-destructive">
+              {deactivateError ?? availabilityError}
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
