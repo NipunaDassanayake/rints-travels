@@ -1,225 +1,378 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import {
+  ArrowLeft,
   BriefcaseBusiness,
-  Languages,
   LoaderCircle,
-  Mail,
-  MapPin,
-  Pencil,
+  Search,
   Star,
   UserRound,
-  Wallet,
+  X,
 } from "lucide-react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+
+import {
+  deactivateAdminTourGuide,
+  getAdminTourGuides,
+  updateAdminTourGuideAvailability,
+} from "@/features/tour-guides/admin-tour-guide.api";
+
+import { AdminTourGuideCard } from "@/features/tour-guides/components/admin-tour-guide-card";
 
 import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
 
-interface AdminTourGuideCardProps {
-  guide: TourGuide;
+type AvailabilityFilter = "" | "available" | "unavailable";
 
-  isUpdatingAvailability?: boolean;
+export default function AdminGuidesPage() {
+  const queryClient = useQueryClient();
 
-  isDeactivating?: boolean;
+  /**
+   * =========================================================
+   * Filters
+   * =========================================================
+   */
 
-  onAvailabilityChange: (guide: TourGuide, isAvailable: boolean) => void;
+  const [search, setSearch] = useState("");
 
-  onDeactivate: (guide: TourGuide) => void;
-}
+  const [availability, setAvailability] = useState<AvailabilityFilter>("");
 
-function formatRating(value: string | number) {
-  return (Number(value) || 0).toFixed(1);
-}
+  const normalizedSearch = search.trim();
 
-export function AdminTourGuideCard({
-  guide,
-  isUpdatingAvailability = false,
-  isDeactivating = false,
-  onAvailabilityChange,
-  onDeactivate,
-}: AdminTourGuideCardProps) {
-  const fullName = `${guide.user.firstName} ${guide.user.lastName}`;
+  /**
+   * =========================================================
+   * Guide Query
+   * =========================================================
+   */
+
+  const {
+    data: guides = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin", "guides", normalizedSearch, availability],
+
+    queryFn: () =>
+      getAdminTourGuides({
+        search: normalizedSearch || undefined,
+
+        isAvailable:
+          availability === "" ? undefined : availability === "available",
+      }),
+  });
+
+  /**
+   * =========================================================
+   * Availability Mutation
+   * =========================================================
+   */
+
+  const availabilityMutation = useMutation({
+    mutationFn: ({
+      guide,
+      isAvailable,
+    }: {
+      guide: TourGuide;
+      isAvailable: boolean;
+    }) => updateAdminTourGuideAvailability(guide.id, isAvailable),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "guides"],
+      });
+    },
+  });
+
+  /**
+   * =========================================================
+   * Deactivate Mutation
+   * =========================================================
+   */
+
+  const deactivateMutation = useMutation({
+    mutationFn: (guide: TourGuide) => deactivateAdminTourGuide(guide.id),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "guides"],
+      });
+    },
+  });
+
+  const hasFilters = Boolean(normalizedSearch || availability);
+
+  const clearFilters = () => {
+    setSearch("");
+
+    setAvailability("");
+  };
+
+  const availableGuides = guides.filter((guide) => guide.isAvailable);
+
+  const unavailableGuides = guides.filter((guide) => !guide.isAvailable);
+
+  const totalReviews = guides.reduce(
+    (total, guide) => total + guide.totalReviews,
+    0,
+  );
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted">
-              <UserRound className="size-6 text-muted-foreground" />
-            </div>
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
 
-            <div>
-              <CardTitle className="text-xl">{fullName}</CardTitle>
+      <div className="mb-8">
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to dashboard
+        </Link>
 
-              {guide.user.email && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Mail className="size-4" />
-
-                  {guide.user.email}
-                </div>
-              )}
-
-              {guide.location && (
-                <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="size-4" />
-
-                  {guide.location}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <span
-            className={
-              guide.isAvailable
-                ? "rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-700"
-                : "rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-            }
-          >
-            {guide.isAvailable ? "Available" : "Unavailable"}
-          </span>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-5 p-6">
-        {guide.bio && (
-          <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
-            {guide.bio}
-          </p>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex gap-3">
-            <BriefcaseBusiness className="mt-0.5 size-5 text-muted-foreground" />
-
-            <div>
-              <p className="text-xs text-muted-foreground">Experience</p>
-
-              <p className="mt-1 text-sm font-medium">
-                {guide.experienceYears}{" "}
-                {guide.experienceYears === 1 ? "year" : "years"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Star className="mt-0.5 size-5 text-muted-foreground" />
-
-            <div>
-              <p className="text-xs text-muted-foreground">Rating</p>
-
-              <p className="mt-1 text-sm font-medium">
-                {guide.totalReviews > 0
-                  ? `${formatRating(
-                      guide.averageRating,
-                    )} · ${guide.totalReviews} ${
-                      guide.totalReviews === 1 ? "review" : "reviews"
-                    }`
-                  : "No reviews yet"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Languages className="mt-0.5 size-5 text-muted-foreground" />
-
-            <div>
-              <p className="text-xs text-muted-foreground">Languages</p>
-
-              <p className="mt-1 text-sm font-medium">
-                {guide.languages.length > 0
-                  ? guide.languages.join(", ")
-                  : "Not specified"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Wallet className="mt-0.5 size-5 text-muted-foreground" />
-
-            <div>
-              <p className="text-xs text-muted-foreground">Daily rate</p>
-
-              <p className="mt-1 text-sm font-medium">
-                {guide.dailyRate ? `USD ${guide.dailyRate}` : "Not specified"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {guide.specializations.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="text-xs text-muted-foreground">Specializations</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+              Travora administration
+            </p>
 
-            <div className="mt-2 flex flex-wrap gap-2">
-              {guide.specializations.slice(0, 5).map((specialization) => (
-                <span
-                  key={specialization}
-                  className="rounded-full bg-muted px-3 py-1 text-xs"
-                >
-                  {specialization}
-                </span>
-              ))}
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              Tour guides
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-muted-foreground">
+              View guide availability, experience, ratings, locations and
+              assigned guide information.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* =====================================================
+          SUMMARY
+      ====================================================== */}
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard
+          title="Total guides"
+          value={guides.length}
+          icon={UserRound}
+        />
+
+        <SummaryCard
+          title="Available"
+          value={availableGuides.length}
+          icon={BriefcaseBusiness}
+        />
+
+        <SummaryCard
+          title="Unavailable"
+          value={unavailableGuides.length}
+          icon={UserRound}
+        />
+
+        <SummaryCard title="Total reviews" value={totalReviews} icon={Star} />
+      </section>
+
+      {/* =====================================================
+          FILTER PANEL
+      ====================================================== */}
+
+      <div className="mt-8 rounded-2xl border bg-card p-5">
+        <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr_auto]">
+          <div className="space-y-2">
+            <label htmlFor="guide-search" className="text-sm font-medium">
+              Search guides
+            </label>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
+              <input
+                id="guide-search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name, email or location..."
+                className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              />
             </div>
           </div>
-        )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/admin/guides/${guide.id}/edit`}
+          <div className="flex items-end">
+            <button
+              type="button"
+              disabled={!hasFilters}
+              onClick={clearFilters}
               className={buttonVariants({
                 variant: "outline",
               })}
             >
-              <Pencil className="size-4" />
-              Edit
-            </Link>
-
-            <Link
-              href={`/guides/${guide.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({
-                variant: "ghost",
-              })}
-            >
-              View public profile
-            </Link>
+              <X className="size-4" />
+              Clear filters
+            </button>
           </div>
+        </div>
+
+        <div className="mt-5 border-t pt-5">
+          <p className="mb-3 text-sm font-medium">Availability</p>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isUpdatingAvailability || isDeactivating}
-              onClick={() => onAvailabilityChange(guide, !guide.isAvailable)}
-            >
-              {isUpdatingAvailability && (
-                <LoaderCircle className="size-4 animate-spin" />
-              )}
+            {(
+              [
+                { label: "All", value: "" },
+                { label: "Available", value: "available" },
+                { label: "Unavailable", value: "unavailable" },
+              ] as { label: string; value: AvailabilityFilter }[]
+            ).map((filter) => {
+              const active = availability === filter.value;
 
-              {guide.isAvailable ? "Mark unavailable" : "Mark available"}
-            </Button>
-
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isUpdatingAvailability || isDeactivating}
-              onClick={() => onDeactivate(guide)}
-            >
-              {isDeactivating && (
-                <LoaderCircle className="size-4 animate-spin" />
-              )}
-              Deactivate
-            </Button>
+              return (
+                <button
+                  key={filter.value || "ALL"}
+                  type="button"
+                  onClick={() => setAvailability(filter.value)}
+                  className={
+                    active
+                      ? buttonVariants()
+                      : buttonVariants({
+                          variant: "outline",
+                        })
+                  }
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
           </div>
+        </div>
+      </div>
+
+      {/* =====================================================
+          LOADING
+      ====================================================== */}
+
+      {isLoading && (
+        <div className="mt-10 flex min-h-64 items-center justify-center">
+          <LoaderCircle className="size-7 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* =====================================================
+          ERROR
+      ====================================================== */}
+
+      {isError && (
+        <div className="mt-10 rounded-2xl border border-destructive/40 p-6">
+          <h2 className="font-semibold">Unable to load tour guides</h2>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tour guide information could not be retrieved.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className={`${buttonVariants({
+              variant: "outline",
+            })} mt-5`}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* =====================================================
+          GUIDE LIST
+      ====================================================== */}
+
+      {!isLoading && !isError && guides.length > 0 && (
+        <section className="mt-10 grid gap-5 lg:grid-cols-2">
+          {guides.map((guide) => (
+            <AdminTourGuideCard
+              key={guide.id}
+              guide={guide}
+              isUpdatingAvailability={
+                availabilityMutation.isPending &&
+                availabilityMutation.variables?.guide.id === guide.id
+              }
+              isDeactivating={
+                deactivateMutation.isPending &&
+                deactivateMutation.variables?.id === guide.id
+              }
+              onAvailabilityChange={(selectedGuide, isAvailable) =>
+                availabilityMutation.mutate({
+                  guide: selectedGuide,
+                  isAvailable,
+                })
+              }
+              onDeactivate={(selectedGuide) =>
+                deactivateMutation.mutate(selectedGuide)
+              }
+            />
+          ))}
+        </section>
+      )}
+
+      {/* =====================================================
+          EMPTY STATE
+      ====================================================== */}
+
+      {!isLoading && !isError && guides.length === 0 && (
+        <div className="mt-10 rounded-2xl border border-dashed p-10 text-center">
+          <UserRound className="mx-auto size-9 text-muted-foreground" />
+
+          <h3 className="mt-4 font-semibold">
+            {hasFilters ? "No matching guides" : "No tour guides found"}
+          </h3>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            {hasFilters
+              ? "No tour guides match the selected search and filters. Try changing or clearing them."
+              : "Tour guides will appear here once they are added."}
+          </p>
+        </div>
+      )}
+    </main>
+  );
+}
+
+/**
+ * =========================================================
+ * Summary card
+ * =========================================================
+ */
+
+function SummaryCard({
+  title,
+  value,
+  icon: Icon,
+}: {
+  title: string;
+  value: number;
+  icon: typeof UserRound;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between p-5">
+        <div>
+          <p className="text-sm text-muted-foreground">{title}</p>
+
+          <p className="mt-2 text-3xl font-bold">{value}</p>
+        </div>
+
+        <div className="flex size-11 items-center justify-center rounded-xl bg-muted">
+          <Icon className="size-5" />
         </div>
       </CardContent>
     </Card>
