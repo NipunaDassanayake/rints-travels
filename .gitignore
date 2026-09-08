@@ -31,3 +31,7 @@ Thumbs.db
 # Prisma generated
 /generated/prisma
 **/generated/prisma
+
+# Local Claude CR files
+docs/cr/*.md
+!docs/cr/.gitkeep
