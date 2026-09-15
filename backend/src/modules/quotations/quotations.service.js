@@ -4,6 +4,8 @@ const quotationsRepository = require("./quotations.repository");
 
 const tourRequestsRepository = require("../tour-requests/tourRequests.repository");
 
+const lifecycle = require("../tour-requests/tourRequests.lifecycle");
+
 const tourGuidesRepository = require("../tour-guides/tourGuides.repository");
 
 const {
@@ -64,27 +66,22 @@ const createQuotation = async (tourRequestId, data) => {
     throw new NotFoundError("Tour request not found");
   }
 
-  if (
-    !["UNDER_DISCUSSION", "READY_FOR_QUOTATION"].includes(tourRequest.status)
-  ) {
+  if (!lifecycle.QUOTATION_CREATE_ALLOWED.includes(tourRequest.status)) {
     throw new BadRequestError("Tour request is not ready for quotation");
   }
 
   await validateGuide(data.guideId);
 
-  const latestRevision =
-    await quotationsRepository.getLatestRevisionNumber(tourRequestId);
-
-  const revisionNumber = latestRevision + 1;
-
-  return quotationsRepository.createQuotation({
-    ...data,
-
+  return quotationsRepository.createQuotationTransaction({
     tourRequestId,
 
-    revisionNumber,
+    data: {
+      ...data,
 
-    quotationNumber: generateQuotationNumber(),
+      tourRequestId,
+
+      quotationNumber: generateQuotationNumber(),
+    },
   });
 };
 
@@ -190,21 +187,17 @@ const sendQuotation = async (quotationId) => {
     throw new BadRequestError("Cannot send an expired quotation");
   }
 
-  const updated = await quotationsRepository.updateQuotationStatus(
+  if (!lifecycle.QUOTATION_SEND.from.includes(quotation.tourRequest.status)) {
+    throw new BadRequestError(
+      `Cannot send a quotation while the tour request is ${quotation.tourRequest.status}`,
+    );
+  }
+
+  return quotationsRepository.sendQuotationTransaction({
     quotationId,
-    {
-      status: "SENT",
 
-      sentAt: new Date(),
-    },
-  );
-
-  await tourRequestsRepository.updateTourRequestStatus(
-    quotation.tourRequestId,
-    "QUOTATION_SENT",
-  );
-
-  return updated;
+    tourRequestId: quotation.tourRequestId,
+  });
 };
 
 /**
@@ -238,6 +231,14 @@ const acceptQuotation = async (quotationId, touristId) => {
     throw new BadRequestError("Quotation has expired");
   }
 
+  if (
+    !lifecycle.QUOTATION_ACCEPT.from.includes(quotation.tourRequest.status)
+  ) {
+    throw new BadRequestError(
+      `Cannot accept a quotation while the tour request is ${quotation.tourRequest.status}`,
+    );
+  }
+
   return quotationsRepository.acceptQuotationTransaction({
     quotationId,
 
@@ -268,25 +269,23 @@ const rejectQuotation = async (quotationId, touristId, reason) => {
     throw new BadRequestError("Only sent quotations can be rejected");
   }
 
-  const rejected = await quotationsRepository.updateQuotationStatus(
+  if (
+    !lifecycle.QUOTATION_REJECT.from.includes(quotation.tourRequest.status)
+  ) {
+    throw new BadRequestError(
+      `Cannot reject a quotation while the tour request is ${quotation.tourRequest.status}`,
+    );
+  }
+
+  return quotationsRepository.rejectQuotationTransaction({
     quotationId,
-    {
-      status: "REJECTED",
 
-      respondedAt: new Date(),
+    tourRequestId: quotation.tourRequestId,
 
-      notes: reason
-        ? `${quotation.notes || ""}\nRejection reason: ${reason}`.trim()
-        : quotation.notes,
-    },
-  );
-
-  await tourRequestsRepository.updateTourRequestStatus(
-    quotation.tourRequestId,
-    "REJECTED",
-  );
-
-  return rejected;
+    notes: reason
+      ? `${quotation.notes || ""}\nRejection reason: ${reason}`.trim()
+      : quotation.notes,
+  });
 };
 
 /**
@@ -305,6 +304,12 @@ const createRevision = async (quotationId, data) => {
   if (!["SENT", "REJECTED"].includes(quotation.status)) {
     throw new BadRequestError(
       "Only sent or rejected quotations can be revised",
+    );
+  }
+
+  if (!lifecycle.QUOTATION_REVISE_ALLOWED.includes(quotation.tourRequest.status)) {
+    throw new BadRequestError(
+      `Cannot revise a quotation while the tour request is ${quotation.tourRequest.status}`,
     );
   }
 
@@ -369,6 +374,8 @@ const createRevision = async (quotationId, data) => {
   try {
     return await quotationsRepository.createRevisionTransaction({
       previousQuotationId: quotation.id,
+
+      previousQuotationStatus: quotation.status,
 
       tourRequestId: quotation.tourRequestId,
 

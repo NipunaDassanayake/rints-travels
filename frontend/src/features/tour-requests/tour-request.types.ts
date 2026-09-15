@@ -13,9 +13,25 @@ export type TourRequestStatus =
   | "BOOKED";
 
 // Statuses from which a tour request can still be cancelled (mirrors the
-// backend's ALLOWED_STATUS_TRANSITIONS "CANCELLED" targets).
+// backend's MANUAL_ADMIN_TRANSITIONS "CANCELLED" targets).
 export const CANCELLABLE_TOUR_REQUEST_STATUSES: TourRequestStatus[] = [
   "PENDING_REVIEW",
+  "UNDER_DISCUSSION",
+  "READY_FOR_QUOTATION",
+  "QUOTATION_SENT",
+];
+
+// Request statuses from which a DRAFT quotation may still be sent (mirrors
+// the backend's tourRequests.lifecycle QUOTATION_SEND.from).
+export const QUOTATION_SENDABLE_REQUEST_STATUSES: TourRequestStatus[] = [
+  "UNDER_DISCUSSION",
+  "READY_FOR_QUOTATION",
+  "QUOTATION_SENT",
+];
+
+// Request statuses from which a new quotation revision may be created
+// (mirrors the backend's tourRequests.lifecycle QUOTATION_REVISE_ALLOWED).
+export const QUOTATION_REVISABLE_REQUEST_STATUSES: TourRequestStatus[] = [
   "UNDER_DISCUSSION",
   "READY_FOR_QUOTATION",
   "QUOTATION_SENT",

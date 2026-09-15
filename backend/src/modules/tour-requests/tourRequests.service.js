@@ -1,4 +1,5 @@
 const tourRequestsRepository = require("./tourRequests.repository");
+const lifecycle = require("./tourRequests.lifecycle");
 const packagesRepository = require("../packages/packages.repository");
 const {
   NotFoundError,
@@ -143,29 +144,6 @@ const assignAdmin = async (tourRequestId, adminId) => {
   );
 };
 
-// Define allowed status transitions for tour requests
-const ALLOWED_STATUS_TRANSITIONS = {
-  PENDING_REVIEW: ["UNDER_DISCUSSION", "REJECTED", "CANCELLED"],
-
-  UNDER_DISCUSSION: ["READY_FOR_QUOTATION", "REJECTED", "CANCELLED"],
-
-  READY_FOR_QUOTATION: ["UNDER_DISCUSSION", "CANCELLED"],
-
-  QUOTATION_SENT: ["UNDER_DISCUSSION", "CANCELLED"],
-
-  ACCEPTED: [],
-
-  REJECTED: [],
-  CANCELLED: [],
-  BOOKED: [],
-};
-
-const isTransitionAllowed = (currentStatus, targetStatus) => {
-  const allowedStatuses = ALLOWED_STATUS_TRANSITIONS[currentStatus] || [];
-
-  return allowedStatuses.includes(targetStatus);
-};
-
 const updateStatus = async (tourRequestId, newStatus) => {
   const tourRequest =
     await tourRequestsRepository.findTourRequestById(tourRequestId);
@@ -174,16 +152,17 @@ const updateStatus = async (tourRequestId, newStatus) => {
     throw new NotFoundError("Tour request not found");
   }
 
-  if (!isTransitionAllowed(tourRequest.status, newStatus)) {
+  if (!lifecycle.isTransitionAllowed(tourRequest.status, newStatus)) {
     throw new BadRequestError(
       `Cannot change tour request status from ${tourRequest.status} to ${newStatus}`,
     );
   }
 
-  return tourRequestsRepository.updateTourRequestStatus(
+  return tourRequestsRepository.transitionStatusTransaction({
     tourRequestId,
-    newStatus,
-  );
+    from: lifecycle.allowedSourcesFor(newStatus),
+    to: newStatus,
+  });
 };
 
 // Tourist - cancel own tour request
@@ -201,16 +180,17 @@ const cancelOwnTourRequest = async (tourRequestId, touristId) => {
     );
   }
 
-  if (!isTransitionAllowed(tourRequest.status, "CANCELLED")) {
+  if (!lifecycle.isTransitionAllowed(tourRequest.status, "CANCELLED")) {
     throw new BadRequestError(
       `Cannot cancel a tour request with status ${tourRequest.status}`,
     );
   }
 
-  return tourRequestsRepository.updateTourRequestStatus(
+  return tourRequestsRepository.transitionStatusTransaction({
     tourRequestId,
-    "CANCELLED",
-  );
+    from: lifecycle.TOURIST_CANCEL.from,
+    to: "CANCELLED",
+  });
 };
 
 // Admin - list active admins that a tour request can be assigned to
@@ -224,6 +204,12 @@ const adminEditTourRequest = async (tourRequestId, updateData) => {
 
   if (!tourRequest) {
     throw new NotFoundError("Tour request not found");
+  }
+
+  if (!lifecycle.ADMIN_EDIT_ALLOWED.includes(tourRequest.status)) {
+    throw new BadRequestError(
+      `Cannot edit a tour request with status ${tourRequest.status}`,
+    );
   }
 
   const startDate =
@@ -240,7 +226,15 @@ const adminEditTourRequest = async (tourRequestId, updateData) => {
     );
   }
 
-  return tourRequestsRepository.updateTourRequest(tourRequestId, updateData);
+  if (updateData.preferredGuideId !== undefined) {
+    await validatePreferredGuide(updateData.preferredGuideId);
+  }
+
+  return tourRequestsRepository.adminEditTransaction({
+    tourRequestId,
+    allowed: lifecycle.ADMIN_EDIT_ALLOWED,
+    data: updateData,
+  });
 };
 
 const validatePreferredGuide = async (preferredGuideId) => {

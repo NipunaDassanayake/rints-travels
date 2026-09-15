@@ -415,10 +415,7 @@ test.describe("Admin reject and cancel actions", () => {
     });
 
     await expect(
-      page.getByText(
-        "This request or quotation has been rejected.",
-        { exact: true },
-      ),
+      page.getByText("This request has been rejected.", { exact: true }),
     ).toBeVisible();
   });
 

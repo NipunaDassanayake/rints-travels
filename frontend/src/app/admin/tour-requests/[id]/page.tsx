@@ -760,6 +760,7 @@ export default function AdminTourRequestDetailsPage() {
                       key={quotation.id}
                       quotation={quotation}
                       requestId={requestId}
+                      requestStatus={request.status}
                     />
                   ))}
                 </div>
@@ -1071,7 +1072,7 @@ export default function AdminTourRequestDetailsPage() {
 
               {request.status === "REJECTED" && (
                 <p className="text-sm leading-6 text-muted-foreground">
-                  This request or quotation has been rejected.
+                  This request has been rejected.
                 </p>
               )}
 

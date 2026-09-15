@@ -1,5 +1,9 @@
 const prisma = require("../../config/prisma");
 
+const lifecycle = require("../tour-requests/tourRequests.lifecycle");
+
+const { ConflictError } = require("../../utils/AppError");
+
 /**
  * =========================================================
  * Shared Booking Include
@@ -332,6 +336,20 @@ const confirmBookingFromPayment = async ({ paymentId, bookingReference }) => {
 
     const tourRequest = quotation.tourRequest;
 
+    if (quotation.status !== "ACCEPTED") {
+      throw new ConflictError(
+        `Cannot confirm a booking because the quotation is ${quotation.status}, not ACCEPTED`,
+      );
+    }
+
+    await lifecycle.transitionTourRequestStatus(tx, {
+      tourRequestId: tourRequest.id,
+
+      from: lifecycle.BOOKING_CONFIRM.from,
+
+      to: lifecycle.BOOKING_CONFIRM.to,
+    });
+
     const booking = await tx.booking.create({
       data: {
         tourRequestId: tourRequest.id,
@@ -355,16 +373,6 @@ const confirmBookingFromPayment = async ({ paymentId, bookingReference }) => {
         currency: payment.currency,
 
         confirmedAt: new Date(),
-      },
-    });
-
-    await tx.tourRequest.update({
-      where: {
-        id: tourRequest.id,
-      },
-
-      data: {
-        status: "BOOKED",
       },
     });
 

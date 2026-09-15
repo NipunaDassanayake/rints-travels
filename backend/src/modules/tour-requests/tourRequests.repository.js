@@ -1,5 +1,7 @@
 const prisma = require("../../config/prisma");
 
+const lifecycle = require("./tourRequests.lifecycle");
+
 const createTourRequest = async (data) => {
   return prisma.tourRequest.create({
     data,
@@ -166,78 +168,121 @@ const assignAdminToTourRequest = async (id, adminId) => {
   });
 };
 
-// Update tour request status
-const updateTourRequestStatus = async (id, status) => {
-  return prisma.tourRequest.update({
-    where: {
-      id,
-    },
+/**
+ * =========================================================
+ * Transition Status Transaction
+ * =========================================================
+ *
+ * Moves the tour request from one of `from` to `to`, then
+ * supersedes any DRAFT/SENT (or SENT-only, for a recall to
+ * UNDER_DISCUSSION) quotations the target status implies --
+ * atomically, so a request can never end up CANCELLED/REJECTED
+ * with a quotation that still looks live.
+ */
+const transitionStatusTransaction = async ({ tourRequestId, from, to }) => {
+  return prisma.$transaction(async (tx) => {
+    await lifecycle.transitionTourRequestStatus(tx, {
+      tourRequestId,
+      from,
+      to,
+    });
 
-    data: {
-      status,
-    },
+    await lifecycle.supersedeOpenQuotations(tx, {
+      tourRequestId,
+      statuses: lifecycle.supersedeStatusesFor(to),
+    });
 
-    include: {
-      travelPackage: true,
-
-      tourist: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-        },
+    return tx.tourRequest.findFirst({
+      where: {
+        id: tourRequestId,
+        deletedAt: null,
       },
 
-      preferredGuide: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
+      include: {
+        travelPackage: true,
+
+        tourist: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+
+        preferredGuide: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
             },
           },
         },
       },
-    },
+    });
   });
 };
 
-const updateTourRequest = async (id, data) => {
-  return prisma.tourRequest.update({
-    where: {
-      id,
-    },
+/**
+ * =========================================================
+ * Admin Edit Transaction
+ * =========================================================
+ *
+ * Locks the request in one of `allowed` (without changing its
+ * status) before applying the edit, so a request that moves out
+ * of an editable status mid-request cannot be edited anyway.
+ */
+const adminEditTransaction = async ({ tourRequestId, allowed, data }) => {
+  return prisma.$transaction(async (tx) => {
+    await lifecycle.lockTourRequestInStatus(tx, {
+      tourRequestId,
+      allowed,
+    });
 
-    data,
-
-    include: {
-      travelPackage: true,
-
-      tourist: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-        },
+    await tx.tourRequest.update({
+      where: {
+        id: tourRequestId,
       },
 
-      preferredGuide: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
+      data,
+    });
+
+    return tx.tourRequest.findFirst({
+      where: {
+        id: tourRequestId,
+        deletedAt: null,
+      },
+
+      include: {
+        travelPackage: true,
+
+        tourist: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+
+        preferredGuide: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
             },
           },
         },
       },
-    },
+    });
   });
 };
 
@@ -247,6 +292,6 @@ module.exports = {
   findTourRequestsByTouristId,
   findAllTourRequests,
   assignAdminToTourRequest,
-  updateTourRequestStatus,
-  updateTourRequest,
+  transitionStatusTransaction,
+  adminEditTransaction,
 };

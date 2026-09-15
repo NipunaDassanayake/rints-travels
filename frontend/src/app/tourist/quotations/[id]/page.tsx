@@ -570,7 +570,8 @@ export default function TouristQuotationPage() {
                 <p className="font-semibold">Previous revision</p>
 
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  This quotation has been replaced by a newer revision.
+                  This quotation is no longer active. It was replaced by a
+                  newer revision or the request was closed.
                 </p>
               </CardContent>
             </Card>

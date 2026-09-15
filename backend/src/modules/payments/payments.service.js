@@ -10,6 +10,8 @@ const paymentsRepository = require("./payments.repository");
 
 const quotationsRepository = require("../quotations/quotations.repository");
 
+const tourRequestsLifecycle = require("../tour-requests/tourRequests.lifecycle");
+
 const bookingsService = require("../bookings/bookings.service");
 
 const {
@@ -114,6 +116,24 @@ const initiatePayment = async (touristId, data) => {
     });
 
     throw new ConflictError("This quotation has already been paid");
+  }
+
+  /**
+   * =======================================================
+   * Lifecycle Guard
+   * =======================================================
+   *
+   * Payment may only proceed while the tour request is still
+   * ACCEPTED (the quotation.status !== "ACCEPTED" check above
+   * already guarantees the quotation side). This runs before
+   * any Stripe call so a stale/cancelled request never reaches
+   * the payment gateway.
+   */
+
+  if (!tourRequestsLifecycle.PAYMENT_ALLOWED.includes(quotation.tourRequest.status)) {
+    throw new BadRequestError(
+      `Payment is not allowed while the tour request is ${quotation.tourRequest.status}`,
+    );
   }
 
   /**

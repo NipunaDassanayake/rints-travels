@@ -23,9 +23,17 @@ import { CreateQuotationForm } from "@/features/quotations/components/create-quo
 
 import type { Quotation } from "@/features/quotations/quotation.types";
 
+import {
+  QUOTATION_REVISABLE_REQUEST_STATUSES,
+  QUOTATION_SENDABLE_REQUEST_STATUSES,
+} from "@/features/tour-requests/tour-request.types";
+
+import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
+
 interface AdminQuotationCardProps {
   quotation: Quotation;
   requestId: string;
+  requestStatus: TourRequestStatus;
 }
 
 function formatStatus(value: string) {
@@ -70,6 +78,7 @@ function getErrorMessage(error: unknown) {
 export function AdminQuotationCard({
   quotation,
   requestId,
+  requestStatus,
 }: AdminQuotationCardProps) {
   const queryClient = useQueryClient();
 
@@ -219,7 +228,13 @@ export function AdminQuotationCard({
 
   const isDraft = quotation.status === "DRAFT";
 
-  const canCreateRevision = ["SENT", "REJECTED"].includes(quotation.status);
+  const isRevisableStatus = ["SENT", "REJECTED"].includes(quotation.status);
+
+  const canSend = QUOTATION_SENDABLE_REQUEST_STATUSES.includes(requestStatus);
+
+  const canCreateRevision =
+    isRevisableStatus &&
+    QUOTATION_REVISABLE_REQUEST_STATUSES.includes(requestStatus);
 
   const isUpdateInvalid =
     !title.trim() ||
@@ -552,34 +567,46 @@ export function AdminQuotationCard({
             Edit quotation
           </Button>
 
-          <Button
-            className="w-full"
-            disabled={sendMutation.isPending}
-            onClick={() => {
-              const confirmed = window.confirm(
-                "Send this quotation to the tourist? Once sent, this draft can no longer be edited.",
-              );
+          {canSend ? (
+            <>
+              <Button
+                className="w-full"
+                disabled={sendMutation.isPending}
+                onClick={() => {
+                  const confirmed = window.confirm(
+                    "Send this quotation to the tourist? Once sent, this draft can no longer be edited.",
+                  );
 
-              if (confirmed) {
-                sendMutation.mutate();
-              }
-            }}
-          >
-            {sendMutation.isPending ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Send className="size-4" />
-            )}
+                  if (confirmed) {
+                    sendMutation.mutate();
+                  }
+                }}
+              >
+                {sendMutation.isPending ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
 
-            {sendMutation.isPending ? "Sending..." : "Send quotation"}
-          </Button>
+                {sendMutation.isPending ? "Sending..." : "Send quotation"}
+              </Button>
 
-          {sendMutation.isError && (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-              <p className="text-sm text-destructive">
-                {getErrorMessage(sendMutation.error)}
-              </p>
-            </div>
+              {sendMutation.isError && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-sm text-destructive">
+                    {getErrorMessage(sendMutation.error)}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm leading-6 text-muted-foreground">
+              This draft can no longer be sent because the request is{" "}
+              <span className="font-medium text-foreground">
+                {formatStatus(requestStatus)}
+              </span>
+              .
+            </p>
           )}
         </div>
       )}
@@ -604,6 +631,17 @@ export function AdminQuotationCard({
               Create revision
             </Button>
           )}
+
+          {isRevisableStatus &&
+            !QUOTATION_REVISABLE_REQUEST_STATUSES.includes(requestStatus) && (
+              <p className="text-sm leading-6 text-muted-foreground">
+                A new revision cannot be created because the request is{" "}
+                <span className="font-medium text-foreground">
+                  {formatStatus(requestStatus)}
+                </span>
+                .
+              </p>
+            )}
         </div>
       )}
     </div>

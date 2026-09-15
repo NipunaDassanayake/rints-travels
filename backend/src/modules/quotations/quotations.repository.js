@@ -1,5 +1,9 @@
 const prisma = require("../../config/prisma");
 
+const lifecycle = require("../tour-requests/tourRequests.lifecycle");
+
+const { ConflictError } = require("../../utils/AppError");
+
 /**
  * =========================================================
  * Shared Include
@@ -98,26 +102,6 @@ const findQuotationsByTourRequest = async (tourRequestId) => {
 
 /**
  * =========================================================
- * Latest Revision
- * =========================================================
- */
-
-const getLatestRevisionNumber = async (tourRequestId) => {
-  const result = await prisma.tourQuotation.aggregate({
-    where: {
-      tourRequestId,
-    },
-
-    _max: {
-      revisionNumber: true,
-    },
-  });
-
-  return result._max.revisionNumber || 0;
-};
-
-/**
- * =========================================================
  * Quotation Create Data
  * =========================================================
  *
@@ -181,14 +165,40 @@ const buildQuotationCreateData = (data) => ({
 
 /**
  * =========================================================
- * Create Quotation
+ * Create Quotation Transaction
  * =========================================================
+ *
+ * Locks the tour request in a quotation-creatable status
+ * before computing the next revision number and creating the
+ * quotation, so two concurrent creates for the same request
+ * cannot both compute the same revision number.
  */
 
-const createQuotation = async (data) => {
+const createQuotationTransaction = async ({ tourRequestId, data }) => {
   return prisma.$transaction(async (tx) => {
+    await lifecycle.lockTourRequestInStatus(tx, {
+      tourRequestId,
+      allowed: lifecycle.QUOTATION_CREATE_ALLOWED,
+    });
+
+    const latestRevisionResult = await tx.tourQuotation.aggregate({
+      where: {
+        tourRequestId,
+      },
+
+      _max: {
+        revisionNumber: true,
+      },
+    });
+
+    const revisionNumber = (latestRevisionResult._max.revisionNumber || 0) + 1;
+
     const quotation = await tx.tourQuotation.create({
-      data: buildQuotationCreateData(data),
+      data: buildQuotationCreateData({
+        ...data,
+
+        revisionNumber,
+      }),
     });
 
     return tx.tourQuotation.findUnique({
@@ -241,6 +251,11 @@ const updateQuotationStatus = async (id, data) => {
  * =========================================================
  * Supersede Previous Quotations
  * =========================================================
+ *
+ * Kept for backward compatibility -- no longer called from
+ * this module's own transactions (each now supersedes inline,
+ * inside its own transaction), but left in place rather than
+ * removed as part of an unrelated cleanup.
  */
 
 const supersedeOtherQuotations = async (tourRequestId, excludeQuotationId) => {
@@ -265,41 +280,151 @@ const supersedeOtherQuotations = async (tourRequestId, excludeQuotationId) => {
 
 /**
  * =========================================================
+ * Send Quotation Transaction
+ * =========================================================
+ *
+ * Moves the tour request to QUOTATION_SENT (from any status
+ * that still allows sending), flips the quotation DRAFT->SENT
+ * conditionally, and supersedes any other SENT quotation for
+ * the same request so at most one offer stays live.
+ */
+
+const sendQuotationTransaction = async ({ quotationId, tourRequestId }) => {
+  return prisma.$transaction(async (tx) => {
+    await lifecycle.transitionTourRequestStatus(tx, {
+      tourRequestId,
+
+      from: lifecycle.QUOTATION_SEND.from,
+
+      to: lifecycle.QUOTATION_SEND.to,
+    });
+
+    const sendResult = await tx.tourQuotation.updateMany({
+      where: {
+        id: quotationId,
+        status: "DRAFT",
+      },
+
+      data: {
+        status: "SENT",
+
+        sentAt: new Date(),
+      },
+    });
+
+    if (sendResult.count === 0) {
+      throw new ConflictError("This quotation is no longer a draft");
+    }
+
+    await lifecycle.supersedeOpenQuotations(tx, {
+      tourRequestId,
+
+      statuses: ["SENT"],
+
+      excludeQuotationId: quotationId,
+    });
+
+    return tx.tourQuotation.findUnique({
+      where: {
+        id: quotationId,
+      },
+
+      include: quotationInclude,
+    });
+  });
+};
+
+/**
+ * =========================================================
+ * Reject Quotation Transaction
+ * =========================================================
+ *
+ * Returns the tour request to UNDER_DISCUSSION (never to the
+ * terminal REJECTED status, which is reserved for an admin
+ * rejecting the overall request) and flips the quotation
+ * SENT->REJECTED conditionally.
+ */
+
+const rejectQuotationTransaction = async ({
+  quotationId,
+  tourRequestId,
+  notes,
+}) => {
+  return prisma.$transaction(async (tx) => {
+    await lifecycle.transitionTourRequestStatus(tx, {
+      tourRequestId,
+
+      from: lifecycle.QUOTATION_REJECT.from,
+
+      to: lifecycle.QUOTATION_REJECT.to,
+    });
+
+    const rejectResult = await tx.tourQuotation.updateMany({
+      where: {
+        id: quotationId,
+        status: "SENT",
+      },
+
+      data: {
+        status: "REJECTED",
+
+        respondedAt: new Date(),
+
+        notes,
+      },
+    });
+
+    if (rejectResult.count === 0) {
+      throw new ConflictError("This quotation is no longer awaiting a response");
+    }
+
+    return tx.tourQuotation.findUnique({
+      where: {
+        id: quotationId,
+      },
+
+      include: quotationInclude,
+    });
+  });
+};
+
+/**
+ * =========================================================
  * Accept Quotation Transaction
  * =========================================================
+ *
+ * Moves the tour request QUOTATION_SENT->ACCEPTED, flips the
+ * quotation SENT->ACCEPTED conditionally (also re-checking it
+ * has not expired since the service pre-check ran), then
+ * supersedes any other DRAFT/SENT quotation for the request.
  */
 
 const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
   return prisma.$transaction(async (tx) => {
-    /**
-     * Supersede competing quotations.
-     */
+    await lifecycle.transitionTourRequestStatus(tx, {
+      tourRequestId,
 
-    await tx.tourQuotation.updateMany({
-      where: {
-        tourRequestId,
+      from: lifecycle.QUOTATION_ACCEPT.from,
 
-        id: {
-          not: quotationId,
-        },
-
-        status: {
-          in: ["DRAFT", "SENT"],
-        },
-      },
-
-      data: {
-        status: "SUPERSEDED",
-      },
+      to: lifecycle.QUOTATION_ACCEPT.to,
     });
 
-    /**
-     * Accept selected quotation.
-     */
-
-    const acceptedQuotation = await tx.tourQuotation.update({
+    const acceptResult = await tx.tourQuotation.updateMany({
       where: {
         id: quotationId,
+
+        status: "SENT",
+
+        OR: [
+          {
+            validUntil: null,
+          },
+          {
+            validUntil: {
+              gt: new Date(),
+            },
+          },
+        ],
       },
 
       data: {
@@ -307,25 +432,27 @@ const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
 
         respondedAt: new Date(),
       },
+    });
+
+    if (acceptResult.count === 0) {
+      throw new ConflictError("This quotation is no longer available to accept");
+    }
+
+    await lifecycle.supersedeOpenQuotations(tx, {
+      tourRequestId,
+
+      statuses: ["DRAFT", "SENT"],
+
+      excludeQuotationId: quotationId,
+    });
+
+    return tx.tourQuotation.findUnique({
+      where: {
+        id: quotationId,
+      },
 
       include: quotationInclude,
     });
-
-    /**
-     * Update request status.
-     */
-
-    await tx.tourRequest.update({
-      where: {
-        id: tourRequestId,
-      },
-
-      data: {
-        status: "ACCEPTED",
-      },
-    });
-
-    return acceptedQuotation;
   });
 };
 
@@ -334,18 +461,42 @@ const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
  * Create Revision Transaction
  * =========================================================
  *
- * Supersedes the previous quotation and creates the new
- * revision atomically, so a failure partway through never
- * leaves the tour request with a SUPERSEDED quotation and
- * no replacement.
+ * Locks the tour request in a revisable status, conditionally
+ * supersedes the source quotation (guarding against it having
+ * changed since the service pre-check), then computes the next
+ * revision number and creates the new DRAFT -- all atomically,
+ * so a failure partway through never leaves the tour request
+ * with a SUPERSEDED quotation and no replacement.
  */
 
 const createRevisionTransaction = async ({
   previousQuotationId,
+  previousQuotationStatus,
   tourRequestId,
   data,
 }) => {
   return prisma.$transaction(async (tx) => {
+    await lifecycle.lockTourRequestInStatus(tx, {
+      tourRequestId,
+
+      allowed: lifecycle.QUOTATION_REVISE_ALLOWED,
+    });
+
+    const supersedeResult = await tx.tourQuotation.updateMany({
+      where: {
+        id: previousQuotationId,
+        status: previousQuotationStatus,
+      },
+
+      data: {
+        status: "SUPERSEDED",
+      },
+    });
+
+    if (supersedeResult.count === 0) {
+      throw new ConflictError("This quotation can no longer be revised");
+    }
+
     const latestRevisionResult = await tx.tourQuotation.aggregate({
       where: {
         tourRequestId,
@@ -357,16 +508,6 @@ const createRevisionTransaction = async ({
     });
 
     const latestRevision = latestRevisionResult._max.revisionNumber || 0;
-
-    await tx.tourQuotation.update({
-      where: {
-        id: previousQuotationId,
-      },
-
-      data: {
-        status: "SUPERSEDED",
-      },
-    });
 
     const revision = await tx.tourQuotation.create({
       data: buildQuotationCreateData({
@@ -393,15 +534,17 @@ module.exports = {
 
   findQuotationsByTourRequest,
 
-  getLatestRevisionNumber,
-
-  createQuotation,
+  createQuotationTransaction,
 
   updateQuotation,
 
   updateQuotationStatus,
 
   supersedeOtherQuotations,
+
+  sendQuotationTransaction,
+
+  rejectQuotationTransaction,
 
   acceptQuotationTransaction,
 

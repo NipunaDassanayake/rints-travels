@@ -75,11 +75,25 @@ const createBookingFromPayment = async (paymentId) => {
     return existing;
   }
 
-  const booking = await bookingsRepository.confirmBookingFromPayment({
-    paymentId,
+  let booking;
 
-    bookingReference: generateBookingReference(),
-  });
+  try {
+    booking = await bookingsRepository.confirmBookingFromPayment({
+      paymentId,
+
+      bookingReference: generateBookingReference(),
+    });
+  } catch (error) {
+    logger.error({
+      event: "BOOKING_CONFIRMATION_BLOCKED",
+
+      paymentId,
+
+      reason: error.message,
+    });
+
+    throw error;
+  }
 
   if (!booking) {
     logger.warn({

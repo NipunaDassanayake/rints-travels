@@ -392,7 +392,7 @@ test.describe("Travora quotation revision", () => {
 
     await expect(
       page.getByText(
-        "This quotation has been replaced by a newer revision.",
+        "This quotation is no longer active. It was replaced by a newer revision or the request was closed.",
         { exact: true },
       ),
     ).toBeVisible({
