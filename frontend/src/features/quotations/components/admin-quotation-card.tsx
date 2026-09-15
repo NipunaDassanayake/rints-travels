@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { CalendarDays, LoaderCircle, Pencil, Send } from "lucide-react";
+import { CalendarDays, FilePenLine, LoaderCircle, Pencil, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +18,8 @@ import {
   sendQuotation,
   updateQuotation,
 } from "@/features/quotations/quotation.api";
+
+import { CreateQuotationForm } from "@/features/quotations/components/create-quotation-form";
 
 import type { Quotation } from "@/features/quotations/quotation.types";
 
@@ -72,6 +74,8 @@ export function AdminQuotationCard({
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
+
+  const [isRevising, setIsRevising] = useState(false);
 
   const [title, setTitle] = useState(quotation.title);
 
@@ -215,6 +219,8 @@ export function AdminQuotationCard({
 
   const isDraft = quotation.status === "DRAFT";
 
+  const canCreateRevision = ["SENT", "REJECTED"].includes(quotation.status);
+
   const isUpdateInvalid =
     !title.trim() ||
     title.trim().length < 3 ||
@@ -226,6 +232,24 @@ export function AdminQuotationCard({
     Number(subtotal) <= 0 ||
     calculatedTotal <= 0 ||
     !currency.trim();
+
+  /**
+   * =========================================================
+   * Revising
+   * =========================================================
+   */
+
+  if (isRevising) {
+    return (
+      <CreateQuotationForm
+        requestId={requestId}
+        mode="revise"
+        sourceQuotation={quotation}
+        onCreated={() => setIsRevising(false)}
+        onCancel={() => setIsRevising(false)}
+      />
+    );
+  }
 
   /**
    * =========================================================
@@ -561,13 +585,26 @@ export function AdminQuotationCard({
       )}
 
       {!isDraft && (
-        <p className="border-t pt-4 text-sm leading-6 text-muted-foreground">
-          This quotation is no longer editable because its status is{" "}
-          <span className="font-medium text-foreground">
-            {formatStatus(quotation.status)}
-          </span>
-          .
-        </p>
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-sm leading-6 text-muted-foreground">
+            This quotation is no longer editable because its status is{" "}
+            <span className="font-medium text-foreground">
+              {formatStatus(quotation.status)}
+            </span>
+            .
+          </p>
+
+          {canCreateRevision && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setIsRevising(true)}
+            >
+              <FilePenLine className="size-4" />
+              Create revision
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

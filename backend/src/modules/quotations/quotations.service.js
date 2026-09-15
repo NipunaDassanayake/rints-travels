@@ -10,6 +10,7 @@ const {
   NotFoundError,
   BadRequestError,
   ForbiddenError,
+  ConflictError,
 } = require("../../utils/AppError");
 
 const { USER_ROLES } = require("../../core/constants/auth.constants");
@@ -311,15 +312,7 @@ const createRevision = async (quotationId, data) => {
     await validateGuide(data.guideId);
   }
 
-  const latestRevision = await quotationsRepository.getLatestRevisionNumber(
-    quotation.tourRequestId,
-  );
-
-  await quotationsRepository.updateQuotationStatus(quotation.id, {
-    status: "SUPERSEDED",
-  });
-
-  return quotationsRepository.createQuotation({
+  const revisionData = {
     ...data,
 
     tourRequestId: quotation.tourRequestId,
@@ -370,10 +363,34 @@ const createRevision = async (quotationId, data) => {
     exclusions:
       data.exclusions ?? quotation.exclusions.map((item) => item.title),
 
-    revisionNumber: latestRevision + 1,
-
     quotationNumber: generateQuotationNumber(),
-  });
+  };
+
+  try {
+    return await quotationsRepository.createRevisionTransaction({
+      previousQuotationId: quotation.id,
+
+      tourRequestId: quotation.tourRequestId,
+
+      data: revisionData,
+    });
+  } catch (error) {
+    /**
+     * A concurrent duplicate revision attempt can race on the
+     * [tourRequestId, revisionNumber] unique constraint. This
+     * turns that collision into a clean, user-facing error
+     * rather than a raw 500 -- it is duplicate/concurrency
+     * protection, not an idempotent retry: the request is
+     * rejected, not transparently deduplicated.
+     */
+    if (error.code === "P2002") {
+      throw new ConflictError(
+        "This quotation is already being revised. Please try again.",
+      );
+    }
+
+    throw error;
+  }
 };
 
 module.exports = {

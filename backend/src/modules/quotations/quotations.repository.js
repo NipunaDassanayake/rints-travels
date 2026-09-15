@@ -118,6 +118,69 @@ const getLatestRevisionNumber = async (tourRequestId) => {
 
 /**
  * =========================================================
+ * Quotation Create Data
+ * =========================================================
+ *
+ * Shared Prisma `create` input shape, used both for a
+ * brand-new quotation and for a revision's new row.
+ */
+
+const buildQuotationCreateData = (data) => ({
+  tourRequestId: data.tourRequestId,
+
+  guideId: data.guideId,
+
+  quotationNumber: data.quotationNumber,
+
+  revisionNumber: data.revisionNumber,
+
+  title: data.title,
+
+  description: data.description,
+
+  startDate: data.startDate,
+
+  endDate: data.endDate,
+
+  adultCount: data.adultCount,
+
+  childCount: data.childCount,
+
+  subtotal: data.subtotal,
+
+  discountAmount: data.discountAmount,
+
+  taxAmount: data.taxAmount,
+
+  totalAmount: data.totalAmount,
+
+  currency: data.currency,
+
+  notes: data.notes,
+
+  termsConditions: data.termsConditions,
+
+  validUntil: data.validUntil,
+
+  itineraries: {
+    create: data.itineraries || [],
+  },
+
+  inclusions: {
+    create: (data.inclusions || []).map((title) => ({
+      title,
+    })),
+  },
+
+  exclusions: {
+    create: (data.exclusions || []).map((title) => ({
+      title,
+    })),
+  },
+});
+
+/**
+ * =========================================================
  * Create Quotation
  * =========================================================
  */
@@ -125,59 +188,7 @@ const getLatestRevisionNumber = async (tourRequestId) => {
 const createQuotation = async (data) => {
   return prisma.$transaction(async (tx) => {
     const quotation = await tx.tourQuotation.create({
-      data: {
-        tourRequestId: data.tourRequestId,
-
-        guideId: data.guideId,
-
-        quotationNumber: data.quotationNumber,
-
-        revisionNumber: data.revisionNumber,
-
-        title: data.title,
-
-        description: data.description,
-
-        startDate: data.startDate,
-
-        endDate: data.endDate,
-
-        adultCount: data.adultCount,
-
-        childCount: data.childCount,
-
-        subtotal: data.subtotal,
-
-        discountAmount: data.discountAmount,
-
-        taxAmount: data.taxAmount,
-
-        totalAmount: data.totalAmount,
-
-        currency: data.currency,
-
-        notes: data.notes,
-
-        termsConditions: data.termsConditions,
-
-        validUntil: data.validUntil,
-
-        itineraries: {
-          create: data.itineraries || [],
-        },
-
-        inclusions: {
-          create: (data.inclusions || []).map((title) => ({
-            title,
-          })),
-        },
-
-        exclusions: {
-          create: (data.exclusions || []).map((title) => ({
-            title,
-          })),
-        },
-      },
+      data: buildQuotationCreateData(data),
     });
 
     return tx.tourQuotation.findUnique({
@@ -318,6 +329,63 @@ const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
   });
 };
 
+/**
+ * =========================================================
+ * Create Revision Transaction
+ * =========================================================
+ *
+ * Supersedes the previous quotation and creates the new
+ * revision atomically, so a failure partway through never
+ * leaves the tour request with a SUPERSEDED quotation and
+ * no replacement.
+ */
+
+const createRevisionTransaction = async ({
+  previousQuotationId,
+  tourRequestId,
+  data,
+}) => {
+  return prisma.$transaction(async (tx) => {
+    const latestRevisionResult = await tx.tourQuotation.aggregate({
+      where: {
+        tourRequestId,
+      },
+
+      _max: {
+        revisionNumber: true,
+      },
+    });
+
+    const latestRevision = latestRevisionResult._max.revisionNumber || 0;
+
+    await tx.tourQuotation.update({
+      where: {
+        id: previousQuotationId,
+      },
+
+      data: {
+        status: "SUPERSEDED",
+      },
+    });
+
+    const revision = await tx.tourQuotation.create({
+      data: buildQuotationCreateData({
+        ...data,
+
+        revisionNumber: latestRevision + 1,
+      }),
+    });
+
+    return tx.tourQuotation.findUnique({
+      where: {
+        id: revision.id,
+      },
+
+      include: quotationInclude,
+    });
+  });
+};
+
 module.exports = {
   findQuotationsByTouristId,
 
@@ -336,4 +404,6 @@ module.exports = {
   supersedeOtherQuotations,
 
   acceptQuotationTransaction,
+
+  createRevisionTransaction,
 };

@@ -14,15 +14,24 @@ import { Label } from "@/components/ui/label";
 
 import { Textarea } from "@/components/ui/textarea";
 
-import { createQuotation } from "@/features/quotations/quotation.api";
+import {
+  createQuotation,
+  createQuotationRevision,
+} from "@/features/quotations/quotation.api";
 
 import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
 
 import type { TourRequest } from "@/features/tour-requests/tour-request.types";
 
+import type { Quotation } from "@/features/quotations/quotation.types";
+
 interface CreateQuotationFormProps {
-  request: TourRequest;
   requestId: string;
+  request?: TourRequest;
+  mode?: "create" | "revise";
+  sourceQuotation?: Quotation;
+  onCreated?: () => void;
+  onCancel?: () => void;
 }
 
 interface ItineraryFormItem {
@@ -31,12 +40,114 @@ interface ItineraryFormItem {
   description: string;
 }
 
-function toDateInputValue(value: string | null) {
+function toDateInputValue(value: string | null | undefined) {
   if (!value) {
     return "";
   }
 
   return value.slice(0, 10);
+}
+
+/**
+ * =========================================================
+ * Default Field Values
+ * =========================================================
+ *
+ * In "create" mode, defaults come from the tour request.
+ * In "revise" mode, defaults come from the quotation being
+ * revised -- the admin then edits any field before submitting.
+ */
+
+function getDefaultValues(
+  mode: "create" | "revise",
+  request: TourRequest | undefined,
+  sourceQuotation: Quotation | undefined,
+) {
+  if (mode === "revise" && sourceQuotation) {
+    return {
+      guideId: sourceQuotation.guideId ?? "",
+
+      title: sourceQuotation.title,
+
+      description: sourceQuotation.description ?? "",
+
+      startDate: toDateInputValue(sourceQuotation.startDate),
+
+      endDate: toDateInputValue(sourceQuotation.endDate),
+
+      adultCount: String(sourceQuotation.adultCount),
+
+      childCount: String(sourceQuotation.childCount),
+
+      subtotal: sourceQuotation.subtotal,
+
+      discountAmount: sourceQuotation.discountAmount,
+
+      taxAmount: sourceQuotation.taxAmount,
+
+      currency: sourceQuotation.currency,
+
+      notes: sourceQuotation.notes ?? "",
+
+      termsConditions: sourceQuotation.termsConditions ?? "",
+
+      validUntil: toDateInputValue(sourceQuotation.validUntil),
+
+      itineraries: sourceQuotation.itineraries.map((item) => ({
+        dayNumber: item.dayNumber,
+
+        title: item.title,
+
+        description: item.description,
+      })) as ItineraryFormItem[],
+
+      inclusions: sourceQuotation.inclusions.map((item) => item.title),
+
+      exclusions: sourceQuotation.exclusions.map((item) => item.title),
+    };
+  }
+
+  return {
+    guideId: request?.preferredGuideId ?? "",
+
+    title:
+      request?.travelPackage?.title ??
+      request?.title ??
+      "Custom Sri Lanka Tour",
+
+    description:
+      request?.travelPackage?.description ??
+      request?.destinationPreferences ??
+      "",
+
+    startDate: toDateInputValue(request?.preferredStartDate),
+
+    endDate: toDateInputValue(request?.preferredEndDate),
+
+    adultCount: String(request?.adultCount ?? 1),
+
+    childCount: String(request?.childCount ?? 0),
+
+    subtotal: "",
+
+    discountAmount: "0",
+
+    taxAmount: "0",
+
+    currency: request?.currency ?? "USD",
+
+    notes: "",
+
+    termsConditions: "",
+
+    validUntil: "",
+
+    itineraries: [] as ItineraryFormItem[],
+
+    inclusions: [] as string[],
+
+    exclusions: [] as string[],
+  };
 }
 
 function getErrorMessage(error: unknown) {
@@ -66,6 +177,10 @@ function getErrorMessage(error: unknown) {
 export function CreateQuotationForm({
   request,
   requestId,
+  mode = "create",
+  sourceQuotation,
+  onCreated,
+  onCancel,
 }: CreateQuotationFormProps) {
   const queryClient = useQueryClient();
 
@@ -85,55 +200,61 @@ export function CreateQuotationForm({
     queryFn: getTourGuides,
   });
 
-  const defaultTitle =
-    request.travelPackage?.title ?? request.title ?? "Custom Sri Lanka Tour";
+  const defaults = getDefaultValues(mode, request, sourceQuotation);
 
-  const defaultDescription =
-    request.travelPackage?.description ?? request.destinationPreferences ?? "";
+  /**
+   * The guide already on the tour request (create mode) or
+   * already on the quotation being revised (revise mode)
+   * stays selectable even if it has since become unavailable.
+   */
+  const preservedGuideId =
+    mode === "revise" ? (sourceQuotation?.guideId ?? null) : (request?.preferredGuideId ?? null);
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(mode === "revise");
 
-  const [guideId, setGuideId] = useState(request.preferredGuideId ?? "");
+  const [guideId, setGuideId] = useState(defaults.guideId);
 
-  const [title, setTitle] = useState(defaultTitle);
+  const [title, setTitle] = useState(defaults.title);
 
-  const [description, setDescription] = useState(defaultDescription);
+  const [description, setDescription] = useState(defaults.description);
 
-  const [startDate, setStartDate] = useState(
-    toDateInputValue(request.preferredStartDate),
+  const [startDate, setStartDate] = useState(defaults.startDate);
+
+  const [endDate, setEndDate] = useState(defaults.endDate);
+
+  const [adultCount, setAdultCount] = useState(defaults.adultCount);
+
+  const [childCount, setChildCount] = useState(defaults.childCount);
+
+  const [subtotal, setSubtotal] = useState(defaults.subtotal);
+
+  const [discountAmount, setDiscountAmount] = useState(
+    defaults.discountAmount,
   );
 
-  const [endDate, setEndDate] = useState(
-    toDateInputValue(request.preferredEndDate),
+  const [taxAmount, setTaxAmount] = useState(defaults.taxAmount);
+
+  const [currency, setCurrency] = useState(defaults.currency);
+
+  const [notes, setNotes] = useState(defaults.notes);
+
+  const [termsConditions, setTermsConditions] = useState(
+    defaults.termsConditions,
   );
 
-  const [adultCount, setAdultCount] = useState(String(request.adultCount));
+  const [validUntil, setValidUntil] = useState(defaults.validUntil);
 
-  const [childCount, setChildCount] = useState(String(request.childCount));
-
-  const [subtotal, setSubtotal] = useState("");
-
-  const [discountAmount, setDiscountAmount] = useState("0");
-
-  const [taxAmount, setTaxAmount] = useState("0");
-
-  const [currency, setCurrency] = useState(request.currency);
-
-  const [notes, setNotes] = useState("");
-
-  const [termsConditions, setTermsConditions] = useState("");
-
-  const [validUntil, setValidUntil] = useState("");
-
-  const [itineraries, setItineraries] = useState<ItineraryFormItem[]>([]);
+  const [itineraries, setItineraries] = useState<ItineraryFormItem[]>(
+    defaults.itineraries,
+  );
 
   const [inclusionInput, setInclusionInput] = useState("");
 
-  const [inclusions, setInclusions] = useState<string[]>([]);
+  const [inclusions, setInclusions] = useState<string[]>(defaults.inclusions);
 
   const [exclusionInput, setExclusionInput] = useState("");
 
-  const [exclusions, setExclusions] = useState<string[]>([]);
+  const [exclusions, setExclusions] = useState<string[]>(defaults.exclusions);
 
   /**
    * =========================================================
@@ -169,45 +290,41 @@ export function CreateQuotationForm({
    */
 
   const openForm = () => {
-    setGuideId(request.preferredGuideId ?? "");
+    const resetValues = getDefaultValues(mode, request, sourceQuotation);
 
-    setTitle(
-      request.travelPackage?.title ?? request.title ?? "Custom Sri Lanka Tour",
-    );
+    setGuideId(resetValues.guideId);
 
-    setDescription(
-      request.travelPackage?.description ??
-        request.destinationPreferences ??
-        "",
-    );
+    setTitle(resetValues.title);
 
-    setStartDate(toDateInputValue(request.preferredStartDate));
+    setDescription(resetValues.description);
 
-    setEndDate(toDateInputValue(request.preferredEndDate));
+    setStartDate(resetValues.startDate);
 
-    setAdultCount(String(request.adultCount));
+    setEndDate(resetValues.endDate);
 
-    setChildCount(String(request.childCount));
+    setAdultCount(resetValues.adultCount);
 
-    setCurrency(request.currency);
+    setChildCount(resetValues.childCount);
 
-    setSubtotal("");
+    setCurrency(resetValues.currency);
 
-    setDiscountAmount("0");
+    setSubtotal(resetValues.subtotal);
 
-    setTaxAmount("0");
+    setDiscountAmount(resetValues.discountAmount);
 
-    setNotes("");
+    setTaxAmount(resetValues.taxAmount);
 
-    setTermsConditions("");
+    setNotes(resetValues.notes);
 
-    setValidUntil("");
+    setTermsConditions(resetValues.termsConditions);
 
-    setItineraries([]);
+    setValidUntil(resetValues.validUntil);
 
-    setInclusions([]);
+    setItineraries(resetValues.itineraries);
 
-    setExclusions([]);
+    setInclusions(resetValues.inclusions);
+
+    setExclusions(resetValues.exclusions);
 
     setInclusionInput("");
 
@@ -223,8 +340,8 @@ export function CreateQuotationForm({
    */
 
   const mutation = useMutation({
-    mutationFn: () =>
-      createQuotation(requestId, {
+    mutationFn: () => {
+      const payload = {
         guideId: guideId || null,
 
         title: title.trim(),
@@ -260,7 +377,12 @@ export function CreateQuotationForm({
         inclusions,
 
         exclusions,
-      }),
+      };
+
+      return mode === "revise" && sourceQuotation
+        ? createQuotationRevision(sourceQuotation.id, payload)
+        : createQuotation(requestId, payload);
+    },
 
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -275,7 +397,15 @@ export function CreateQuotationForm({
         queryKey: ["admin", "tour-requests"],
       });
 
-      setIsOpen(false);
+      await queryClient.invalidateQueries({
+        queryKey: ["tour-request", requestId],
+      });
+
+      if (onCreated) {
+        onCreated();
+      } else {
+        setIsOpen(false);
+      }
     },
   });
 
@@ -405,11 +535,14 @@ export function CreateQuotationForm({
       ====================================================== */}
 
       <div>
-        <h3 className="text-lg font-semibold">Create quotation</h3>
+        <h3 className="text-lg font-semibold">
+          {mode === "revise" ? "Create revision" : "Create quotation"}
+        </h3>
 
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Prepare the final customized itinerary, pricing and terms for the
-          tourist.
+          {mode === "revise"
+            ? "Review and adjust the quotation before submitting a new revision to the tourist."
+            : "Prepare the final customized itinerary, pricing and terms for the tourist."}
         </p>
       </div>
 
@@ -526,7 +659,7 @@ export function CreateQuotationForm({
                   key={guide.id}
                   value={guide.id}
                   disabled={
-                    !guide.isAvailable && guide.id !== request.preferredGuideId
+                    !guide.isAvailable && guide.id !== preservedGuideId
                   }
                 >
                   {fullName}
@@ -904,7 +1037,9 @@ export function CreateQuotationForm({
       {mutation.isError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
           <p className="font-medium text-destructive">
-            Unable to create quotation
+            {mode === "revise"
+              ? "Unable to create revision"
+              : "Unable to create quotation"}
           </p>
 
           <p className="mt-1 text-sm text-muted-foreground">
@@ -926,8 +1061,10 @@ export function CreateQuotationForm({
           {mutation.isPending ? (
             <>
               <LoaderCircle className="size-4 animate-spin" />
-              Creating...
+              {mode === "revise" ? "Creating revision..." : "Creating..."}
             </>
+          ) : mode === "revise" ? (
+            "Create revision"
           ) : (
             "Create draft quotation"
           )}
@@ -937,7 +1074,13 @@ export function CreateQuotationForm({
           type="button"
           variant="outline"
           disabled={mutation.isPending}
-          onClick={() => setIsOpen(false)}
+          onClick={() => {
+            if (onCancel) {
+              onCancel();
+            } else {
+              setIsOpen(false);
+            }
+          }}
         >
           Cancel
         </Button>
