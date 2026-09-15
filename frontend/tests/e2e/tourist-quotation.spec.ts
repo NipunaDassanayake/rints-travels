@@ -696,7 +696,7 @@ test.describe("Tourist quotation acceptance flow", () => {
      */
 
     await expect(
-      page.getByText(/you can now continue to payment/i),
+      page.getByText(/you can now continue to secure payment/i),
     ).toBeVisible();
 
     console.log(`Quotation accepted successfully: ${quotationId}`);
