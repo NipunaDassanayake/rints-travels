@@ -12,6 +12,15 @@ export type TourRequestStatus =
   | "CANCELLED"
   | "BOOKED";
 
+// Statuses from which a tour request can still be cancelled (mirrors the
+// backend's ALLOWED_STATUS_TRANSITIONS "CANCELLED" targets).
+export const CANCELLABLE_TOUR_REQUEST_STATUSES: TourRequestStatus[] = [
+  "PENDING_REVIEW",
+  "UNDER_DISCUSSION",
+  "READY_FOR_QUOTATION",
+  "QUOTATION_SENT",
+];
+
 export interface PackageBasedTourRequestPayload {
   packageId: number;
 
@@ -118,6 +127,15 @@ export interface TourRequestPreferredGuide {
   deletedAt: string | null;
 
   user: TourRequestPreferredGuideUser;
+}
+
+export interface AssignableAdmin {
+  id: string;
+
+  firstName: string;
+  lastName: string;
+
+  email: string;
 }
 
 export interface TourRequest {

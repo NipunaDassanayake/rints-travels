@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 
 import type {
+  AssignableAdmin,
   ContactMethod,
   TourRequest,
   TourRequestPreferredGuide,
@@ -106,6 +107,26 @@ export async function adminEditTourRequest(
   const response = await apiClient.patch(
     `/tour-requests/${id}/admin-edit`,
     data
+  );
+
+  return response.data.data;
+}
+
+export async function getAssignableAdmins(): Promise<AssignableAdmin[]> {
+  const response = await apiClient.get("/tour-requests/admins");
+
+  return response.data.data;
+}
+
+export async function assignTourRequestAdmin(
+  id: string,
+  adminId: string
+): Promise<TourRequest> {
+  const response = await apiClient.patch(
+    `/tour-requests/${id}/assign-admin`,
+    {
+      adminId,
+    }
   );
 
   return response.data.data;

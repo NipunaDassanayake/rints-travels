@@ -56,6 +56,13 @@ router.get(
   tourRequestsController.getMyTourRequests
 );
 
+router.patch(
+  "/:id/cancel",
+  authenticate,
+  authorize(USER_ROLES.TOURIST),
+  tourRequestsController.cancelTourRequest
+);
+
 /**
  * Quotations linked to a tour request
  */
@@ -89,6 +96,16 @@ router.get(
     USER_ROLES.SYSTEM_ADMIN
   ),
   tourRequestsController.getAllTourRequests
+);
+
+router.get(
+  "/admins",
+  authenticate,
+  authorize(
+    USER_ROLES.ADMIN,
+    USER_ROLES.SYSTEM_ADMIN
+  ),
+  tourRequestsController.getAssignableAdmins
 );
 
 router.patch(

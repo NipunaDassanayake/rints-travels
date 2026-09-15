@@ -5,6 +5,10 @@ import {
 } from "react";
 
 import {
+  useSearchParams,
+} from "next/navigation";
+
+import {
   useQuery,
 } from "@tanstack/react-query";
 
@@ -33,13 +37,36 @@ type RequestTypeFilter =
   | TourRequestType
   | "";
 
+const VALID_STATUSES: TourRequestStatus[] = [
+  "PENDING_REVIEW",
+  "UNDER_DISCUSSION",
+  "READY_FOR_QUOTATION",
+  "QUOTATION_SENT",
+  "ACCEPTED",
+  "REJECTED",
+  "CANCELLED",
+  "BOOKED",
+];
+
+const VALID_REQUEST_TYPES: TourRequestType[] = [
+  "PACKAGE_BASED",
+  "CUSTOM",
+];
+
 export default function AdminTourRequestsPage() {
+  const searchParams = useSearchParams();
+
+  const initialStatus = searchParams.get("status");
+  const initialRequestType = searchParams.get("requestType");
+
   const [
     status,
     setStatus,
   ] =
     useState<StatusFilter>(
-      ""
+      VALID_STATUSES.includes(initialStatus as TourRequestStatus)
+        ? (initialStatus as TourRequestStatus)
+        : ""
     );
 
   const [
@@ -47,7 +74,9 @@ export default function AdminTourRequestsPage() {
     setRequestType,
   ] =
     useState<RequestTypeFilter>(
-      ""
+      VALID_REQUEST_TYPES.includes(initialRequestType as TourRequestType)
+        ? (initialRequestType as TourRequestType)
+        : ""
     );
 
   const {

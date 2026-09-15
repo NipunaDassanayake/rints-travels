@@ -22,6 +22,26 @@ const createUser = async (data) => {
   });
 };
 
+const findActiveAdmins = async () => {
+  return prisma.user.findMany({
+    where: {
+      role: {
+        in: ["ADMIN", "SYSTEM_ADMIN"],
+      },
+      status: "ACTIVE",
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+    orderBy: {
+      firstName: "asc",
+    },
+  });
+};
+
 const createRefreshToken = async (data) => {
   return prisma.refreshToken.create({
     data,
@@ -89,6 +109,7 @@ module.exports = {
   findUserByEmail,
   findUserById,
   createUser,
+  findActiveAdmins,
   createRefreshToken,
   findRefreshTokenByHash,
   revokeRefreshToken,

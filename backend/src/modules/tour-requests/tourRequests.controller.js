@@ -100,6 +100,31 @@ const updateStatus = asyncHandler(async (req, res) => {
   );
 });
 
+const cancelTourRequest = asyncHandler(async (req, res) => {
+  const tourRequest =
+    await tourRequestsService.cancelOwnTourRequest(
+      req.params.id,
+      req.user.id
+    );
+
+  return sendSuccess(
+    res,
+    "Tour request cancelled successfully",
+    tourRequest
+  );
+});
+
+const getAssignableAdmins = asyncHandler(async (req, res) => {
+  const admins =
+    await tourRequestsService.getAssignableAdmins();
+
+  return sendSuccess(
+    res,
+    "Assignable admins retrieved successfully",
+    admins
+  );
+});
+
 
 const adminEditTourRequest = asyncHandler(
   async (req, res) => {
@@ -125,5 +150,7 @@ module.exports = {
   getTourRequestById,
   assignAdmin,
   updateStatus,
+  cancelTourRequest,
+  getAssignableAdmins,
   adminEditTourRequest,
 };

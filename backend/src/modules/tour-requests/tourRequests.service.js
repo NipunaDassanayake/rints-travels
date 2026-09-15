@@ -160,6 +160,12 @@ const ALLOWED_STATUS_TRANSITIONS = {
   BOOKED: [],
 };
 
+const isTransitionAllowed = (currentStatus, targetStatus) => {
+  const allowedStatuses = ALLOWED_STATUS_TRANSITIONS[currentStatus] || [];
+
+  return allowedStatuses.includes(targetStatus);
+};
+
 const updateStatus = async (tourRequestId, newStatus) => {
   const tourRequest =
     await tourRequestsRepository.findTourRequestById(tourRequestId);
@@ -168,9 +174,7 @@ const updateStatus = async (tourRequestId, newStatus) => {
     throw new NotFoundError("Tour request not found");
   }
 
-  const allowedStatuses = ALLOWED_STATUS_TRANSITIONS[tourRequest.status] || [];
-
-  if (!allowedStatuses.includes(newStatus)) {
+  if (!isTransitionAllowed(tourRequest.status, newStatus)) {
     throw new BadRequestError(
       `Cannot change tour request status from ${tourRequest.status} to ${newStatus}`,
     );
@@ -180,6 +184,38 @@ const updateStatus = async (tourRequestId, newStatus) => {
     tourRequestId,
     newStatus,
   );
+};
+
+// Tourist - cancel own tour request
+const cancelOwnTourRequest = async (tourRequestId, touristId) => {
+  const tourRequest =
+    await tourRequestsRepository.findTourRequestById(tourRequestId);
+
+  if (!tourRequest) {
+    throw new NotFoundError("Tour request not found");
+  }
+
+  if (tourRequest.touristId !== touristId) {
+    throw new ForbiddenError(
+      "You do not have permission to cancel this tour request",
+    );
+  }
+
+  if (!isTransitionAllowed(tourRequest.status, "CANCELLED")) {
+    throw new BadRequestError(
+      `Cannot cancel a tour request with status ${tourRequest.status}`,
+    );
+  }
+
+  return tourRequestsRepository.updateTourRequestStatus(
+    tourRequestId,
+    "CANCELLED",
+  );
+};
+
+// Admin - list active admins that a tour request can be assigned to
+const getAssignableAdmins = async () => {
+  return authRepository.findActiveAdmins();
 };
 
 const adminEditTourRequest = async (tourRequestId, updateData) => {
@@ -227,5 +263,7 @@ module.exports = {
   getAllTourRequests,
   assignAdmin,
   updateStatus,
+  cancelOwnTourRequest,
+  getAssignableAdmins,
   adminEditTourRequest,
 };

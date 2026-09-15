@@ -3,9 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { useState } from "react";
+
 import { useParams } from "next/navigation";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+} from "@tanstack/react-query";
 
 import {
   ArrowLeft,
@@ -30,13 +37,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 import { getPackageImageUrl } from "@/features/packages/admin-package.api";
 
 import { getPackageBySlug } from "@/features/packages/package.api";
 
 import { getTourRequestById } from "@/features/tour-requests/tour-request.api";
 
-import { updateTourRequestStatus } from "@/features/tour-requests/admin-tour-request.api";
+import {
+  assignTourRequestAdmin,
+  getAssignableAdmins,
+  updateTourRequestStatus,
+} from "@/features/tour-requests/admin-tour-request.api";
 
 import { getTourRequestQuotations } from "@/features/quotations/quotation.api";
 
@@ -46,7 +69,10 @@ import { CreateQuotationForm } from "@/features/quotations/components/create-quo
 
 import { AdminEditTourRequestDialog } from "@/features/tour-requests/components/admin-edit-tour-request-dialog";
 
-import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
+import type {
+  TourRequest,
+  TourRequestStatus,
+} from "@/features/tour-requests/tour-request.types";
 
 /**
  * =========================================================
@@ -87,6 +113,53 @@ function getProgressIndex(status: TourRequestStatus) {
   return STATUS_ORDER.indexOf(status);
 }
 
+function StatusChangeConfirm({
+  label,
+  title,
+  description,
+  confirmLabel,
+  targetStatus,
+  mutation,
+}: {
+  label: string;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  targetStatus: TourRequestStatus;
+  mutation: UseMutationResult<TourRequest, unknown, TourRequestStatus>;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger
+        className={`${buttonVariants({ variant: "destructive" })} w-full`}
+        disabled={mutation.isPending}
+      >
+        {label}
+      </AlertDialogTrigger>
+
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel>Go back</AlertDialogCancel>
+
+          <AlertDialogAction
+            variant="destructive"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate(targetStatus)}
+          >
+            {confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function AdminTourRequestDetailsPage() {
   const params = useParams<{
     id: string;
@@ -95,6 +168,8 @@ export default function AdminTourRequestDetailsPage() {
   const requestId = params.id;
 
   const queryClient = useQueryClient();
+
+  const [selectedAdminId, setSelectedAdminId] = useState("");
 
   /**
    * =========================================================
@@ -178,6 +253,35 @@ export default function AdminTourRequestDetailsPage() {
 
   /**
    * =========================================================
+   * Admin assignment
+   * =========================================================
+   */
+
+  const { data: admins = [] } = useQuery({
+    queryKey: ["admin", "tour-requests", "assignable-admins"],
+
+    queryFn: () => getAssignableAdmins(),
+  });
+
+  const assignAdminMutation = useMutation({
+    mutationFn: (adminId: string) =>
+      assignTourRequestAdmin(requestId, adminId),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "tour-request", requestId],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "tour-requests"],
+      });
+
+      setSelectedAdminId("");
+    },
+  });
+
+  /**
+   * =========================================================
    * Loading
    * =========================================================
    */
@@ -241,6 +345,26 @@ export default function AdminTourRequestDetailsPage() {
 
   const isTerminalStatus =
     request.status === "REJECTED" || request.status === "CANCELLED";
+
+  const canReject =
+    request.status === "PENDING_REVIEW" ||
+    request.status === "UNDER_DISCUSSION";
+
+  const canCancel =
+    request.status === "PENDING_REVIEW" ||
+    request.status === "UNDER_DISCUSSION" ||
+    request.status === "READY_FOR_QUOTATION" ||
+    request.status === "QUOTATION_SENT";
+
+  const assignedAdmin = admins.find(
+    (admin) => admin.id === request.assignedAdminId,
+  );
+
+  const assignedAdminLabel = !request.assignedAdminId
+    ? "Not assigned"
+    : assignedAdmin
+      ? `${assignedAdmin.firstName} ${assignedAdmin.lastName}`
+      : "Assigned admin no longer active";
 
   const packagePrimaryImage = fullPackage
     ? (fullPackage.images.find((image) => image.isPrimary) ??
@@ -767,9 +891,7 @@ export default function AdminTourRequestDetailsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Assigned admin</p>
 
-                <p className="mt-1 font-medium">
-                  {request.assignedAdminId ? "Assigned" : "Not assigned"}
-                </p>
+                <p className="mt-1 font-medium">{assignedAdminLabel}</p>
               </div>
 
               <div>
@@ -778,6 +900,45 @@ export default function AdminTourRequestDetailsPage() {
                 <p className="mt-1 font-medium">
                   {formatDate(request.createdAt)}
                 </p>
+              </div>
+
+              <div className="space-y-2 border-t pt-4">
+                <label
+                  htmlFor="tour-request-admin"
+                  className="text-sm font-medium"
+                >
+                  {request.assignedAdminId ? "Reassign to" : "Assign to"}
+                </label>
+
+                <select
+                  id="tour-request-admin"
+                  value={selectedAdminId}
+                  onChange={(event) => setSelectedAdminId(event.target.value)}
+                  className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Select an admin</option>
+
+                  {admins.map((admin) => (
+                    <option key={admin.id} value={admin.id}>
+                      {admin.firstName} {admin.lastName}
+                    </option>
+                  ))}
+                </select>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={!selectedAdminId || assignAdminMutation.isPending}
+                  onClick={() => assignAdminMutation.mutate(selectedAdminId)}
+                >
+                  {assignAdminMutation.isPending ? "Assigning..." : "Assign"}
+                </Button>
+
+                {assignAdminMutation.isError && (
+                  <p className="text-sm text-destructive">
+                    Unable to assign this admin.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -862,6 +1023,34 @@ export default function AdminTourRequestDetailsPage() {
                     The quotation has been sent and is waiting for the
                     tourist&apos;s response.
                   </p>
+                </div>
+              )}
+
+              {/* REJECT / CANCEL */}
+
+              {(canReject || canCancel) && (
+                <div className="space-y-3 border-t pt-4">
+                  {canReject && (
+                    <StatusChangeConfirm
+                      label="Reject request"
+                      title="Reject this request?"
+                      description="This marks the request as rejected and cannot be undone. The tourist will need to submit a new request if they want to continue."
+                      confirmLabel="Yes, reject request"
+                      targetStatus="REJECTED"
+                      mutation={statusMutation}
+                    />
+                  )}
+
+                  {canCancel && (
+                    <StatusChangeConfirm
+                      label="Cancel request"
+                      title="Cancel this request?"
+                      description="This marks the request as cancelled and cannot be undone."
+                      confirmLabel="Yes, cancel request"
+                      targetStatus="CANCELLED"
+                      mutation={statusMutation}
+                    />
+                  )}
                 </div>
               )}
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   ArrowLeft,
@@ -27,15 +27,33 @@ import { buttonVariants } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 import { getPackageImageUrl } from "@/features/packages/admin-package.api";
 
 import { getPackageBySlug } from "@/features/packages/package.api";
 
-import { getTourRequestById } from "@/features/tour-requests/tour-request.api";
+import {
+  cancelTourRequest,
+  getTourRequestById,
+} from "@/features/tour-requests/tour-request.api";
 
 import { getTourRequestQuotations } from "@/features/quotations/quotation.api";
 
-import type { TourRequestStatus } from "@/features/tour-requests/tour-request.types";
+import {
+  CANCELLABLE_TOUR_REQUEST_STATUSES,
+  type TourRequestStatus,
+} from "@/features/tour-requests/tour-request.types";
 
 const STATUS_ORDER: TourRequestStatus[] = [
   "PENDING_REVIEW",
@@ -80,6 +98,8 @@ export default function TourRequestDetailsPage() {
 
   const requestId = params.id;
 
+  const queryClient = useQueryClient();
+
   const {
     data: request,
     isLoading,
@@ -90,6 +110,20 @@ export default function TourRequestDetailsPage() {
     queryFn: () => getTourRequestById(requestId),
 
     enabled: Boolean(requestId),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelTourRequest(requestId),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["tour-request", requestId],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["tour-requests", "me"],
+      });
+    },
   });
 
   const {
@@ -161,6 +195,10 @@ export default function TourRequestDetailsPage() {
 
   const isTerminalStatus =
     request.status === "REJECTED" || request.status === "CANCELLED";
+
+  const canCancel = CANCELLABLE_TOUR_REQUEST_STATUSES.includes(
+    request.status,
+  );
 
   const packagePrimaryImage = fullPackage
     ? (fullPackage.images.find((image) => image.isPrimary) ??
@@ -570,6 +608,68 @@ export default function TourRequestDetailsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Manage request */}
+
+          {canCancel && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Manage request</CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Changed your mind? You can cancel this request as long as it
+                  hasn&apos;t been booked yet.
+                </p>
+
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    className={`${buttonVariants({
+                      variant: "destructive",
+                    })} w-full`}
+                    disabled={cancelMutation.isPending}
+                  >
+                    {cancelMutation.isPending
+                      ? "Cancelling..."
+                      : "Cancel request"}
+                  </AlertDialogTrigger>
+
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Cancel this request?
+                      </AlertDialogTitle>
+
+                      <AlertDialogDescription>
+                        This marks your request as cancelled and cannot be
+                        undone. You&apos;ll need to submit a new request if you
+                        want to continue.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep request</AlertDialogCancel>
+
+                      <AlertDialogAction
+                        variant="destructive"
+                        disabled={cancelMutation.isPending}
+                        onClick={() => cancelMutation.mutate()}
+                      >
+                        Yes, cancel request
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                {cancelMutation.isError && (
+                  <p className="text-sm text-destructive">
+                    Unable to cancel this request. Please try again.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quotations */}
 
