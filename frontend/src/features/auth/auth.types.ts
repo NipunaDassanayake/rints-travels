@@ -18,6 +18,14 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  password: string;
+}
+
 export interface LoginResponse {
   user: AuthUser;
   accessToken: string;

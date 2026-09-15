@@ -206,6 +206,15 @@ export function PublicNavbar() {
               </Link>
 
               <Link
+                href="/register"
+                className={buttonVariants({
+                  variant: "outline",
+                })}
+              >
+                Sign up
+              </Link>
+
+              <Link
                 href={planTripHref}
                 className={`${buttonVariants()} rounded-full px-5`}
               >
@@ -408,10 +417,21 @@ export function PublicNavbar() {
                   </Link>
 
                   <Link
+                    href="/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={buttonVariants({
+                      variant: "outline",
+                      className: "mt-2 w-full justify-center",
+                    })}
+                  >
+                    Sign up
+                  </Link>
+
+                  <Link
                     href={planTripHref}
                     onClick={() => setMobileMenuOpen(false)}
                     className={buttonVariants({
-                      className: "w-full justify-center",
+                      className: "mt-2 w-full justify-center",
                     })}
                   >
                     <Route className="size-4" />
