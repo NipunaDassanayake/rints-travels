@@ -30,6 +30,18 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+import {
   assignBookingGuide,
   getAdminBookingById,
   updateBookingStatus,
@@ -819,24 +831,47 @@ export default function AdminBookingDetailsPage() {
                     </p>
                   </div>
 
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    disabled={statusMutation.isPending}
-                    onClick={() => {
-                      const confirmed = window.confirm(
-                        "Are you sure you want to cancel this booking?",
-                      );
+                  <AlertDialog>
+                    <AlertDialogTrigger
+                      className={`${buttonVariants({
+                        variant: "destructive",
+                      })} w-full`}
+                      disabled={statusMutation.isPending}
+                    >
+                      {statusMutation.isPending && (
+                        <LoaderCircle className="size-4 animate-spin" />
+                      )}
+                      {statusMutation.isPending
+                        ? "Cancelling..."
+                        : "Cancel booking"}
+                    </AlertDialogTrigger>
 
-                      if (confirmed) {
-                        statusMutation.mutate("CANCELLED");
-                      }
-                    }}
-                  >
-                    {statusMutation.isPending
-                      ? "Cancelling..."
-                      : "Cancel booking"}
-                  </Button>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Cancel this booking?
+                        </AlertDialogTitle>
+
+                        <AlertDialogDescription>
+                          This marks the booking as cancelled and cannot be
+                          undone. The tourist, guide, quotation, and payment
+                          history are preserved, and no refund is processed.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep booking</AlertDialogCancel>
+
+                        <AlertDialogAction
+                          variant="destructive"
+                          disabled={statusMutation.isPending}
+                          onClick={() => statusMutation.mutate("CANCELLED")}
+                        >
+                          Yes, cancel booking
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </>
               )}
 
@@ -858,6 +893,14 @@ export default function AdminBookingDetailsPage() {
                   <p className="text-sm leading-6 text-muted-foreground">
                     This booking has been cancelled. No further status changes
                     are available.
+                  </p>
+                </div>
+              )}
+
+              {statusMutation.isSuccess && (
+                <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
+                  <p className="text-sm text-emerald-700">
+                    Booking cancelled successfully.
                   </p>
                 </div>
               )}
