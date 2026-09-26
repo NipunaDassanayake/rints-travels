@@ -4,7 +4,13 @@
  * =========================================================
  */
 
-export type PaymentStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED";
+export type PaymentStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "SUCCESS"
+  | "FAILED"
+  | "CANCELLED"
+  | "REFUNDED";
 
 /**
  * =========================================================
@@ -141,6 +147,22 @@ export interface Payment {
   quotation: PaymentQuotation;
 
   tourist: PaymentTourist;
+
+  /**
+   * Created by the backend only after the verified Stripe
+   * webhook confirms the payment.
+   */
+  booking?: PaymentBooking | null;
+}
+
+/**
+ * =========================================================
+ * Booking
+ * =========================================================
+ */
+
+export interface PaymentBooking {
+  id: string;
 }
 
 /**

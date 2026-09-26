@@ -65,6 +65,19 @@ const getPaymentById = asyncHandler(async (req, res) => {
  *
  * app.js registers this route before express.json()
  * using express.raw({ type: "application/json" }).
+ *
+ * CR-007 governing principle (see plan §9): the
+ * StripeWebhookEvent ledger's terminal PROCESSED state is only
+ * ever written AFTER the complete unit of work for this event
+ * -- including Booking creation -- has actually succeeded. Any
+ * other failure leaves the claim in PROCESSING so a later
+ * delivery can take over the stale claim and genuinely retry,
+ * landing on the existing idempotent replay paths in
+ * paymentsService.markPaymentSuccessful /
+ * bookingsService.createBookingFromPayment. Only the four
+ * pre-payment verification checks in
+ * paymentsService.handleCheckoutSessionCompleted are ever
+ * treated as permanently non-retryable (ledger FAILED).
  */
 
 const handleStripeWebhook = asyncHandler(async (req, res) => {
@@ -135,153 +148,221 @@ const handleStripeWebhook = asyncHandler(async (req, res) => {
 
   /**
    * =====================================================
-   * Checkout Session Completed
+   * Claim / Inspect The Event Ledger
    * =====================================================
    */
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
+  const claim = await paymentsService.claimOrInspectWebhookEvent(
+    event.id,
+    event.type,
+  );
 
-    if (session.payment_status !== "paid") {
-      logger.info({
-        event: "STRIPE_CHECKOUT_COMPLETED_NOT_PAID",
+  if (claim.outcome === "ALREADY_PROCESSED") {
+    logger.info({
+      event: "STRIPE_WEBHOOK_EVENT_REPLAY_PROCESSED",
 
-        checkoutSessionId: session.id,
+      stripeEventId: event.id,
+    });
 
-        paymentStatus: session.payment_status,
-      });
+    return res.status(200).json({
+      received: true,
+    });
+  }
 
-      return res.status(200).json({
-        received: true,
+  if (claim.outcome === "ALREADY_FAILED") {
+    logger.warn({
+      event: "STRIPE_WEBHOOK_EVENT_REPLAY_FAILED",
+
+      stripeEventId: event.id,
+
+      reason: claim.failureReason,
+    });
+
+    return res.status(400).json({
+      received: false,
+
+      message: claim.failureReason,
+    });
+  }
+
+  if (claim.outcome === "IN_PROGRESS") {
+    logger.warn({
+      event: "STRIPE_WEBHOOK_EVENT_CONCURRENT",
+
+      stripeEventId: event.id,
+    });
+
+    return res.status(409).json({
+      received: false,
+
+      message: "Event is already being processed",
+    });
+  }
+
+  // claim.outcome === "PROCEED" -- we hold the claim.
+
+  try {
+    /**
+     * ===================================================
+     * Checkout Session Completed
+     * ===================================================
+     */
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+
+      if (session.payment_status !== "paid") {
+        logger.info({
+          event: "STRIPE_CHECKOUT_COMPLETED_NOT_PAID",
+
+          checkoutSessionId: session.id,
+
+          paymentStatus: session.payment_status,
+        });
+      } else {
+        const successfulPayment =
+          await paymentsService.handleCheckoutSessionCompleted(session);
+
+        logger.info({
+          event: "STRIPE_PAYMENT_COMPLETED",
+
+          stripeEventId: event.id,
+
+          checkoutSessionId: session.id,
+
+          paymentId: successfulPayment.id,
+
+          paymentReference: successfulPayment.paymentReference,
+
+          quotationId: successfulPayment.quotationId,
+
+          touristId: successfulPayment.touristId,
+
+          gatewayReference: successfulPayment.gatewayReference,
+
+          status: successfulPayment.status,
+        });
+      }
+    }
+
+    /**
+     * ===================================================
+     * Payment Attempt Failed
+     * ===================================================
+     *
+     * IMPORTANT:
+     *
+     * We do not mark the Travora payment FAILED
+     * immediately.
+     *
+     * Stripe Checkout may allow the tourist to retry
+     * using another card.
+     */
+
+    if (event.type === "payment_intent.payment_failed") {
+      const paymentIntent = event.data.object;
+
+      const paymentId = paymentIntent.metadata?.paymentId;
+
+      const lastPaymentError = paymentIntent.last_payment_error;
+
+      logger.warn({
+        event: "STRIPE_PAYMENT_ATTEMPT_FAILED",
+
+        stripeEventId: event.id,
+
+        paymentIntentId: paymentIntent.id,
+
+        paymentId: paymentId ?? null,
+
+        failureCode: lastPaymentError?.code ?? null,
+
+        declineCode: lastPaymentError?.decline_code ?? null,
+
+        failureMessage:
+          lastPaymentError?.message ?? "Stripe payment attempt failed",
       });
     }
 
-    const paymentId = session.metadata?.paymentId;
+    /**
+     * ===================================================
+     * Checkout Session Expired
+     * ===================================================
+     *
+     * We reuse the same local PENDING payment across
+     * checkout attempts (see paymentsService.createCheckoutSession's
+     * retrieve-and-reuse / retry-keyed logic). Therefore an old
+     * Checkout Session expiring must not automatically fail the
+     * local payment.
+     */
 
-    if (!paymentId) {
-      logger.error({
-        event: "STRIPE_PAYMENT_ID_MISSING",
+    if (event.type === "checkout.session.expired") {
+      const session = event.data.object;
+
+      logger.info({
+        event: "STRIPE_CHECKOUT_SESSION_EXPIRED",
+
+        stripeEventId: event.id,
 
         checkoutSessionId: session.id,
+
+        paymentId: session.metadata?.paymentId ?? null,
+
+        quotationId: session.metadata?.quotationId ?? null,
+      });
+    }
+
+    /**
+     * ===================================================
+     * Mark Fully Processed
+     * ===================================================
+     *
+     * Reached only if every branch above completed without
+     * throwing -- including, for checkout.session.completed,
+     * Booking creation inside handleCheckoutSessionCompleted.
+     */
+
+    await paymentsService.markWebhookEventProcessed(event.id);
+
+    return res.status(200).json({
+      received: true,
+    });
+  } catch (error) {
+    if (error instanceof paymentsService.PermanentWebhookVerificationError) {
+      await paymentsService.markWebhookEventFailed(event.id, error.message);
+
+      logger.error({
+        event: "STRIPE_WEBHOOK_PERMANENT_FAILURE",
+
+        stripeEventId: event.id,
+
+        message: error.message,
       });
 
       return res.status(400).json({
         received: false,
 
-        message: "Payment ID missing from Stripe metadata",
+        message: error.message,
       });
     }
 
-    const gatewayReference =
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.id;
-
-    const successfulPayment = await paymentsService.markPaymentSuccessful(
-      paymentId,
-      gatewayReference,
-    );
-
-    logger.info({
-      event: "STRIPE_PAYMENT_COMPLETED",
+    /**
+     * Deliberately do NOT mark PROCESSED or FAILED. The row
+     * stays PROCESSING with its original claimedAt, so the next
+     * delivery's stale-claim takeover (see
+     * paymentsService.claimOrInspectWebhookEvent) re-runs this
+     * entire block from scratch once Stripe retries.
+     */
+    logger.error({
+      event: "STRIPE_WEBHOOK_PROCESSING_ERROR",
 
       stripeEventId: event.id,
 
-      checkoutSessionId: session.id,
-
-      paymentId: successfulPayment.id,
-
-      paymentReference: successfulPayment.paymentReference,
-
-      quotationId: successfulPayment.quotationId,
-
-      touristId: successfulPayment.touristId,
-
-      gatewayReference,
-
-      status: successfulPayment.status,
+      message: error.message,
     });
+
+    throw error;
   }
-
-  /**
-   * =====================================================
-   * Payment Attempt Failed
-   * =====================================================
-   *
-   * IMPORTANT:
-   *
-   * We do not mark the Travora payment FAILED
-   * immediately.
-   *
-   * Stripe Checkout may allow the tourist to retry
-   * using another card.
-   */
-
-  if (event.type === "payment_intent.payment_failed") {
-    const paymentIntent = event.data.object;
-
-    const paymentId = paymentIntent.metadata?.paymentId;
-
-    const lastPaymentError = paymentIntent.last_payment_error;
-
-    logger.warn({
-      event: "STRIPE_PAYMENT_ATTEMPT_FAILED",
-
-      stripeEventId: event.id,
-
-      paymentIntentId: paymentIntent.id,
-
-      paymentId: paymentId ?? null,
-
-      failureCode: lastPaymentError?.code ?? null,
-
-      declineCode: lastPaymentError?.decline_code ?? null,
-
-      failureMessage:
-        lastPaymentError?.message ?? "Stripe payment attempt failed",
-    });
-  }
-
-  /**
-   * =====================================================
-   * Checkout Session Expired
-   * =====================================================
-   *
-   * We reuse the same local PENDING payment across
-   * checkout attempts.
-   *
-   * Therefore an old Checkout Session expiring must
-   * not automatically fail the local payment.
-   */
-
-  if (event.type === "checkout.session.expired") {
-    const session = event.data.object;
-
-    logger.info({
-      event: "STRIPE_CHECKOUT_SESSION_EXPIRED",
-
-      stripeEventId: event.id,
-
-      checkoutSessionId: session.id,
-
-      paymentId: session.metadata?.paymentId ?? null,
-
-      quotationId: session.metadata?.quotationId ?? null,
-    });
-  }
-
-  /**
-   * =====================================================
-   * Other Stripe Events
-   * =====================================================
-   *
-   * Unused events are acknowledged with 200 so
-   * Stripe does not retry them unnecessarily.
-   */
-
-  return res.status(200).json({
-    received: true,
-  });
 });
 
 module.exports = {

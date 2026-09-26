@@ -10,6 +10,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { createCheckoutSession } from "@/features/payments/payment.api";
 
+/**
+ * Only 409 conflicts carry a message meant for the tourist
+ * (checkout still being prepared, already paid, awaiting
+ * confirmation). Anything else falls back to generic copy.
+ */
+function getConflictMessage(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as {
+        response?: {
+          status?: number;
+          data?: {
+            message?: string;
+          };
+        };
+      }
+    ).response;
+
+    if (response?.status === 409 && response.data?.message) {
+      return response.data.message;
+    }
+  }
+
+  return null;
+}
+
 interface InitiatePaymentCardProps {
   quotationId: string;
 
@@ -71,7 +97,8 @@ export function InitiatePaymentCard({
             </p>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Please try again in a moment.
+              {getConflictMessage(mutation.error) ??
+                "Please try again in a moment."}
             </p>
           </div>
         )}
