@@ -44,10 +44,24 @@ const quotationInclude = {
  * =========================================================
  */
 
+/**
+ * Tourists only ever see quotations that were actually sent to
+ * them (`sentAt` is set atomically by sendQuotationTransaction).
+ * This hides admin DRAFTs and drafts that were SUPERSEDED without
+ * ever being sent, while keeping sent-then-superseded history.
+ */
+const TOURIST_VISIBLE_QUOTATION = {
+  sentAt: {
+    not: null,
+  },
+};
+
 const findQuotationsByTouristId = async (touristId) => {
   return prisma.tourQuotation.findMany({
     where: {
       deletedAt: null,
+
+      ...TOURIST_VISIBLE_QUOTATION,
 
       tourRequest: {
         touristId,
@@ -90,6 +104,27 @@ const findQuotationsByTourRequest = async (tourRequestId) => {
     where: {
       tourRequestId,
       deletedAt: null,
+    },
+
+    include: quotationInclude,
+
+    orderBy: {
+      revisionNumber: "desc",
+    },
+  });
+};
+
+/**
+ * Tourist view of a request's quotations -- see
+ * TOURIST_VISIBLE_QUOTATION.
+ */
+const findSentQuotationsByTourRequest = async (tourRequestId) => {
+  return prisma.tourQuotation.findMany({
+    where: {
+      tourRequestId,
+      deletedAt: null,
+
+      ...TOURIST_VISIBLE_QUOTATION,
     },
 
     include: quotationInclude,
@@ -213,19 +248,116 @@ const createQuotationTransaction = async ({ tourRequestId, data }) => {
 
 /**
  * =========================================================
- * Update Quotation
+ * Update Draft Quotation Transaction
  * =========================================================
+ *
+ * Conditional on the quotation still being DRAFT, so an edit
+ * racing a send cannot modify a quotation the tourist already
+ * received. Each child collection is replaced only when a new
+ * array was provided (undefined = leave untouched).
+ *
+ * Concurrency: the conditional updateMany takes the row lock.
+ * A concurrent edit blocks on that lock and, once this
+ * transaction commits, applies its own changes on top of the
+ * committed row. `validate` then runs inside the transaction on
+ * the row exactly as it will be committed -- so two edits that
+ * are each valid in isolation cannot combine into an
+ * inconsistent quotation. Any throw (validation, child rows)
+ * rolls the whole edit back.
  */
 
-const updateQuotation = async (id, data) => {
-  return prisma.tourQuotation.update({
-    where: {
-      id,
-    },
+const updateDraftQuotationTransaction = async ({
+  id,
+  scalars,
+  itineraries,
+  inclusions,
+  exclusions,
+  validate,
+}) => {
+  return prisma.$transaction(async (tx) => {
+    const updateResult = await tx.tourQuotation.updateMany({
+      where: {
+        id,
+        status: "DRAFT",
+        deletedAt: null,
+      },
 
-    data,
+      // Always write updatedAt: an edit may change only child
+      // collections, and an empty `data` would skip the
+      // conditional DRAFT check entirely (count 0).
+      data: {
+        ...scalars,
 
-    include: quotationInclude,
+        updatedAt: new Date(),
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new ConflictError("Only draft quotations can be edited");
+    }
+
+    const written = await tx.tourQuotation.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    validate(written);
+
+    if (itineraries !== undefined) {
+      await tx.quotationItinerary.deleteMany({
+        where: {
+          quotationId: id,
+        },
+      });
+
+      await tx.quotationItinerary.createMany({
+        data: itineraries.map((item) => ({
+          quotationId: id,
+          dayNumber: item.dayNumber,
+          title: item.title,
+          description: item.description,
+        })),
+      });
+    }
+
+    if (inclusions !== undefined) {
+      await tx.quotationInclusion.deleteMany({
+        where: {
+          quotationId: id,
+        },
+      });
+
+      await tx.quotationInclusion.createMany({
+        data: inclusions.map((title) => ({
+          quotationId: id,
+          title,
+        })),
+      });
+    }
+
+    if (exclusions !== undefined) {
+      await tx.quotationExclusion.deleteMany({
+        where: {
+          quotationId: id,
+        },
+      });
+
+      await tx.quotationExclusion.createMany({
+        data: exclusions.map((title) => ({
+          quotationId: id,
+          title,
+        })),
+      });
+    }
+
+    return tx.tourQuotation.findUnique({
+      where: {
+        id,
+      },
+
+      include: quotationInclude,
+    });
   });
 };
 
@@ -534,9 +666,11 @@ module.exports = {
 
   findQuotationsByTourRequest,
 
+  findSentQuotationsByTourRequest,
+
   createQuotationTransaction,
 
-  updateQuotation,
+  updateDraftQuotationTransaction,
 
   updateQuotationStatus,
 
