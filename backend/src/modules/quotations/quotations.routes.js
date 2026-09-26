@@ -13,6 +13,7 @@ const { USER_ROLES } = require("../../core/constants/auth.constants");
 const {
   createQuotationSchema,
   updateQuotationSchema,
+  reviseQuotationSchema,
   rejectQuotationSchema,
 } = require("./quotations.validation");
 
@@ -140,7 +141,7 @@ router.post(
   "/:id/revisions",
   authenticate,
   authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),
-  validateRequest(updateQuotationSchema),
+  validateRequest(reviseQuotationSchema),
   quotationsController.createRevision,
 );
 

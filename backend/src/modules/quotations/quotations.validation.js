@@ -16,6 +16,34 @@ const itineraryItemSchema = Joi.object({
 
 /**
  * =========================================================
+ * Money
+ * =========================================================
+ *
+ * Monetary columns are NUMERIC(12,2). Values with more than two
+ * decimal places are REJECTED (not rounded): PostgreSQL would
+ * round them on write, so the server-side pricing check and the
+ * stored row could disagree. The maximum is the largest value
+ * NUMERIC(12,2) can hold.
+ */
+
+const MONEY_MAX = 9999999999.99;
+
+// The sign is left to .positive()/.min(0) so they report it.
+const TWO_DECIMAL_PATTERN = /^-?\d+(\.\d{1,2})?$/;
+
+const money = () =>
+  Joi.number()
+    .max(MONEY_MAX)
+    .custom((value, helpers) => {
+      return TWO_DECIMAL_PATTERN.test(String(value))
+        ? value
+        : helpers.error("number.precision", {
+            limit: 2,
+          });
+    }, "two decimal places");
+
+/**
+ * =========================================================
  * Create Quotation
  * =========================================================
  */
@@ -35,13 +63,13 @@ const createQuotationSchema = Joi.object({
 
   childCount: Joi.number().integer().min(0).default(0),
 
-  subtotal: Joi.number().positive().required(),
+  subtotal: money().positive().required(),
 
-  discountAmount: Joi.number().min(0).default(0),
+  discountAmount: money().min(0).default(0),
 
-  taxAmount: Joi.number().min(0).default(0),
+  taxAmount: money().min(0).default(0),
 
-  totalAmount: Joi.number().positive().required(),
+  totalAmount: money().positive().required(),
 
   currency: Joi.string().trim().uppercase().max(10).default("USD"),
 
@@ -51,7 +79,10 @@ const createQuotationSchema = Joi.object({
 
   validUntil: Joi.date().iso().allow(null),
 
-  itineraries: Joi.array().items(itineraryItemSchema).default([]),
+  itineraries: Joi.array()
+    .items(itineraryItemSchema)
+    .unique("dayNumber")
+    .default([]),
 
   inclusions: Joi.array()
     .items(Joi.string().trim().min(2).max(255))
@@ -64,17 +95,67 @@ const createQuotationSchema = Joi.object({
 
 /**
  * =========================================================
- * Update Quotation
+ * Quotation Changes (update / revision)
  * =========================================================
+ *
+ * Deliberately NOT derived from createQuotationSchema: its
+ * `.default()`s would be injected into partial bodies by
+ * validateRequest and silently overwrite stored values (and
+ * wipe child collections). Omitted keys stay omitted; the
+ * service merges them with the stored quotation and validates
+ * dates/pricing against the merged result.
  */
 
-const updateQuotationSchema = createQuotationSchema
-  .fork(
-    ["title", "startDate", "endDate", "adultCount", "subtotal", "totalAmount"],
-    (schema) => schema.optional(),
-  )
+const quotationChangeKeys = {
+  guideId: Joi.string().uuid().allow(null),
+
+  title: Joi.string().trim().min(3).max(200),
+
+  description: Joi.string().trim().allow(null, ""),
+
+  startDate: Joi.date().iso(),
+
+  endDate: Joi.date().iso(),
+
+  adultCount: Joi.number().integer().min(1),
+
+  childCount: Joi.number().integer().min(0),
+
+  subtotal: money().positive(),
+
+  discountAmount: money().min(0),
+
+  taxAmount: money().min(0),
+
+  totalAmount: money().positive(),
+
+  currency: Joi.string().trim().uppercase().max(10),
+
+  notes: Joi.string().trim().allow(null, ""),
+
+  termsConditions: Joi.string().trim().allow(null, ""),
+
+  validUntil: Joi.date().iso().allow(null),
+
+  itineraries: Joi.array().items(itineraryItemSchema).unique("dayNumber"),
+
+  inclusions: Joi.array().items(Joi.string().trim().min(2).max(255)),
+
+  exclusions: Joi.array().items(Joi.string().trim().min(2).max(255)),
+};
+
+/**
+ * Update Draft Quotation -- at least one change is required.
+ */
+const updateQuotationSchema = Joi.object(quotationChangeKeys)
   .min(1)
   .required();
+
+/**
+ * Create Revision -- an empty body is valid and means "revise
+ * with the source quotation's content unchanged".
+ */
+const reviseQuotationSchema = Joi.object(quotationChangeKeys).required();
 
 /**
  * =========================================================
@@ -90,6 +171,8 @@ module.exports = {
   createQuotationSchema,
 
   updateQuotationSchema,
+
+  reviseQuotationSchema,
 
   rejectQuotationSchema,
 };

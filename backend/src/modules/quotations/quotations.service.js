@@ -1,5 +1,7 @@
 const crypto = require("crypto");
 
+const { Prisma } = require("@prisma/client");
+
 const quotationsRepository = require("./quotations.repository");
 
 const tourRequestsRepository = require("../tour-requests/tourRequests.repository");
@@ -42,6 +44,88 @@ const validateGuide = async (guideId) => {
   }
 };
 
+const isAdminUser = (user) =>
+  user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SYSTEM_ADMIN;
+
+/**
+ * Scalar quotation fields an admin may change on a DRAFT or
+ * carry into a revision.
+ */
+const QUOTATION_SCALAR_FIELDS = [
+  "guideId",
+  "title",
+  "description",
+  "startDate",
+  "endDate",
+  "adultCount",
+  "childCount",
+  "subtotal",
+  "discountAmount",
+  "taxAmount",
+  "totalAmount",
+  "currency",
+  "notes",
+  "termsConditions",
+  "validUntil",
+];
+
+/**
+ * Omitted (undefined) keys inherit the stored value; an explicit
+ * null is a deliberate change (e.g. clearing validUntil).
+ */
+const mergeScalarFields = (changes, stored) => {
+  return Object.fromEntries(
+    QUOTATION_SCALAR_FIELDS.map((field) => [
+      field,
+      changes[field] !== undefined ? changes[field] : stored[field],
+    ]),
+  );
+};
+
+/**
+ * The server is the source of truth for quotation pricing:
+ * totalAmount must equal subtotal - discountAmount + taxAmount.
+ *
+ * Exact decimal arithmetic (Prisma.Decimal, the same type Prisma
+ * returns for NUMERIC columns) -- no binary floating point.
+ * Validation guarantees request amounts have at most two decimal
+ * places, so these values are exactly what NUMERIC(12,2) stores.
+ */
+const assertPricingConsistent = ({
+  subtotal,
+  discountAmount,
+  taxAmount,
+  totalAmount,
+}) => {
+  const expectedTotal = new Prisma.Decimal(subtotal)
+    .minus(new Prisma.Decimal(discountAmount))
+    .plus(new Prisma.Decimal(taxAmount));
+
+  const total = new Prisma.Decimal(totalAmount);
+
+  if (total.lessThanOrEqualTo(0) || !total.equals(expectedTotal)) {
+    throw new BadRequestError(
+      "Quotation total must equal subtotal - discount + tax",
+    );
+  }
+};
+
+const assertDateRange = (startDate, endDate) => {
+  if (new Date(endDate) < new Date(startDate)) {
+    throw new BadRequestError("End date must be on or after the start date");
+  }
+};
+
+/**
+ * Whole-quotation consistency rules, applied to the quotation as
+ * it will actually be stored.
+ */
+const assertQuotationConsistent = (quotation) => {
+  assertDateRange(quotation.startDate, quotation.endDate);
+
+  assertPricingConsistent(quotation);
+};
+
 /**
  * =========================================================
  * Tourist - My Quotations
@@ -69,6 +153,8 @@ const createQuotation = async (tourRequestId, data) => {
   if (!lifecycle.QUOTATION_CREATE_ALLOWED.includes(tourRequest.status)) {
     throw new BadRequestError("Tour request is not ready for quotation");
   }
+
+  assertQuotationConsistent(data);
 
   await validateGuide(data.guideId);
 
@@ -101,9 +187,7 @@ const getQuotationsByTourRequest = async (tourRequestId, currentUser) => {
 
   const isOwner = tourRequest.touristId === currentUser.id;
 
-  const isAdmin =
-    currentUser.role === USER_ROLES.ADMIN ||
-    currentUser.role === USER_ROLES.SYSTEM_ADMIN;
+  const isAdmin = isAdminUser(currentUser);
 
   if (!isOwner && !isAdmin) {
     throw new ForbiddenError(
@@ -111,7 +195,12 @@ const getQuotationsByTourRequest = async (tourRequestId, currentUser) => {
     );
   }
 
-  return quotationsRepository.findQuotationsByTourRequest(tourRequestId);
+  if (isAdmin) {
+    return quotationsRepository.findQuotationsByTourRequest(tourRequestId);
+  }
+
+  // Tourists never see quotations that were not sent to them.
+  return quotationsRepository.findSentQuotationsByTourRequest(tourRequestId);
 };
 
 /**
@@ -129,14 +218,20 @@ const getQuotationById = async (quotationId, currentUser) => {
 
   const isOwner = quotation.tourRequest.touristId === currentUser.id;
 
-  const isAdmin =
-    currentUser.role === USER_ROLES.ADMIN ||
-    currentUser.role === USER_ROLES.SYSTEM_ADMIN;
+  const isAdmin = isAdminUser(currentUser);
 
   if (!isOwner && !isAdmin) {
     throw new ForbiddenError(
       "You do not have permission to view this quotation",
     );
+  }
+
+  /**
+   * A quotation that was never sent (DRAFT, or a draft later
+   * SUPERSEDED) does not exist from the tourist's perspective.
+   */
+  if (!isAdmin && !quotation.sentAt) {
+    throw new NotFoundError("Quotation not found");
   }
 
   return quotation;
@@ -159,11 +254,34 @@ const updateQuotation = async (quotationId, data) => {
     throw new BadRequestError("Only draft quotations can be edited");
   }
 
-  if (data.guideId !== undefined) {
-    await validateGuide(data.guideId);
+  const { itineraries, inclusions, exclusions, ...scalarChanges } = data;
+
+  if (scalarChanges.guideId !== undefined) {
+    await validateGuide(scalarChanges.guideId);
   }
 
-  return quotationsRepository.updateQuotation(quotationId, data);
+  return quotationsRepository.updateDraftQuotationTransaction({
+    id: quotationId,
+
+    // Only the provided scalar fields are written.
+    scalars: scalarChanges,
+
+    itineraries,
+
+    inclusions,
+
+    exclusions,
+
+    /**
+     * Authoritative check, run inside the transaction on the row
+     * as written (this edit applied on top of any concurrently
+     * committed edit) while the row lock is held. A stale
+     * pre-transaction read cannot be trusted here: two edits
+     * that are each valid against the same snapshot can combine
+     * into an inconsistent quotation.
+     */
+    validate: assertQuotationConsistent,
+  });
 };
 
 /**
@@ -313,63 +431,47 @@ const createRevision = async (quotationId, data) => {
     );
   }
 
-  if (data.guideId !== undefined) {
-    await validateGuide(data.guideId);
-  }
-
+  /**
+   * Every omitted field -- including each child collection --
+   * inherits from the quotation being revised. Provided values
+   * (including explicit nulls and empty arrays) override.
+   */
   const revisionData = {
-    ...data,
+    ...mergeScalarFields(data, quotation),
 
     tourRequestId: quotation.tourRequestId,
 
-    guideId: data.guideId !== undefined ? data.guideId : quotation.guideId,
-
-    title: data.title ?? quotation.title,
-
-    description: data.description ?? quotation.description,
-
-    startDate: data.startDate ?? quotation.startDate,
-
-    endDate: data.endDate ?? quotation.endDate,
-
-    adultCount: data.adultCount ?? quotation.adultCount,
-
-    childCount: data.childCount ?? quotation.childCount,
-
-    subtotal: data.subtotal ?? quotation.subtotal,
-
-    discountAmount: data.discountAmount ?? quotation.discountAmount,
-
-    taxAmount: data.taxAmount ?? quotation.taxAmount,
-
-    totalAmount: data.totalAmount ?? quotation.totalAmount,
-
-    currency: data.currency ?? quotation.currency,
-
-    notes: data.notes ?? quotation.notes,
-
-    termsConditions: data.termsConditions ?? quotation.termsConditions,
-
-    validUntil: data.validUntil ?? quotation.validUntil,
-
     itineraries:
-      data.itineraries ??
-      quotation.itineraries.map((item) => ({
-        dayNumber: item.dayNumber,
+      data.itineraries !== undefined
+        ? data.itineraries
+        : quotation.itineraries.map((item) => ({
+            dayNumber: item.dayNumber,
 
-        title: item.title,
+            title: item.title,
 
-        description: item.description,
-      })),
+            description: item.description,
+          })),
 
     inclusions:
-      data.inclusions ?? quotation.inclusions.map((item) => item.title),
+      data.inclusions !== undefined
+        ? data.inclusions
+        : quotation.inclusions.map((item) => item.title),
 
     exclusions:
-      data.exclusions ?? quotation.exclusions.map((item) => item.title),
+      data.exclusions !== undefined
+        ? data.exclusions
+        : quotation.exclusions.map((item) => item.title),
 
     quotationNumber: generateQuotationNumber(),
   };
+
+  // The source is immutable once SENT/REJECTED, so validating
+  // against this read is safe for revisions.
+  assertQuotationConsistent(revisionData);
+
+  if (data.guideId !== undefined) {
+    await validateGuide(data.guideId);
+  }
 
   try {
     return await quotationsRepository.createRevisionTransaction({
