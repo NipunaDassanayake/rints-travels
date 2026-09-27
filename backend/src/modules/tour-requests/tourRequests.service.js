@@ -89,16 +89,19 @@ const getMyTourRequests = async (touristId) => {
 };
 
 const getTourRequestById = async (id, currentUser) => {
-  const tourRequest = await tourRequestsRepository.findTourRequestById(id);
+  const isAdmin =
+    currentUser.role === "ADMIN" || currentUser.role === "SYSTEM_ADMIN";
+
+  // Non-admins never load the preferred guide's contact details.
+  const tourRequest = await tourRequestsRepository.findTourRequestById(id, {
+    view: isAdmin ? "admin" : "tourist",
+  });
 
   if (!tourRequest) {
     throw new NotFoundError("Tour request not found");
   }
 
   const isOwner = tourRequest.touristId === currentUser.id;
-
-  const isAdmin =
-    currentUser.role === "ADMIN" || currentUser.role === "SYSTEM_ADMIN";
 
   if (!isOwner && !isAdmin) {
     throw new ForbiddenError(

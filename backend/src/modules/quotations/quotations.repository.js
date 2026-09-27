@@ -6,23 +6,34 @@ const { ConflictError } = require("../../utils/AppError");
 
 /**
  * =========================================================
- * Shared Include
+ * Shared Includes (role-specific guide contact data)
  * =========================================================
+ *
+ * A guide's personal contact details (email, phone) are only
+ * ever loaded for admin responses. Tourist responses use a
+ * select that never reads them, so they cannot leak through a
+ * missed post-query filter.
  */
 
-const quotationInclude = {
+const GUIDE_USER_PUBLIC_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+};
+
+const GUIDE_USER_ADMIN_SELECT = {
+  ...GUIDE_USER_PUBLIC_SELECT,
+  email: true,
+  phone: true,
+};
+
+const buildQuotationInclude = (guideUserSelect) => ({
   tourRequest: true,
 
   guide: {
     include: {
       user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-        },
+        select: guideUserSelect,
       },
     },
   },
@@ -36,6 +47,17 @@ const quotationInclude = {
   inclusions: true,
 
   exclusions: true,
+});
+
+// Admin-facing responses (unchanged admin response contract).
+const quotationInclude = buildQuotationInclude(GUIDE_USER_ADMIN_SELECT);
+
+// Tourist-facing responses: no guide email/phone.
+const touristQuotationInclude = buildQuotationInclude(GUIDE_USER_PUBLIC_SELECT);
+
+const QUOTATION_INCLUDES = {
+  admin: quotationInclude,
+  tourist: touristQuotationInclude,
 };
 
 /**
@@ -68,7 +90,7 @@ const findQuotationsByTouristId = async (touristId) => {
       },
     },
 
-    include: quotationInclude,
+    include: touristQuotationInclude,
 
     orderBy: {
       createdAt: "desc",
@@ -82,14 +104,28 @@ const findQuotationsByTouristId = async (touristId) => {
  * =========================================================
  */
 
-const findQuotationById = async (id) => {
+/**
+ * `view` selects the guide-contact exposure. It is fail-closed:
+ * omitting it returns the "tourist" view (no guide email/phone).
+ * Only a caller that has established the user is an admin may
+ * pass `view: "admin"`. Internal callers that merely check
+ * status/ownership/pricing need no contact details and use the
+ * default.
+ */
+const findQuotationById = async (id, { view = "tourist" } = {}) => {
+  if (!Object.hasOwn(QUOTATION_INCLUDES, view)) {
+    throw new Error(`Unknown quotation view "${view}"`);
+  }
+
+  const include = QUOTATION_INCLUDES[view];
+
   return prisma.tourQuotation.findFirst({
     where: {
       id,
       deletedAt: null,
     },
 
-    include: quotationInclude,
+    include,
   });
 };
 
@@ -127,7 +163,7 @@ const findSentQuotationsByTourRequest = async (tourRequestId) => {
       ...TOURIST_VISIBLE_QUOTATION,
     },
 
-    include: quotationInclude,
+    include: touristQuotationInclude,
 
     orderBy: {
       revisionNumber: "desc",
@@ -510,12 +546,13 @@ const rejectQuotationTransaction = async ({
       throw new ConflictError("This quotation is no longer awaiting a response");
     }
 
+    // Only the tourist reject endpoint calls this.
     return tx.tourQuotation.findUnique({
       where: {
         id: quotationId,
       },
 
-      include: quotationInclude,
+      include: touristQuotationInclude,
     });
   });
 };
@@ -578,12 +615,13 @@ const acceptQuotationTransaction = async ({ quotationId, tourRequestId }) => {
       excludeQuotationId: quotationId,
     });
 
+    // Only the tourist accept endpoint calls this.
     return tx.tourQuotation.findUnique({
       where: {
         id: quotationId,
       },
 
-      include: quotationInclude,
+      include: touristQuotationInclude,
     });
   });
 };
