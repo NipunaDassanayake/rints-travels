@@ -29,8 +29,13 @@ export interface QuotationGuideUser {
 
   lastName: string;
 
+  /**
+   * Admin responses only. The backend never sends a guide's
+   * contact details to tourists (CR-009).
+   */
   email?: string;
 
+  /** Admin responses only (CR-009). */
   phone?: string | null;
 }
 

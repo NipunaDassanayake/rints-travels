@@ -12,7 +12,42 @@ const createTourRequest = async (data) => {
   });
 };
 
-const findTourRequestById = async (id) => {
+/**
+ * A preferred guide's personal contact details (email, phone)
+ * are only loaded for admin responses; the tourist view never
+ * reads them. The tourist's own contact details are included in
+ * both views.
+ */
+const PREFERRED_GUIDE_USER_PUBLIC_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+};
+
+const PREFERRED_GUIDE_USER_SELECTS = {
+  admin: {
+    ...PREFERRED_GUIDE_USER_PUBLIC_SELECT,
+    email: true,
+    phone: true,
+  },
+
+  tourist: PREFERRED_GUIDE_USER_PUBLIC_SELECT,
+};
+
+/**
+ * `view` is fail-closed: omitting it returns the "tourist" view
+ * (no preferred-guide email/phone). Only a caller that has
+ * established the user is an admin may pass `view: "admin"`.
+ * Internal callers that merely check status/ownership/dates need
+ * no guide contact details and use the default.
+ */
+const findTourRequestById = async (id, { view = "tourist" } = {}) => {
+  if (!Object.hasOwn(PREFERRED_GUIDE_USER_SELECTS, view)) {
+    throw new Error(`Unknown tour request view "${view}"`);
+  }
+
+  const preferredGuideUserSelect = PREFERRED_GUIDE_USER_SELECTS[view];
+
   return prisma.tourRequest.findFirst({
     where: {
       id,
@@ -35,13 +70,7 @@ const findTourRequestById = async (id) => {
       preferredGuide: {
         include: {
           user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-            },
+            select: preferredGuideUserSelect,
           },
         },
       },

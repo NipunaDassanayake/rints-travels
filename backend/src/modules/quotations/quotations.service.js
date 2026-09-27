@@ -210,15 +210,18 @@ const getQuotationsByTourRequest = async (tourRequestId, currentUser) => {
  */
 
 const getQuotationById = async (quotationId, currentUser) => {
-  const quotation = await quotationsRepository.findQuotationById(quotationId);
+  const isAdmin = isAdminUser(currentUser);
+
+  // Non-admins never load the guide's private contact details.
+  const quotation = await quotationsRepository.findQuotationById(quotationId, {
+    view: isAdmin ? "admin" : "tourist",
+  });
 
   if (!quotation) {
     throw new NotFoundError("Quotation not found");
   }
 
   const isOwner = quotation.tourRequest.touristId === currentUser.id;
-
-  const isAdmin = isAdminUser(currentUser);
 
   if (!isOwner && !isAdmin) {
     throw new ForbiddenError(
