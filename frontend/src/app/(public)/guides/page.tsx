@@ -3,7 +3,7 @@ import type {
 } from "next";
 
 import {
-  getTourGuides,
+  getTourGuidesUncached,
 } from "@/features/tour-guides/tour-guide.api";
 
 import {
@@ -20,7 +20,9 @@ export const metadata: Metadata = {
 };
 
 export default async function GuidesPage() {
-  const guides = await getTourGuides();
+  // Fresh on every request: deactivated/unavailable guides must
+  // leave the directory immediately.
+  const guides = await getTourGuidesUncached();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">

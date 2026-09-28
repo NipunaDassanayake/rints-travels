@@ -1,37 +1,26 @@
-const path = require("path");
 const crypto = require("crypto");
 
 /**
  * =========================================================
- * Load Backend Environment
+ * Environment + Production / Local-Only Protection
  * =========================================================
  *
- * This script may be executed from the frontend directory
- * by Playwright.
- *
- * Therefore explicitly load backend/.env instead of
- * depending on the current terminal working directory.
+ * This script creates artificial E2E data. It loads
+ * backend/.env explicitly (Playwright runs it from the
+ * frontend directory) and refuses to run in production or
+ * against a non-local database.
  */
 
-require("dotenv").config({
-  path: path.resolve(__dirname, "../.env"),
-});
+const {
+  loadBackendEnv,
+  assertSafeE2EEnvironment,
+} = require("./lib/e2e-guards");
 
-/**
- * =========================================================
- * Production Protection
- * =========================================================
- *
- * This script creates artificial E2E data.
- *
- * It must NEVER run against production.
- */
+loadBackendEnv();
 
-if (process.env.NODE_ENV === "production") {
-  console.error("E2E fixture creation is disabled in production.");
+assertSafeE2EEnvironment("Booking lifecycle E2E fixture");
 
-  process.exit(1);
-}
+const { allocateGuideWindow } = require("./lib/guide-window");
 
 const prisma = require("../src/config/prisma");
 
@@ -45,6 +34,8 @@ const bookingsService = require("../src/modules/bookings/bookings.service");
 
 const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
 
+const GUIDE_EMAIL = process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com";
+
 /**
  * =========================================================
  * Helpers
@@ -56,39 +47,40 @@ function createUniqueSuffix() {
 }
 
 /**
- * Generate future travel dates.
- *
- * We deliberately move the booking well into the future
- * and add a random offset so repeatedly-created E2E
- * bookings are unlikely to overlap.
- *
- * This is useful because Travora prevents the same guide
- * from having overlapping CONFIRMED / IN_PROGRESS tours.
+ * Travel dates for a booking the spec will assign to the shared
+ * E2E guide: the earliest window (at least a year ahead) that
+ * does not overlap any of that guide's CONFIRMED / IN_PROGRESS
+ * bookings, so assignment can never hit the guide-overlap rule.
  */
-function createTravelDates() {
-  const startDate = new Date();
+async function createTravelDates() {
+  const guide = await prisma.tourGuideProfile.findFirst({
+    where: {
+      user: {
+        email: GUIDE_EMAIL,
+      },
+    },
+  });
 
-  startDate.setUTCHours(0, 0, 0, 0);
+  if (!guide) {
+    throw new Error(`E2E guide "${GUIDE_EMAIL}" was not found.`);
+  }
 
-  /**
-   * At least one year into the future.
-   *
-   * Add up to approximately 10 additional years
-   * to make collisions between failed E2E runs
-   * extremely unlikely.
-   */
-  const randomOffset = crypto.randomInt(1, 3650);
+  const tourist = await prisma.user.findUnique({
+    where: {
+      email: TOURIST_EMAIL,
+    },
+  });
 
-  startDate.setUTCDate(startDate.getUTCDate() + 365 + randomOffset);
+  if (!tourist) {
+    throw new Error(`E2E tourist "${TOURIST_EMAIL}" was not found.`);
+  }
 
-  const endDate = new Date(startDate);
-
-  endDate.setUTCDate(endDate.getUTCDate() + 5);
-
-  return {
-    startDate,
-    endDate,
-  };
+  return allocateGuideWindow(prisma, {
+    guideId: guide.id,
+    spanDays: 5,
+    // Other fixtures awaiting assignment of this guide.
+    pendingAssignmentTouristId: tourist.id,
+  });
 }
 
 /**
@@ -100,7 +92,7 @@ function createTravelDates() {
 async function prepareBookingLifecycleFixture() {
   const uniqueSuffix = createUniqueSuffix();
 
-  const { startDate, endDate } = createTravelDates();
+  const { startDate, endDate } = await createTravelDates();
 
   /**
    * =======================================================

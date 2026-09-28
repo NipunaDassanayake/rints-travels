@@ -1,37 +1,26 @@
-const path = require("path");
 const crypto = require("crypto");
 
 /**
  * =========================================================
- * Load Backend Environment
+ * Environment + Production / Local-Only Protection
  * =========================================================
  *
- * This script may be executed from the frontend directory
- * by Playwright.
- *
- * Therefore explicitly load backend/.env instead of
- * depending on the current terminal working directory.
+ * This script creates artificial E2E data. It loads
+ * backend/.env explicitly (Playwright runs it from the
+ * frontend directory) and refuses to run in production or
+ * against a non-local database.
  */
 
-require("dotenv").config({
-  path: path.resolve(__dirname, "../.env"),
-});
+const {
+  loadBackendEnv,
+  assertSafeE2EEnvironment,
+} = require("./lib/e2e-guards");
 
-/**
- * =========================================================
- * Production Protection
- * =========================================================
- *
- * This script creates artificial E2E data.
- *
- * It must NEVER run against production.
- */
+loadBackendEnv();
 
-if (process.env.NODE_ENV === "production") {
-  console.error("E2E fixture creation is disabled in production.");
+assertSafeE2EEnvironment("Booking cancellation conflict E2E fixture");
 
-  process.exit(1);
-}
+const { allocateGuideWindow } = require("./lib/guide-window");
 
 const prisma = require("../src/config/prisma");
 
@@ -74,31 +63,21 @@ function createUniqueSuffix() {
 }
 
 /**
- * Generate future, shared travel dates.
+ * Shared travel dates for both bookings.
  *
- * Both bookings intentionally use the SAME date range so
- * they are guaranteed to overlap for guide-conflict checks.
- *
- * A random offset keeps this run's dates from colliding
- * with any other E2E fixture's dates.
+ * Both bookings intentionally use the SAME date range so they
+ * overlap EACH OTHER for the guide-conflict checks. The range
+ * itself is the earliest window that overlaps none of the
+ * guide's other CONFIRMED / IN_PROGRESS bookings, so the only
+ * conflict the spec can hit is the intended one.
  */
-function createTravelDates() {
-  const startDate = new Date();
-
-  startDate.setUTCHours(0, 0, 0, 0);
-
-  const randomOffset = crypto.randomInt(1, 3650);
-
-  startDate.setUTCDate(startDate.getUTCDate() + 365 + randomOffset);
-
-  const endDate = new Date(startDate);
-
-  endDate.setUTCDate(endDate.getUTCDate() + 5);
-
-  return {
-    startDate,
-    endDate,
-  };
+function createTravelDates(guideId, touristId) {
+  return allocateGuideWindow(prisma, {
+    guideId,
+    spanDays: 5,
+    // Other fixtures awaiting assignment of this guide.
+    pendingAssignmentTouristId: touristId,
+  });
 }
 
 async function createConfirmedBooking({
@@ -272,8 +251,6 @@ async function createConfirmedBooking({
  */
 
 async function prepareBookingCancellationConflictFixture() {
-  const { startDate, endDate } = createTravelDates();
-
   const tourist = await prisma.user.findUnique({
     where: {
       email: TOURIST_EMAIL,
@@ -311,6 +288,8 @@ async function prepareBookingCancellationConflictFixture() {
   if (guide.user.status !== "ACTIVE") {
     throw new Error(`E2E guide "${GUIDE_EMAIL}" must be ACTIVE.`);
   }
+
+  const { startDate, endDate } = await createTravelDates(guide.id, tourist.id);
 
   /**
    * =======================================================

@@ -30,6 +30,8 @@ import {
 
 import { getDashboardPath } from "@/features/auth/auth.utils";
 
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
+
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
 
@@ -44,6 +46,8 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   const [serverError, setServerError] = useState<string | null>(null);
+
+  const isHydrated = useIsHydrated();
 
   const {
     register,
@@ -132,50 +136,65 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+          {/*
+            Disabled until hydrated: typed input would otherwise be
+            wiped by react-hook-form, and a pre-hydration submit
+            would fall back to a native form submission. POST keeps
+            credentials out of the URL even in that case.
+          */}
+          <form
+            method="post"
+            onSubmit={handleSubmit(onSubmit)}
+            aria-busy={!isHydrated}
+          >
+            <fieldset
+              disabled={!isHydrated}
+              className="m-0 min-w-0 space-y-5 border-0 p-0"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
 
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                autoComplete="email"
-                {...register("email")}
-              />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  {...register("email")}
+                />
 
-              {errors.email && (
-                <p className="text-sm text-destructive">
-                  {errors.email.message}
-                </p>
+                {errors.email && (
+                  <p className="text-sm text-destructive">
+                    {errors.email.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  {...register("password")}
+                />
+
+                {errors.password && (
+                  <p className="text-sm text-destructive">
+                    {errors.password.message}
+                  </p>
+                )}
+              </div>
+
+              {serverError && (
+                <p className="text-sm text-destructive">{serverError}</p>
               )}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                {...register("password")}
-              />
-
-              {errors.password && (
-                <p className="text-sm text-destructive">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            {serverError && (
-              <p className="text-sm text-destructive">{serverError}</p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in..." : "Sign in"}
-            </Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Signing in..." : "Sign in"}
+              </Button>
+            </fieldset>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
