@@ -12,16 +12,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  * Returns publicly available guides.
  */
 
-export async function getTourGuides(): Promise<TourGuide[]> {
+async function fetchTourGuides(init: RequestInit): Promise<TourGuide[]> {
   if (!API_BASE_URL) {
     throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured");
   }
 
-  const response = await fetch(`${API_BASE_URL}/tour-guides`, {
-    next: {
-      revalidate: 60,
-    },
-  });
+  const response = await fetch(`${API_BASE_URL}/tour-guides`, init);
 
   if (!response.ok) {
     throw new Error("Failed to load tour guides");
@@ -30,6 +26,30 @@ export async function getTourGuides(): Promise<TourGuide[]> {
   const result = await response.json();
 
   return result.data as TourGuide[];
+}
+
+/**
+ * Cached for up to 60 seconds. Used by the statically generated
+ * home page (featured guides) and client-side lists.
+ */
+export async function getTourGuides(): Promise<TourGuide[]> {
+  return fetchTourGuides({
+    next: {
+      revalidate: 60,
+    },
+  });
+}
+
+/**
+ * Not cached: used by the public guide directory (/guides), where
+ * a guide that is deactivated or marked unavailable must
+ * disappear immediately rather than after a revalidation window.
+ * Only call from dynamically rendered routes.
+ */
+export async function getTourGuidesUncached(): Promise<TourGuide[]> {
+  return fetchTourGuides({
+    cache: "no-store",
+  });
 }
 
 /**
@@ -48,9 +68,9 @@ export async function getTourGuideById(id: string): Promise<TourGuide | null> {
   const response = await fetch(
     `${API_BASE_URL}/tour-guides/${encodeURIComponent(id)}`,
     {
-      next: {
-        revalidate: 60,
-      },
+      // Not cached, for the same reason as getTourGuidesUncached.
+      // Only used by the dynamically rendered /guides/[id] page.
+      cache: "no-store",
     },
   );
 

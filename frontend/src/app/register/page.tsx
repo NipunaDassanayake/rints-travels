@@ -26,6 +26,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
+
 const registerSchema = z.object({
   firstName: z
     .string()
@@ -87,6 +89,8 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const [isRegistered, setIsRegistered] = useState(false);
+
+  const isHydrated = useIsHydrated();
 
   const {
     register,
@@ -162,111 +166,126 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div className="grid gap-5 sm:grid-cols-2">
+          {/*
+            Disabled until hydrated: typed input would otherwise be
+            wiped by react-hook-form, and a pre-hydration submit
+            would fall back to a native form submission. POST keeps
+            credentials out of the URL even in that case.
+          */}
+          <form
+            method="post"
+            onSubmit={handleSubmit(onSubmit)}
+            aria-busy={!isHydrated}
+          >
+            <fieldset
+              disabled={!isHydrated}
+              className="m-0 min-w-0 space-y-5 border-0 p-0"
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First name</Label>
+
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="Jane"
+                    autoComplete="given-name"
+                    {...register("firstName")}
+                  />
+
+                  {errors.firstName && (
+                    <p className="text-sm text-destructive">
+                      {errors.firstName.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last name</Label>
+
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Doe"
+                    autoComplete="family-name"
+                    {...register("lastName")}
+                  />
+
+                  {errors.lastName && (
+                    <p className="text-sm text-destructive">
+                      {errors.lastName.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
+                <Label htmlFor="email">Email</Label>
 
                 <Input
-                  id="firstName"
-                  type="text"
-                  placeholder="Jane"
-                  autoComplete="given-name"
-                  {...register("firstName")}
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  {...register("email")}
                 />
 
-                {errors.firstName && (
+                {errors.email && (
                   <p className="text-sm text-destructive">
-                    {errors.firstName.message}
+                    {errors.email.message}
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
+                <Label htmlFor="phone">Phone (optional)</Label>
 
                 <Input
-                  id="lastName"
-                  type="text"
-                  placeholder="Doe"
-                  autoComplete="family-name"
-                  {...register("lastName")}
+                  id="phone"
+                  type="tel"
+                  placeholder="+94 71 234 5678"
+                  autoComplete="tel"
+                  {...register("phone")}
                 />
 
-                {errors.lastName && (
+                {errors.phone && (
                   <p className="text-sm text-destructive">
-                    {errors.lastName.message}
+                    {errors.phone.message}
                   </p>
                 )}
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
 
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                autoComplete="email"
-                {...register("email")}
-              />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Create a password"
+                  autoComplete="new-password"
+                  {...register("password")}
+                />
 
-              {errors.email && (
-                <p className="text-sm text-destructive">
-                  {errors.email.message}
-                </p>
+                {errors.password ? (
+                  <p className="text-sm text-destructive">
+                    {errors.password.message}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    At least 8 characters, with an uppercase letter, a
+                    lowercase letter, and a number.
+                  </p>
+                )}
+              </div>
+
+              {serverError && (
+                <p className="text-sm text-destructive">{serverError}</p>
               )}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone (optional)</Label>
-
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="+94 71 234 5678"
-                autoComplete="tel"
-                {...register("phone")}
-              />
-
-              {errors.phone && (
-                <p className="text-sm text-destructive">
-                  {errors.phone.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-
-              <Input
-                id="password"
-                type="password"
-                placeholder="Create a password"
-                autoComplete="new-password"
-                {...register("password")}
-              />
-
-              {errors.password ? (
-                <p className="text-sm text-destructive">
-                  {errors.password.message}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  At least 8 characters, with an uppercase letter, a
-                  lowercase letter, and a number.
-                </p>
-              )}
-            </div>
-
-            {serverError && (
-              <p className="text-sm text-destructive">{serverError}</p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creating account..." : "Create account"}
-            </Button>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Creating account..." : "Create account"}
+              </Button>
+            </fieldset>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">

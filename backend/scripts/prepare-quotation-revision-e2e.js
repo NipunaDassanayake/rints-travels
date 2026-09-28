@@ -1,37 +1,24 @@
-const path = require("path");
 const crypto = require("crypto");
 
 /**
  * =========================================================
- * Load Backend Environment
+ * Environment + Production / Local-Only Protection
  * =========================================================
  *
- * This script may be executed from the frontend directory
- * by Playwright.
- *
- * Therefore explicitly load backend/.env instead of
- * depending on the current terminal working directory.
+ * This script creates artificial E2E data. It loads
+ * backend/.env explicitly (Playwright runs it from the
+ * frontend directory) and refuses to run in production or
+ * against a non-local database.
  */
 
-require("dotenv").config({
-  path: path.resolve(__dirname, "../.env"),
-});
+const {
+  loadBackendEnv,
+  assertSafeE2EEnvironment,
+} = require("./lib/e2e-guards");
 
-/**
- * =========================================================
- * Production Protection
- * =========================================================
- *
- * This script creates artificial E2E data.
- *
- * It must NEVER run against production.
- */
+loadBackendEnv();
 
-if (process.env.NODE_ENV === "production") {
-  console.error("E2E fixture creation is disabled in production.");
-
-  process.exit(1);
-}
+assertSafeE2EEnvironment("Quotation revision E2E fixture");
 
 const prisma = require("../src/config/prisma");
 
