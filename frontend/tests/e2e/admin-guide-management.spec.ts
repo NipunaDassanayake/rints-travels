@@ -130,6 +130,27 @@ async function loginAsAdmin(page: Page) {
 }
 
 /**
+ * Public pages are server-rendered, so their content appears
+ * before the client-side session restore finishes. Navigating
+ * away during that restore can lose the rotated session. Wait
+ * for the signed-in admin's navbar state, which only renders
+ * once the restore has completed.
+ */
+async function waitForAuthenticatedPublicNavbar(page: Page, isMobile: boolean) {
+  if (isMobile) {
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+
+    await expect(
+      page.getByRole("link", { name: "Admin portal" }),
+    ).toBeVisible();
+  } else {
+    await expect(
+      page.getByRole("button", { name: /Administrator$/ }),
+    ).toBeVisible();
+  }
+}
+
+/**
  * =========================================================
  * Prepare Fresh Backend Fixture
  * =========================================================
@@ -287,7 +308,18 @@ test.describe("Travora admin guide management", () => {
 
     await expect(page).toHaveURL("/admin/guides");
 
-    await expect(page.getByText("Galle, Sri Lanka")).toBeVisible();
+    /**
+     * Scope to Guide A's own card, identified by its edit link
+     * (which carries the guide's ID): other guides in the list
+     * may share the same location.
+     */
+    const guideACard = page.locator('[data-slot="card"]').filter({
+      has: page.locator(`a[href="/admin/guides/${guideAId}/edit"]`),
+    });
+
+    await expect(
+      guideACard.getByText("Galle, Sri Lanka", { exact: true }),
+    ).toBeVisible();
   });
 
   test("admin creates a second guide for the eligible-deactivation scenario", async ({
@@ -334,6 +366,7 @@ test.describe("Travora admin guide management", () => {
 
   test("marking a guide unavailable excludes it from public discovery but keeps the profile reachable", async ({
     page,
+    isMobile,
   }) => {
     if (!guideAId) {
       throw new Error("Guide A was not created.");
@@ -370,6 +403,12 @@ test.describe("Travora admin guide management", () => {
     await page.goto("/guides");
 
     await expect(
+      page.getByRole("heading", { level: 1, name: "Meet our tour guides" }),
+    ).toBeVisible();
+
+    await waitForAuthenticatedPublicNavbar(page, isMobile);
+
+    await expect(
       page.getByText(GUIDE_A_NAME, { exact: true }),
     ).toHaveCount(0);
 
@@ -389,6 +428,8 @@ test.describe("Travora admin guide management", () => {
         level: 1,
       }),
     ).toBeVisible();
+
+    await waitForAuthenticatedPublicNavbar(page, isMobile);
 
     /**
      * The public projection must never expose account
@@ -478,9 +519,11 @@ test.describe("Travora admin guide management", () => {
 
     expect(assignResponse.ok()).toBeTruthy();
 
-    await expect(
-      page.getByText(GUIDE_A_NAME, { exact: true }),
-    ).toBeVisible();
+    const currentGuide = page
+      .getByText("Current guide", { exact: true })
+      .locator("xpath=following-sibling::p[1]");
+
+    await expect(currentGuide).toHaveText(GUIDE_A_NAME);
 
     /**
      * Attempt deactivation: must be blocked.
@@ -519,6 +562,7 @@ test.describe("Travora admin guide management", () => {
 
   test("guide completes the tour and receives a review, then can be safely deactivated with history preserved", async ({
     page,
+    isMobile,
   }) => {
     if (!guideAId || !fixture) {
       throw new Error("Guide A or the booking fixture is missing.");
@@ -572,9 +616,11 @@ test.describe("Travora admin guide management", () => {
 
     await page.getByRole("button", { name: "Rate 5 out of 5" }).click();
 
+    const reviewComment = `Playwright admin-guide-management review ${uniqueSuffix}`;
+
     await page
       .getByLabel("Tell us about your experience")
-      .fill(`Playwright admin-guide-management review ${uniqueSuffix}`);
+      .fill(reviewComment);
 
     const reviewResponsePromise = page.waitForResponse(
       (response) =>
@@ -584,11 +630,25 @@ test.describe("Travora admin guide management", () => {
 
     await page.getByRole("button", { name: "Submit review" }).click();
 
-    await reviewResponsePromise;
+    const reviewResponse = await reviewResponsePromise;
+
+    expect(reviewResponse.ok()).toBeTruthy();
+
+    /**
+     * Durable outcome: the saved review, rendered from server
+     * state. (The "Thank you" message is transient: it is
+     * replaced by the saved review as soon as the refetch
+     * completes.)
+     */
+    await expect(
+      page.getByText("Your review", { exact: true }),
+    ).toBeVisible({ timeout: 10_000 });
 
     await expect(
-      page.getByText("Thank you for your review", { exact: true }),
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByText(reviewComment, { exact: true }),
+    ).toBeVisible();
+
+    await expect(page.getByText("5/5", { exact: true })).toBeVisible();
 
     /**
      * Booking is now COMPLETED: deactivation is now eligible.
@@ -626,6 +686,12 @@ test.describe("Travora admin guide management", () => {
     await page.goto("/guides");
 
     await expect(
+      page.getByRole("heading", { level: 1, name: "Meet our tour guides" }),
+    ).toBeVisible();
+
+    await waitForAuthenticatedPublicNavbar(page, isMobile);
+
+    await expect(
       page.getByText(GUIDE_A_NAME, { exact: true }),
     ).toHaveCount(0);
 
@@ -647,9 +713,11 @@ test.describe("Travora admin guide management", () => {
 
     await page.goto(`/admin/bookings/${bookingId}`);
 
-    await expect(
-      page.getByText(GUIDE_A_NAME, { exact: true }).first(),
-    ).toBeVisible();
+    const currentGuide = page
+      .getByText("Current guide", { exact: true })
+      .locator("xpath=following-sibling::p[1]");
+
+    await expect(currentGuide).toHaveText(GUIDE_A_NAME);
 
     await expect(
       page.getByText("Completed", { exact: true }).first(),
