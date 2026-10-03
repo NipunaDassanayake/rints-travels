@@ -328,16 +328,18 @@ test.describe("Travora booking lifecycle", () => {
     expect(assignResponse.ok()).toBeTruthy();
 
     /**
-     * Verify the actual rendered current-guide area,
-     * rather than asserting visibility of the hidden
-     * <option>.
+     * Verify the persisted assignment in the "Current guide"
+     * field. The guide's name legitimately appears in several
+     * places (Trip details, Current guide and, until the
+     * refetch completes, the selected-guide preview), so a
+     * page-wide text match is ambiguous and timing-dependent.
      */
 
-    await expect(
-      page.getByText(GUIDE_NAME, {
-        exact: true,
-      }),
-    ).toBeVisible({
+    const currentGuide = page
+      .getByText("Current guide", { exact: true })
+      .locator("xpath=following-sibling::p[1]");
+
+    await expect(currentGuide).toHaveText(GUIDE_NAME, {
       timeout: 10_000,
     });
 
@@ -601,13 +603,32 @@ test.describe("Travora booking lifecycle", () => {
      * =================================================
      */
 
+    /**
+     * Durable outcome: the saved review, rendered from server
+     * state. (The "Thank you" message is transient: it is
+     * replaced by the saved review as soon as the refetch
+     * completes.)
+     */
+
     await expect(
-      page.getByText("Thank you for your review", {
+      page.getByText("Your review", {
         exact: true,
       }),
     ).toBeVisible({
       timeout: 10_000,
     });
+
+    await expect(
+      page.getByText(reviewComment, {
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      page.getByText("5/5", {
+        exact: true,
+      }),
+    ).toBeVisible();
 
     console.log("Booking lifecycle completed successfully:", bookingId);
 
