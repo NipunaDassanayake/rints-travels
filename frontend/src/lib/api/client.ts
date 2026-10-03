@@ -50,19 +50,51 @@ apiClient.interceptors.request.use(
 );
 
 /*
- * Prevent multiple simultaneous 401 responses
- * from creating multiple refresh requests.
+ * 409 from /auth/refresh means another request (e.g. a second
+ * tab) rotated this session's refresh token a moment ago and
+ * its response -- carrying the new HttpOnly cookie -- may still
+ * be in flight. The server keeps the session and sets no cookie
+ * on a 409, so retrying is safe; the delays total well under
+ * the server's reuse grace window.
+ */
+const REFRESH_CONFLICT_RETRY_DELAYS_MS = [300, 1_000, 3_000];
+
+const wait = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+const requestNewAccessToken = async (): Promise<string> => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await refreshClient.post("/auth/refresh");
+
+      return response.data.data.accessToken;
+    } catch (error) {
+      const isConflict =
+        axios.isAxiosError(error) &&
+        error.response?.status === 409;
+
+      if (
+        !isConflict ||
+        attempt >= REFRESH_CONFLICT_RETRY_DELAYS_MS.length
+      ) {
+        throw error;
+      }
+
+      await wait(REFRESH_CONFLICT_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+};
+
+/*
+ * Single flight: every caller in this tab (session restore,
+ * simultaneous 401 responses) shares one refresh request.
  */
 let refreshPromise: Promise<string> | null = null;
 
-const getNewAccessToken = async () => {
+export const refreshAccessToken = async () => {
   if (!refreshPromise) {
-    refreshPromise = refreshClient
-      .post("/auth/refresh")
-      .then((response) => {
-        const newAccessToken =
-          response.data.data.accessToken;
-
+    refreshPromise = requestNewAccessToken()
+      .then((newAccessToken) => {
         tokenStore.setAccessToken(
           newAccessToken
         );
@@ -118,7 +150,7 @@ apiClient.interceptors.response.use(
 
     try {
       const newAccessToken =
-        await getNewAccessToken();
+        await refreshAccessToken();
 
       originalRequest.headers.Authorization =
         `Bearer ${newAccessToken}`;

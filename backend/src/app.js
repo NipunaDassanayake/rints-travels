@@ -3,6 +3,7 @@ const path = require("path");
 
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
 
 const env = require("./config/env");
 
@@ -18,6 +19,26 @@ const paymentsController = require("./modules/payments/payments.controller");
 const { sendSuccess } = require("./utils/apiResponse");
 
 const app = express();
+
+/**
+ * =========================================================
+ * Proxy trust
+ * =========================================================
+ *
+ * Off unless TRUST_PROXY is configured: req.ip (used for
+ * session metadata and auth rate limiting) is then the socket
+ * address and a client-supplied X-Forwarded-For is ignored.
+ */
+app.set("trust proxy", env.trustProxy);
+
+/**
+ * =========================================================
+ * Security headers
+ * =========================================================
+ *
+ * Also removes X-Powered-By.
+ */
+app.use(helmet());
 
 /**
  * =========================================================
@@ -98,8 +119,20 @@ app.use(requestLogger);
  *
  * IMPORTANT:
  * This must be BEFORE notFoundHandler.
+ *
+ * Uploaded images are public and loaded directly by the
+ * frontend's browser from another origin (next/image
+ * "unoptimized"), so they opt out of helmet's same-origin
+ * Cross-Origin-Resource-Policy.
  */
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static(path.join(process.cwd(), "uploads")),
+);
 
 /**
  * =========================================================
