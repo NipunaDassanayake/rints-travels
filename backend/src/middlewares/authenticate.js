@@ -49,24 +49,43 @@ const authenticate = async (req, res, next) => {
       );
     }
 
+    /*
+     * Access tokens are bound to their login session (sid).
+     * Tokens without one (issued before CR-012) are rejected
+     * with 401; the client then refreshes transparently.
+     */
     if (
       payload.type !== TOKEN_TYPES.ACCESS ||
-      !payload.sub
+      !payload.sub ||
+      !payload.sid
     ) {
       throw new UnauthorizedError(
         AUTH_MESSAGES.INVALID_ACCESS_TOKEN
       );
     }
 
-    const user = await authRepository.findUserById(
-      payload.sub
-    );
+    /*
+     * One query: the session with its user. Logout, logout-all,
+     * reuse revocation and session expiry therefore take effect
+     * on the very next request, not when the token expires.
+     */
+    const session =
+      await authRepository.findRefreshTokenBySessionId(
+        payload.sid
+      );
 
-    if (!user) {
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.revokedAt ||
+      session.expiresAt <= new Date()
+    ) {
       throw new UnauthorizedError(
         AUTH_MESSAGES.INVALID_ACCESS_TOKEN
       );
     }
+
+    const { user } = session;
 
     if (user.status !== USER_STATUS.ACTIVE) {
       throw new ForbiddenError(
@@ -82,6 +101,7 @@ const authenticate = async (req, res, next) => {
 
     req.auth = {
       tokenPayload: payload,
+      sessionId: session.sessionId,
     };
 
     next();

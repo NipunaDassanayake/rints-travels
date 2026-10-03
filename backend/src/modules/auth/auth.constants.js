@@ -11,6 +11,7 @@ const AUTH_MESSAGES = {
   ACCOUNT_NOT_ACTIVE: "This account is not active",
   REFRESH_TOKEN_REQUIRED: "Refresh token is required",
   INVALID_REFRESH_TOKEN: "Invalid or expired refresh token",
+  REFRESH_IN_PROGRESS: "This session was just refreshed. Please retry.",
 
   ACCESS_TOKEN_REQUIRED: "Access token is required",
   INVALID_ACCESS_TOKEN: "Invalid or expired access token",

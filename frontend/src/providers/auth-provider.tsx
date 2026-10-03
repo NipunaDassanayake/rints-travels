@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import { apiClient } from "@/lib/api/client";
+import { apiClient, refreshAccessToken } from "@/lib/api/client";
 import { tokenStore } from "@/lib/auth/tokenStore";
 
 import type { AuthUser, LoginRequest } from "@/features/auth/auth.types";
@@ -27,11 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
-      const refreshResponse = await apiClient.post("/auth/refresh");
-
-      const accessToken = refreshResponse.data.data.accessToken;
-
-      tokenStore.setAccessToken(accessToken);
+      // Shared single-flight refresh (stores the new access token).
+      await refreshAccessToken();
 
       const meResponse = await apiClient.get("/auth/me");
 
