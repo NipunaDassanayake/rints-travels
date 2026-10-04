@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { ArrowRight, Clock3, ImageOff, MapPin } from "lucide-react";
 
+import { formatUsdPrice } from "@/lib/format";
+
 import { getPackageImageUrl } from "../admin-package.api";
 
 import type { TravelPackage } from "../package.types";
@@ -53,6 +55,8 @@ export function PackageCard({
     ? getPackageImageUrl(primaryImage.imageUrl)
     : null;
 
+  const price = formatUsdPrice(travelPackage.price);
+
   const durationLabel = `${travelPackage.durationDays} ${
     travelPackage.durationDays === 1 ? "day" : "days"
   }`;
@@ -85,9 +89,10 @@ export function PackageCard({
 
       {/* Package Content */}
       <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
-          <MapPin aria-hidden="true" className="size-4 shrink-0" />
-          {travelPackage.destination}
+        <p className="flex items-start gap-1.5 text-caption text-muted-foreground">
+          <MapPin aria-hidden="true" className="mt-px size-4 shrink-0" />
+          {/* Long routes may wrap; never beyond two lines. */}
+          <span className="line-clamp-2">{travelPackage.destination}</span>
         </p>
 
         <Heading className="mt-2 font-display text-heading-md text-foreground">
@@ -99,22 +104,24 @@ export function PackageCard({
           </Link>
         </Heading>
 
-        <p className="mt-3 line-clamp-3 text-body-sm text-foreground-secondary">
+        <p className="mt-3 line-clamp-2 text-body-sm text-foreground-secondary">
           {travelPackage.description}
         </p>
 
-        {/* Price */}
+        {/* Price (omitted rather than shown as "$NaN" if the value is unusable) */}
         <div className="mt-auto pt-5">
           <div className="flex items-end justify-between gap-4 border-t border-border pt-4">
-            <div>
-              <p className="text-caption text-muted-foreground">Starting from</p>
+            {price && (
+              <div>
+                <p className="text-caption text-muted-foreground">Starting from</p>
 
-              <p className="text-heading-sm text-foreground">${travelPackage.price}</p>
-            </div>
+                <p className="text-heading-sm text-foreground">{price}</p>
+              </div>
+            )}
 
             <span
               aria-hidden="true"
-              className="inline-flex items-center gap-1.5 text-label text-tea-700"
+              className="ml-auto inline-flex items-center gap-1.5 text-label text-tea-700"
             >
               View package
               <ArrowRight className="size-4 transition-transform duration-fast group-hover:translate-x-1 motion-reduce:transition-none" />

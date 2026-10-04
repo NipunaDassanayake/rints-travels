@@ -4,16 +4,31 @@ import { ArrowRight } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 
+import { cn } from "@/lib/utils";
+
 /*
  * Final custom-trip CTA (CR-029). Solid Rainforest Ink with a Tea
  * Green glow until a licensed background photograph is supplied.
  * The primary action keeps the existing /tourist/requests/new
  * behaviour (RoleGuard sends guests to sign in first).
+ *
+ * Also closes /packages (Stage 3C), where "Browse packages" would
+ * link to the page itself, so that page turns it off and trims
+ * the top spacing.
  */
 
-export function CustomTripCta() {
+export function CustomTripCta({
+  showBrowseLink = true,
+  className,
+}: {
+  showBrowseLink?: boolean;
+  className?: string;
+}) {
   return (
-    <section aria-labelledby="custom-trip-heading" className="bg-background py-20 sm:py-24">
+    <section
+      aria-labelledby="custom-trip-heading"
+      className={cn("bg-background py-20 sm:py-24", className)}
+    >
       <div className="mx-auto max-w-wide px-4 sm:px-6 lg:px-8">
         <div
           data-surface="dark"
@@ -51,12 +66,14 @@ export function CustomTripCta() {
                 <ArrowRight aria-hidden="true" />
               </Link>
 
-              <Link
-                href="/packages"
-                className={`${buttonVariants({ variant: "ghost", size: "lg" })} border border-white/25 text-ivory hover:bg-white/10 hover:text-ivory`}
-              >
-                Browse packages
-              </Link>
+              {showBrowseLink && (
+                <Link
+                  href="/packages"
+                  className={`${buttonVariants({ variant: "ghost", size: "lg" })} border border-white/25 text-ivory hover:bg-white/10 hover:text-ivory`}
+                >
+                  Browse packages
+                </Link>
+              )}
             </div>
           </div>
         </div>

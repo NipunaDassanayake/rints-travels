@@ -55,3 +55,51 @@ export function formatMoney(
 ) {
   return `${currency ?? ""} ${amount ?? ""}`.trim();
 }
+
+const usdWhole = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+const usdCents = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Plain non-negative decimal, as the API serializes Prisma Decimals ("1650", "680.5"). */
+const DECIMAL_STRING = /^\d+(\.\d+)?$/;
+
+/**
+ * Public package price in USD (CR-029): "$1,650", "$680",
+ * "$680.50", "$1,234.56". Whole amounts show no decimals;
+ * anything with cents shows exactly two.
+ *
+ * Unlike formatMoney (kept byte-identical for portal pages), this
+ * is a deliberate, locale-aware public format. Packages carry no
+ * currency field; USD is the existing package convention.
+ *
+ * Returns null for anything that is not a finite, non-negative
+ * amount (empty, non-numeric, "0x10", "1e5", NaN, Infinity) so
+ * callers can omit the price instead of showing "$NaN".
+ */
+export function formatUsdPrice(amount: string | number | null | undefined): string | null {
+  let value = Number.NaN;
+
+  if (typeof amount === "number") {
+    value = amount;
+  } else if (typeof amount === "string" && DECIMAL_STRING.test(amount.trim())) {
+    value = Number(amount.trim());
+  }
+
+  if (!Number.isFinite(value) || value < 0) {
+    return null;
+  }
+
+  const cents = Math.round(value * 100);
+
+  return cents % 100 === 0 ? usdWhole.format(cents / 100) : usdCents.format(cents / 100);
+}
