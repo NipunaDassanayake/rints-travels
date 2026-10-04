@@ -1,12 +1,26 @@
 import Link from "next/link";
 
-import { ArrowRight, Languages, MapPin, Star, UserRound } from "lucide-react";
+import { ArrowRight, MapPin, Star } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+
+import { cn } from "@/lib/utils";
 
 import { getTourGuides } from "@/features/tour-guides/tour-guide.api";
 
 import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
+
+import { GuideMonogram } from "./guide-monogram";
+
+import { PublicSection } from "./public-section";
+
+import { SnapRow } from "./snap-row";
+
+/*
+ * Meet local guides (CR-029): up to three available guides, from
+ * public guide data only (no portraits, credentials or trip
+ * counts). Hidden when there are no guides or the request fails.
+ */
 
 export async function LocalGuides() {
   let guides: TourGuide[] = [];
@@ -32,173 +46,127 @@ export async function LocalGuides() {
     return null;
   }
 
+  const single = featuredGuides.length === 1;
+
   return (
-    <section className="bg-white py-20 sm:py-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Local experts
-            </p>
+    <PublicSection
+      id="local-guides"
+      overline="Local guides"
+      title="Travel with people who know the island"
+      description="Our local guides bring the stories, routes and quiet corners that make a trip feel personal."
+      action={
+        <Link href="/guides" className={buttonVariants({ variant: "outline" })}>
+          Meet all our guides
+          <ArrowRight aria-hidden="true" />
+        </Link>
+      }
+    >
+      {single ? (
+        /* One guide: a single wide card, no scrolling row. */
+        <ul className="mt-10 max-w-3xl">
+          <li>
+            <GuideCard guide={featuredGuides[0]} wide />
+          </li>
+        </ul>
+      ) : (
+        <SnapRow
+          className={cn(
+            "mt-10 -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6",
+            "md:mx-0 md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3",
+            "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          )}
+        >
+          {featuredGuides.map((guide) => (
+            <li key={guide.id} className="w-[85%] shrink-0 snap-start md:w-auto">
+              <GuideCard guide={guide} wide={false} />
+            </li>
+          ))}
+        </SnapRow>
+      )}
+    </PublicSection>
+  );
+}
 
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Meet the people behind the journey
-            </h2>
+function GuideCard({ guide, wide }: { guide: TourGuide; wide: boolean }) {
+  const { firstName, lastName } = guide.user;
 
-            <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-              Discover experienced local guides who know Sri Lanka&apos;s
-              landscapes, culture, stories, and hidden places beyond the usual
-              tourist trail.
-            </p>
-          </div>
+  const rating = Number(guide.averageRating) || 0;
 
+  return (
+    <article
+      className={cn(
+        "group relative flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-xs transition-shadow duration-base ease-standard hover:shadow-md motion-reduce:transition-none",
+        wide && "sm:flex-row sm:gap-8 sm:p-8",
+      )}
+    >
+      <GuideMonogram
+        firstName={firstName}
+        lastName={lastName}
+        size={wide ? "lg" : "md"}
+      />
+
+      <div className="mt-5 flex flex-1 flex-col sm:mt-0">
+        <h3 className={cn("font-display text-heading-md text-foreground", !wide && "sm:mt-5")}>
           <Link
-            href="/guides"
-            className={buttonVariants({
-              variant: "outline",
-            })}
+            href={`/guides/${guide.id}`}
+            className="rounded-sm after:absolute after:inset-0 after:content-['']"
           >
-            View all guides
-            <ArrowRight className="size-4" />
+            {firstName} {lastName}
           </Link>
-        </div>
+        </h3>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {featuredGuides.map((guide: TourGuide) => {
-            const fullName = `${guide.user.firstName} ${guide.user.lastName}`;
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-muted-foreground">
+          {guide.location && (
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin aria-hidden="true" className="size-4" />
+              {guide.location}
+            </span>
+          )}
 
-            const rating = Number(guide.averageRating) || 0;
+          <span>
+            {guide.experienceYears} {guide.experienceYears === 1 ? "year" : "years"} guiding
+          </span>
 
-            return (
-              <article
-                key={guide.id}
-                className="group overflow-hidden rounded-[24px] border bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+          {guide.totalReviews > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Star aria-hidden="true" className="size-4 fill-cinnamon-400 text-cinnamon-400" />
+              {rating.toFixed(1)} · {guide.totalReviews}{" "}
+              {guide.totalReviews === 1 ? "review" : "reviews"}
+            </span>
+          )}
+        </p>
+
+        {guide.bio && (
+          <p className="mt-4 line-clamp-2 text-body-sm text-foreground-secondary">{guide.bio}</p>
+        )}
+
+        {guide.languages.length > 0 && (
+          <ul aria-label="Languages" className="mt-4 flex flex-wrap gap-2">
+            {guide.languages.slice(0, 3).map((language) => (
+              <li
+                key={language}
+                className="rounded-full bg-sand-100 px-3 py-1 text-caption text-foreground"
               >
-                <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
-                  <div className="flex size-28 items-center justify-center rounded-full bg-white shadow-sm">
-                    <UserRound className="size-14 text-slate-400" />
-                  </div>
+                {language}
+              </li>
+            ))}
+          </ul>
+        )}
 
-                  <div className="absolute left-4 top-4">
-                    <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-slate-950 shadow-sm">
-                      Available
-                    </span>
-                  </div>
-                </div>
+        {guide.specializations.length > 0 && (
+          <p className="mt-3 text-caption text-muted-foreground">
+            {guide.specializations.slice(0, 3).join(" · ")}
+          </p>
+        )}
 
-                <div className="space-y-5 p-6">
-                  <div>
-                    <h3 className="text-xl font-semibold tracking-tight text-slate-950">
-                      {fullName}
-                    </h3>
-
-                    <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      {guide.location && (
-                        <span className="flex items-center gap-1.5">
-                          <MapPin className="size-4" />
-                          {guide.location}
-                        </span>
-                      )}
-
-                      <span className="flex items-center gap-1.5">
-                        <Star className="size-4" />
-
-                        {rating.toFixed(1)}
-
-                        {guide.totalReviews > 0 && (
-                          <span>({guide.totalReviews})</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
-                    {guide.bio ||
-                      "An experienced local guide ready to help you explore Sri Lanka."}
-                  </p>
-
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Experience
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-slate-950">
-                      {guide.experienceYears}{" "}
-                      {guide.experienceYears === 1 ? "year" : "years"}
-                    </p>
-                  </div>
-
-                  {guide.languages.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Languages className="size-4 text-muted-foreground" />
-
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          Languages
-                        </p>
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {guide.languages.slice(0, 4).map((language: string) => (
-                          <span
-                            key={language}
-                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                          >
-                            {language}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {guide.specializations.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Specializes in
-                      </p>
-
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {guide.specializations
-                          .slice(0, 3)
-                          .map((specialization: string) => (
-                            <span
-                              key={specialization}
-                              className="rounded-full border px-3 py-1 text-xs text-slate-700"
-                            >
-                              {specialization}
-                            </span>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-end justify-between gap-4 border-t pt-5">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Daily rate
-                      </p>
-
-                      <p className="mt-1 font-semibold text-slate-950">
-                        {guide.dailyRate
-                          ? `$${guide.dailyRate}`
-                          : "Contact for rate"}
-                      </p>
-                    </div>
-
-                    <Link
-                      href={`/guides/${guide.id}`}
-                      className="group/link inline-flex items-center gap-2 text-sm font-semibold text-slate-950"
-                    >
-                      View guide
-                      <ArrowRight className="size-4 transition-transform group-hover/link:translate-x-1" />
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        <span
+          aria-hidden="true"
+          className="mt-auto inline-flex items-center gap-1.5 pt-5 text-label text-tea-700"
+        >
+          Meet {firstName}
+          <ArrowRight className="size-4 transition-transform duration-fast group-hover:translate-x-1 motion-reduce:transition-none" />
+        </span>
       </div>
-    </section>
+    </article>
   );
 }

@@ -6,9 +6,23 @@ import type {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export async function getPackages(): Promise<PackageListData> {
+/**
+ * Public package list. `destination` uses the API's existing
+ * case-insensitive "contains" filter on the package destination.
+ */
+export async function getPackages(
+  filters: { destination?: string } = {},
+): Promise<PackageListData> {
+  const query = new URLSearchParams();
+
+  if (filters.destination) {
+    query.set("destination", filters.destination);
+  }
+
+  const queryString = query.toString();
+
   const response = await fetch(
-    `${API_BASE_URL}/packages`,
+    `${API_BASE_URL}/packages${queryString ? `?${queryString}` : ""}`,
     {
       next: {
         revalidate: 60,

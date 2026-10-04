@@ -1,90 +1,70 @@
-import Link from "next/link";
+import Image from "next/image";
 
-import { CalendarDays, MapPin, Search, Users } from "lucide-react";
+import heroImage from "../../../public/images/home/sri-lanka-hero.jpg";
 
-import { buttonVariants } from "@/components/ui/button";
+import { DestinationSearch } from "./destination-search";
+
+/*
+ * Homepage hero (CR-029). The photograph is the LCP element:
+ * next/image loaded eagerly at high fetch priority (Next 16
+ * deprecates `priority`), a blur placeholder and a fixed-height
+ * frame (no layout shift). One source serves every width; the
+ * focal point moves so phones keep the train and the bridge.
+ *
+ * Text contrast comes from Rainforest Ink scrims, not from the
+ * photograph: a bottom scrim on phones (copy sits low, under the
+ * train) and a left scrim from `lg` (copy sits left of the train).
+ */
 
 export function HomeHero() {
   return (
-    <section className="relative overflow-hidden bg-slate-950">
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: "url('/images/home/sri-lanka-hero.jpg')",
-        }}
-      />
+    <section aria-labelledby="home-hero-heading" className="relative">
+      <div data-surface="dark" className="relative isolate overflow-hidden bg-ink-950">
+        <Image
+          src={heroImage}
+          alt="A blue train crossing the Nine Arch Bridge near Ella at sunrise"
+          fill
+          loading="eager"
+          fetchPriority="high"
+          placeholder="blur"
+          sizes="100vw"
+          className="-z-20 object-cover object-[46%_38%] lg:object-[50%_8%]"
+        />
 
-      <div className="absolute inset-0 bg-black/45" />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950/95 via-ink-950/65 via-45% to-ink-950/5 lg:bg-gradient-to-r lg:from-ink-950/80 lg:via-ink-950/60 lg:via-40% lg:to-ink-950/0 lg:to-75%"
+        />
 
-      <div className="relative mx-auto flex min-h-[620px] max-w-7xl flex-col justify-center px-4 py-20 sm:px-6 lg:px-8">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80">
-            Discover Sri Lanka
-          </p>
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 -z-10 hidden h-48 bg-gradient-to-t from-ink-950/70 to-transparent lg:block"
+        />
 
-          <h1 className="mt-4 text-5xl font-bold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
-            Your journey,
-            <br />
-            your way.
-          </h1>
+        <div className="mx-auto flex min-h-[40rem] max-w-wide flex-col justify-end px-4 pb-16 pt-48 sm:px-6 lg:min-h-[42rem] lg:justify-start lg:px-8 lg:pb-44 lg:pt-20">
+          <div className="max-w-xl">
+            <p className="text-overline text-tea-100">Sri Lanka, considered</p>
 
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
-            Curated journeys, trusted local guides, and travel experiences
-            designed around you.
-          </p>
-        </div>
-
-        <div className="mt-10 rounded-2xl bg-white p-3 shadow-2xl">
-          <div className="grid gap-3 lg:grid-cols-[1.25fr_1fr_1fr_auto]">
-            <div className="flex items-center gap-3 rounded-xl border px-4 py-3">
-              <MapPin className="size-5 shrink-0 text-muted-foreground" />
-
-              <div>
-                <p className="text-xs text-muted-foreground">Destination</p>
-
-                <p className="font-medium">Where do you want to go?</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-xl border px-4 py-3">
-              <CalendarDays className="size-5 shrink-0 text-muted-foreground" />
-
-              <div>
-                <p className="text-xs text-muted-foreground">Travel dates</p>
-
-                <p className="font-medium">Choose your dates</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-xl border px-4 py-3">
-              <Users className="size-5 shrink-0 text-muted-foreground" />
-
-              <div>
-                <p className="text-xs text-muted-foreground">Travelers</p>
-
-                <p className="font-medium">2 travelers</p>
-              </div>
-            </div>
-
-            <Link
-              href="/packages"
-              className={`${buttonVariants({
-                size: "lg",
-              })} min-h-14 px-7`}
+            <h1
+              id="home-hero-heading"
+              className="mt-4 text-balance font-display text-display-md text-ivory sm:text-display-lg lg:text-display-xl"
             >
-              <Search className="size-5" />
-              Explore
-            </Link>
+              Sri Lanka, shaped around you.
+            </h1>
+
+            <p className="mt-5 max-w-lg text-body-lg text-ink-100">
+              Start with one of our journeys or tell us what you have in mind.
+              We&apos;ll shape the route, stays and local guide around you.
+            </p>
           </div>
         </div>
+      </div>
 
-        <div className="mt-5">
-          <Link
-            href="/tourist/requests/new"
-            className="text-sm font-medium text-white underline-offset-4 hover:underline"
-          >
-            Prefer something unique? Plan a custom trip →
-          </Link>
+      {/* Discovery panel: bridges the photograph and the page below. */}
+
+      <div className="relative z-10 mx-auto -mt-12 max-w-wide px-4 sm:px-6 lg:-mt-24 lg:px-8">
+        <div className="max-w-3xl">
+          <DestinationSearch />
         </div>
       </div>
     </section>

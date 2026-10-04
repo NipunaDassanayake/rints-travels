@@ -1,158 +1,114 @@
 import Image from "next/image";
+
 import Link from "next/link";
 
-import { ArrowUpRight, MapPin } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Mountain } from "lucide-react";
 
-const destinations = [
-  {
-    name: "Ella",
-    subtitle: "Hill Country",
-    description:
-      "Misty mountains, tea estates, scenic rail journeys and unforgettable viewpoints.",
-    image: "/images/home/destinations/ella.jpg",
-    href: "/packages?destination=Ella",
-  },
-  {
-    name: "Kandy",
-    subtitle: "Culture & Heritage",
-    description:
-      "Sacred temples, lush hills and one of Sri Lanka’s most important cultural cities.",
-    image: "/images/home/destinations/kandy.jpg",
-    href: "/packages?destination=Kandy",
-  },
-  {
-    name: "Sigiriya",
-    subtitle: "Ancient Lanka",
-    description:
-      "Explore the iconic rock fortress and discover Sri Lanka’s ancient kingdoms.",
-    image: "/images/home/destinations/sigiriya.jpg",
-    href: "/packages?destination=Sigiriya",
-  },
-  {
-    name: "Galle",
-    subtitle: "Southern Coast",
-    description:
-      "Colonial charm, tropical beaches and the historic streets of Galle Fort.",
-    image: "/images/home/destinations/galle.jpg",
-    href: "/packages?destination=Galle",
-  },
-  {
-    name: "Nuwara Eliya",
-    subtitle: "Tea Country",
-    description:
-      "Cool mountain air, endless tea plantations and beautiful highland landscapes.",
-    image: "/images/home/destinations/nuwara-eliya.jpg",
-    href: "/packages?destination=Nuwara%20Eliya",
-  },
-];
+import { buttonVariants } from "@/components/ui/button";
+
+import { cn } from "@/lib/utils";
+
+import {
+  DESTINATIONS,
+  packagesForDestination,
+  type Destination,
+} from "./destination-data";
+
+import { PublicSection } from "./public-section";
+
+import { SnapRow } from "./snap-row";
+
+/*
+ * "Where would you like to begin?" (CR-029). Desktop: a 3x2 grid.
+ * Below `lg`: a horizontal snap row with the next card peeking in,
+ * instead of six tall cards stacked. Each card is a single link;
+ * keyboard focus scrolls the row naturally.
+ */
 
 export function DestinationGrid() {
   return (
-    <section id="destinations" className="bg-white py-20 sm:py-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Explore Sri Lanka
-            </p>
-
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Places worth discovering
-            </h2>
-
-            <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-              From misty mountain towns to ancient kingdoms and golden
-              coastlines, discover destinations that make every journey feel
-              different.
-            </p>
-          </div>
-
-          <Link
-            href="/packages"
-            className="group inline-flex items-center gap-2 text-sm font-semibold text-slate-950"
+    <PublicSection
+      id="destinations"
+      overline="Explore by destination"
+      title="Where would you like to begin?"
+      description="Six places that shape a first journey through Sri Lanka. Each one opens the packages that visit it."
+      action={
+        <Link href="/packages" className={buttonVariants({ variant: "outline" })}>
+          Browse all packages
+          <ArrowRight aria-hidden="true" />
+        </Link>
+      }
+    >
+      <SnapRow
+        className={cn(
+          // py-2 (with mt-8, same position as before) keeps the cards' focus ring inside the scroll container.
+          "mt-8 -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 py-2 sm:-mx-6 sm:scroll-px-6 sm:px-6",
+          "lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-6 lg:overflow-visible lg:px-0 lg:pb-0",
+          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        )}
+      >
+        {DESTINATIONS.map((destination) => (
+          <li
+            key={destination.name}
+            className="w-[78%] shrink-0 snap-start sm:w-[44%] lg:w-auto"
           >
-            Explore all packages
-            <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </Link>
-        </div>
-
-        <div className="mt-10 grid gap-5 md:grid-cols-2">
-          {destinations.slice(0, 2).map((destination) => (
-            <DestinationCard
-              key={destination.name}
-              destination={destination}
-              large
-            />
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {destinations.slice(2).map((destination) => (
-            <DestinationCard key={destination.name} destination={destination} />
-          ))}
-        </div>
-      </div>
-    </section>
+            <DestinationCard destination={destination} />
+          </li>
+        ))}
+      </SnapRow>
+    </PublicSection>
   );
 }
 
-interface DestinationCardProps {
-  destination: (typeof destinations)[number];
+function DestinationCard({ destination }: { destination: Destination }) {
+  const captionId = `destination-${destination.query.toLowerCase().replace(/\s+/g, "-")}-caption`;
 
-  large?: boolean;
-}
-
-function DestinationCard({ destination, large = false }: DestinationCardProps) {
   return (
     <Link
-      href={destination.href}
-      className={`group relative overflow-hidden rounded-[24px] bg-slate-900 ${
-        large ? "min-h-[360px] sm:min-h-[420px]" : "min-h-[320px]"
-      }`}
+      href={packagesForDestination(destination.query)}
+      aria-label={`${destination.name}: view packages`}
+      aria-describedby={captionId}
+      className="group relative isolate flex aspect-[4/5] flex-col justify-end overflow-hidden rounded-2xl bg-ink-950 p-5 sm:p-6"
     >
-      <Image
-        src={destination.image}
-        alt={`${destination.name}, Sri Lanka`}
-        fill
-        sizes={
-          large
-            ? "(max-width: 768px) 100vw, 50vw"
-            : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        }
-        className="object-cover transition duration-700 ease-out group-hover:scale-105"
+      {destination.image ? (
+        <Image
+          src={destination.image}
+          alt={destination.imageAlt}
+          fill
+          placeholder="blur"
+          sizes="(min-width: 1024px) 30vw, (min-width: 640px) 44vw, 78vw"
+          className="-z-20 object-cover transition-transform duration-slower ease-standard group-hover:scale-105 motion-reduce:transition-none"
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-20 bg-[radial-gradient(120%_80%_at_80%_0%,var(--color-tea-700),transparent_60%),linear-gradient(160deg,var(--color-tea-900),var(--color-ink-950))]"
+        >
+          <Mountain className="absolute right-6 top-6 size-16 text-tea-300/30" />
+        </div>
+      )}
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950/95 via-ink-950/65 via-45% to-ink-950/0"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/5" />
+      <p className="text-overline text-tea-200">{destination.region}</p>
 
-      <div className="absolute inset-x-0 bottom-0 z-10 p-6 sm:p-7">
-        <div className="flex items-start justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-2 text-white/75">
-              <MapPin className="size-4" />
+      <div className="mt-2 flex items-end justify-between gap-4">
+        <h3 className="font-display text-heading-xl text-ivory">{destination.name}</h3>
 
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
-                {destination.subtitle}
-              </p>
-            </div>
-
-            <h3
-              className={`mt-2 font-bold tracking-tight text-white ${
-                large ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"
-              }`}
-            >
-              {destination.name}
-            </h3>
-
-            <p className="mt-3 max-w-lg text-sm leading-6 text-white/80">
-              {destination.description}
-            </p>
-          </div>
-
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-slate-950 transition-transform duration-300 group-hover:-translate-y-1 group-hover:translate-x-1">
-            <ArrowUpRight className="size-5" />
-          </div>
-        </div>
+        <span
+          aria-hidden="true"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ivory text-ink-950 transition-transform duration-base ease-standard group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+        >
+          <ArrowUpRight className="size-5" />
+        </span>
       </div>
+
+      <p id={captionId} className="mt-2 text-body-sm text-ink-100">
+        {destination.caption}
+      </p>
     </Link>
   );
 }
