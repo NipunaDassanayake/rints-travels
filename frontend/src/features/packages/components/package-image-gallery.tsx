@@ -4,9 +4,22 @@ import Image from "next/image";
 
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
+
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { getPackageImageUrl } from "@/features/packages/admin-package.api";
+
+import { cn } from "@/lib/utils";
 
 interface GalleryImage {
   id: number;
@@ -21,297 +34,229 @@ interface PackageImageGalleryProps {
   images: GalleryImage[];
 }
 
-export function PackageImageGallery({
-  title,
-  images,
-}: PackageImageGalleryProps) {
-  const validImages = useMemo(
-    () =>
-      [...images]
-        .filter((image) => !image.imageUrl.includes("example.com"))
-        .sort((a, b) => {
-          if (a.isPrimary && !b.isPrimary) {
-            return -1;
-          }
+/** Preview tiles shown at `sm` and up; the lightbox holds every photo. */
+const MAX_PREVIEWS = 3;
 
-          if (!a.isPrimary && b.isPrimary) {
-            return 1;
-          }
+const noopSubscribe = () => () => {};
 
-          return a.displayOrder - b.displayOrder;
-        }),
-    [images],
-  );
+/*
+ * Package gallery (CR-029 Stage 4C).
+ *
+ * Adapts to the photo count: phones show one 4:3 image; from `sm`
+ * one wide image, two equal images, or a main image with two tiles.
+ * Images keep the API order (primary first, then display order).
+ *
+ * Each preview is a figure with the real image (its alt text is the
+ * content) and a full-cover control named for the action. Without
+ * JavaScript that control is a plain link to the full-size image;
+ * once hydrated it opens an accessible lightbox built on the CR-028
+ * Dialog (focus moves in, is trapped, and returns to the opener).
+ * A <noscript> list keeps every photo reachable without JavaScript.
+ */
+export function PackageImageGallery({ title, images }: PackageImageGalleryProps) {
+  const photos = images.filter((image) => !image.imageUrl.includes("example.com"));
 
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const count = photos.length;
 
-  const isOpen = selectedIndex !== null;
+  // false on the server and during hydration, true afterwards.
+  const enhanced = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
-  const closeGallery = useCallback(() => {
-    setSelectedIndex(null);
-  }, []);
+  const [index, setIndex] = useState<number | null>(null);
 
-  const showPrevious = useCallback(() => {
-    setSelectedIndex((current) => {
-      if (current === null) {
-        return null;
-      }
+  const openerRef = useRef<HTMLElement | null>(null);
 
-      if (validImages.length === 0) {
-        return null;
-      }
-
-      return (current - 1 + validImages.length) % validImages.length;
-    });
-  }, [validImages.length]);
-
-  const showNext = useCallback(() => {
-    setSelectedIndex((current) => {
-      if (current === null) {
-        return null;
-      }
-
-      if (validImages.length === 0) {
-        return null;
-      }
-
-      return (current + 1) % validImages.length;
-    });
-  }, [validImages.length]);
-
-  /**
-   * =========================================================
-   * Keyboard controls
-   * =========================================================
-   */
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeGallery();
-      }
-
-      if (event.key === "ArrowLeft") {
-        showPrevious();
-      }
-
-      if (event.key === "ArrowRight") {
-        showNext();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, closeGallery, showPrevious, showNext]);
-
-  /**
-   * =========================================================
-   * Prevent background scrolling while lightbox is open
-   * =========================================================
-   */
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
-
-  /**
-   * =========================================================
-   * Empty gallery
-   * =========================================================
-   */
-
-  if (validImages.length === 0) {
-    return (
-      <div className="flex min-h-[520px] items-center justify-center rounded-[24px] bg-muted text-muted-foreground">
-        No image available
-      </div>
-    );
+  if (count === 0) {
+    return null;
   }
 
-  const primaryImage = validImages[0];
+  const altFor = (photo: GalleryImage) => photo.altText || title;
 
-  const secondaryImages = validImages.slice(1, 3);
+  const open = (at: number, opener: HTMLElement) => {
+    openerRef.current = opener;
+
+    setIndex(at);
+  };
+
+  const step = (delta: number) => {
+    setIndex((current) => (current === null ? current : (current + delta + count) % count));
+  };
+
+  const previews = photos.slice(0, MAX_PREVIEWS);
+
+  const layout =
+    count === 1
+      ? "sm:grid-cols-1"
+      : count === 2
+        ? "sm:grid-cols-2"
+        : "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:grid-rows-2";
+
+  const controlLabel = (at: number) => (count === 1 ? "Open photo" : `Open photo ${at + 1} of ${count}`);
+
+  const current = index === null ? null : photos[index];
 
   return (
     <>
-      {/* =====================================================
-          HERO GALLERY
-      ===================================================== */}
-
-      <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-        {/* Primary */}
-
-        <button
-          type="button"
-          onClick={() => setSelectedIndex(0)}
-          className="group relative min-h-[420px] cursor-zoom-in overflow-hidden rounded-[24px] bg-muted text-left sm:min-h-[520px]"
-          aria-label={`View ${title} image`}
-        >
-          <Image
-            src={getPackageImageUrl(primaryImage.imageUrl)}
-            alt={primaryImage.altText ?? title}
-            fill
-            unoptimized
-            priority
-            sizes="(max-width: 1024px) 100vw, 55vw"
-            className="object-cover transition duration-500 group-hover:scale-[1.02]"
-          />
-
-          <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
-
-          <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg">
-            <Images className="size-4" />
-            View photos
-          </div>
-        </button>
-
-        {/* Secondary */}
-
-        <div className="grid gap-3">
-          {secondaryImages.map((image, index) => {
-            const actualIndex = index + 1;
-
-            return (
-              <button
-                key={image.id}
-                type="button"
-                onClick={() => setSelectedIndex(actualIndex)}
-                className="group relative min-h-[200px] cursor-zoom-in overflow-hidden rounded-[24px] bg-muted sm:min-h-0"
-                aria-label={`View ${image.altText ?? title}`}
-              >
-                <Image
-                  src={getPackageImageUrl(image.imageUrl)}
-                  alt={image.altText ?? title}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 640px) 100vw, 25vw"
-                  className="object-cover transition duration-500 group-hover:scale-105"
-                />
-
-                <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
-
-                {index === 1 && validImages.length > 3 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/35">
-                    <span className="rounded-full bg-black/70 px-4 py-2 text-sm font-semibold text-white backdrop-blur">
-                      +{validImages.length - 3} more
-                    </span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-
-          {/* Empty placeholders */}
-
-          {secondaryImages.length < 2 &&
-            Array.from({
-              length: 2 - secondaryImages.length,
-            }).map((_, index) => (
-              <div
-                key={`placeholder-${index}`}
-                className="min-h-[200px] rounded-[24px] bg-muted sm:min-h-0"
-              />
-            ))}
-        </div>
-      </div>
-
-      {/* =====================================================
-          LIGHTBOX
-      ===================================================== */}
-
-      {selectedIndex !== null && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 sm:p-8"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${title} image gallery`}
-          onClick={closeGallery}
-        >
-          {/* Close */}
-
-          <button
-            type="button"
-            onClick={closeGallery}
-            className="absolute right-5 top-5 z-20 flex size-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-            aria-label="Close gallery"
-          >
-            <X className="size-6" />
-          </button>
-
-          {/* Counter */}
-
-          <div className="absolute left-5 top-5 z-20 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur">
-            {selectedIndex + 1} / {validImages.length}
-          </div>
-
-          {/* Previous */}
-
-          {validImages.length > 1 && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-
-                showPrevious();
-              }}
-              className="absolute left-3 top-1/2 z-20 flex size-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 sm:left-6"
-              aria-label="Previous image"
-            >
-              <ChevronLeft className="size-7" />
-            </button>
-          )}
-
-          {/* Image */}
-
-          <div
-            className="relative h-[80vh] w-full max-w-6xl"
-            onClick={(event) => event.stopPropagation()}
+      <div className={cn("relative grid gap-2 sm:h-80 sm:gap-3 lg:h-[26rem]", layout)}>
+        {previews.map((photo, at) => (
+          <figure
+            key={photo.id}
+            className={cn(
+              "group relative overflow-hidden rounded-2xl bg-sand-100",
+              at === 0 ? "aspect-[4/3] sm:aspect-auto" : "hidden sm:block",
+              at === 0 && count >= 3 && "sm:row-span-2",
+            )}
           >
             <Image
-              src={getPackageImageUrl(validImages[selectedIndex].imageUrl)}
-              alt={validImages[selectedIndex].altText ?? title}
+              src={getPackageImageUrl(photo.imageUrl)}
+              alt={altFor(photo)}
               fill
               unoptimized
-              sizes="100vw"
-              className="object-contain"
+              loading={at === 0 ? "eager" : "lazy"}
+              fetchPriority={at === 0 ? "high" : "auto"}
+              sizes={at === 0 ? "(min-width: 640px) 66vw, 100vw" : "(min-width: 640px) 33vw, 100vw"}
+              className="object-cover transition-transform duration-slower ease-standard group-hover:scale-[1.02] motion-reduce:transition-none"
             />
-          </div>
 
-          {/* Next */}
+            {enhanced ? (
+              <button
+                type="button"
+                aria-label={controlLabel(at)}
+                aria-haspopup="dialog"
+                onClick={(event) => open(at, event.currentTarget)}
+                className="absolute inset-0 cursor-zoom-in rounded-2xl"
+              />
+            ) : (
+              <a
+                href={getPackageImageUrl(photo.imageUrl)}
+                aria-label={`${controlLabel(at)} (full size)`}
+                className="absolute inset-0 rounded-2xl"
+              />
+            )}
+          </figure>
+        ))}
 
-          {validImages.length > 1 && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
+        {enhanced && count > 1 && (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={(event) => open(0, event.currentTarget)}
+            className="absolute bottom-3 right-3 inline-flex min-h-10 items-center gap-2 rounded-full bg-card/95 px-4 text-label text-foreground shadow-md transition-colors duration-fast hover:bg-card sm:bottom-4 sm:right-4"
+          >
+            <Images aria-hidden="true" className="size-4" />
+            View all {count} photos
+          </button>
+        )}
+      </div>
 
-                showNext();
-              }}
-              className="absolute right-3 top-1/2 z-20 flex size-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 sm:right-6"
-              aria-label="Next image"
-            >
-              <ChevronRight className="size-7" />
-            </button>
-          )}
-        </div>
+      {/*
+        Without JavaScript some photos are not previewed (phones show one,
+        larger screens three), so list them all as plain links. Browsers
+        with JavaScript never render this.
+      */}
+      {count > 1 && (
+        <noscript>
+          <ul aria-label="All photos" className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-label">
+            {photos.map((photo, at) => (
+              <li key={photo.id}>
+                <a
+                  href={getPackageImageUrl(photo.imageUrl)}
+                  className="inline-flex min-h-10 items-center text-tea-700 underline underline-offset-4"
+                >
+                  Photo {at + 1} of {count}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </noscript>
       )}
+
+      <Dialog
+        open={index !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setIndex(null);
+          }
+        }}
+      >
+        <DialogPortal>
+          <DialogOverlay className="bg-ink-950 supports-backdrop-filter:backdrop-blur-none" />
+
+          <DialogPrimitive.Popup
+            finalFocus={openerRef}
+            aria-modal="true"
+            data-surface="dark"
+            onKeyDown={(event) => {
+              if (count > 1 && event.key === "ArrowRight") {
+                event.preventDefault();
+                step(1);
+              }
+
+              if (count > 1 && event.key === "ArrowLeft") {
+                event.preventDefault();
+                step(-1);
+              }
+            }}
+            className="fixed inset-0 z-60 flex flex-col text-ivory outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+          >
+            <div className="flex items-center justify-between gap-4 px-4 pt-4 sm:px-6">
+              <DialogTitle className="truncate text-label font-medium text-ink-200">{title}</DialogTitle>
+
+              <DialogClose
+                aria-label="Close photos"
+                className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-ink-950/60 text-ivory ring-1 ring-white/25 transition-colors duration-fast hover:bg-ink-800"
+              >
+                <X aria-hidden="true" className="size-6" />
+              </DialogClose>
+            </div>
+
+            <div className="relative mx-4 my-4 min-h-0 flex-1 sm:mx-6">
+              {current && (
+                <Image
+                  key={current.id}
+                  src={getPackageImageUrl(current.imageUrl)}
+                  alt={altFor(current)}
+                  fill
+                  unoptimized
+                  sizes="100vw"
+                  className="object-contain"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-center gap-4 px-4 pb-6 sm:gap-6">
+              {count > 1 && (
+                <button
+                  type="button"
+                  aria-label="Previous photo"
+                  onClick={() => step(-1)}
+                  className="inline-flex size-12 items-center justify-center rounded-full bg-ink-950/60 text-ivory ring-1 ring-white/25 transition-colors duration-fast hover:bg-ink-800"
+                >
+                  <ChevronLeft aria-hidden="true" className="size-6" />
+                </button>
+              )}
+
+              <DialogDescription
+                aria-live="polite"
+                aria-atomic="true"
+                className={cn("min-w-28 text-center text-label text-ink-200", count === 1 && "sr-only")}
+              >
+                Photo {(index ?? 0) + 1} of {count}
+              </DialogDescription>
+
+              {count > 1 && (
+                <button
+                  type="button"
+                  aria-label="Next photo"
+                  onClick={() => step(1)}
+                  className="inline-flex size-12 items-center justify-center rounded-full bg-ink-950/60 text-ivory ring-1 ring-white/25 transition-colors duration-fast hover:bg-ink-800"
+                >
+                  <ChevronRight aria-hidden="true" className="size-6" />
+                </button>
+              )}
+            </div>
+          </DialogPrimitive.Popup>
+        </DialogPortal>
+      </Dialog>
     </>
   );
 }
