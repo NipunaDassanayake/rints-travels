@@ -661,7 +661,21 @@ test.describe("Tourist quotation acceptance flow", () => {
         response.request().method() === "POST",
     );
 
+    /**
+     * CR-030: accepting asks for explicit confirmation first.
+     */
+
     await acceptButton.click();
+
+    const confirmDialog = page.getByRole("alertdialog", {
+      name: "Accept this quotation?",
+    });
+
+    await expect(confirmDialog).toBeVisible();
+
+    await confirmDialog
+      .getByRole("button", { name: "Yes, accept quotation" })
+      .click();
 
     const acceptResponse = await acceptResponsePromise;
 

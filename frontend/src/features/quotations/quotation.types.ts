@@ -70,6 +70,15 @@ export interface Quotation {
 
   tourRequestId: string;
 
+  /**
+   * The parent request as the API already returns it; only its
+   * status is read (CR-030: a BOOKED request means "paid").
+   */
+  tourRequest?: {
+    id: string;
+    status: string;
+  } | null;
+
   guideId?: string | null;
 
   guide?: QuotationGuide | null;

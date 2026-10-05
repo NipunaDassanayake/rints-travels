@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
+import { useState } from "react";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -21,12 +23,26 @@ import { Button, buttonVariants } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { ConfirmDialog } from "@/components/patterns/confirm-dialog";
+
+import { ErrorState } from "@/components/patterns/error-state";
+
+import { LoadingState } from "@/components/patterns/loading-state";
+
 import {
   acceptQuotation,
   getQuotationById,
 } from "@/features/quotations/quotation.api";
 
+import { ProposedGuideCard } from "@/features/quotations/components/proposed-guide-card";
+
 import { RejectQuotationDialog } from "@/features/quotations/components/reject-quotation-dialog";
+
+import { getMyPayments } from "@/features/payments/payment.api";
+
+import { getQuotationPaymentState } from "@/features/journeys/journey";
+
+import { formatMoney } from "@/lib/format";
 
 import { InitiatePaymentCard } from "@/features/payments/components/initiate-payment-card";
 
@@ -58,6 +74,8 @@ export default function TouristQuotationPage() {
   const quotationId = params.id;
 
   const queryClient = useQueryClient();
+
+  const [confirmAcceptOpen, setConfirmAcceptOpen] = useState(false);
 
   const {
     data: quotation,
@@ -102,7 +120,28 @@ export default function TouristQuotationPage() {
       await queryClient.invalidateQueries({
         queryKey: ["tour-requests", "me"],
       });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["quotations", "me"],
+      });
     },
+  });
+
+  /**
+   * =========================================================
+   * Payment state (CR-030)
+   * =========================================================
+   *
+   * ACCEPTED does not tell paid from unpaid, so the traveler's
+   * payments decide whether payment is still offered.
+   */
+
+  const payments = useQuery({
+    queryKey: ["payments", "me"],
+
+    queryFn: getMyPayments,
+
+    enabled: quotation?.status === "ACCEPTED",
   });
 
   /**
@@ -154,6 +193,11 @@ export default function TouristQuotationPage() {
   const isAccepted = quotation.status === "ACCEPTED";
 
   const isRejected = quotation.status === "REJECTED";
+
+  const paymentInfo =
+    isAccepted && payments.data
+      ? getQuotationPaymentState(quotation, payments.data)
+      : null;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -250,6 +294,10 @@ export default function TouristQuotationPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Proposed guide (CR-030) */}
+
+          {quotation.guide && <ProposedGuideCard guide={quotation.guide} />}
 
           {/* Itinerary */}
 
@@ -474,8 +522,13 @@ export default function TouristQuotationPage() {
 
                 <Button
                   className="w-full"
+                  aria-haspopup="dialog"
                   disabled={acceptMutation.isPending}
-                  onClick={() => acceptMutation.mutate()}
+                  onClick={() => {
+                    acceptMutation.reset();
+
+                    setConfirmAcceptOpen(true);
+                  }}
                 >
                   <CircleCheck className="size-4" />
 
@@ -483,6 +536,29 @@ export default function TouristQuotationPage() {
                     ? "Accepting..."
                     : "Accept quotation"}
                 </Button>
+
+                <ConfirmDialog
+                  open={confirmAcceptOpen}
+                  onOpenChange={setConfirmAcceptOpen}
+                  title="Accept this quotation?"
+                  description={
+                    <>
+                      By accepting, you agree to proceed with this quotation
+                      for {formatMoney(quotation.totalAmount, quotation.currency)}.
+                      You can then complete payment to confirm your booking.
+                      {acceptMutation.isError && (
+                        <span role="alert" className="mt-3 block font-medium text-destructive">
+                          Unable to accept the quotation. Please try again.
+                        </span>
+                      )}
+                    </>
+                  }
+                  confirmLabel="Yes, accept quotation"
+                  cancelLabel="Keep reviewing"
+                  onConfirm={async () => {
+                    await acceptMutation.mutateAsync();
+                  }}
+                />
 
                 <RejectQuotationDialog
                   quotationId={quotation.id}
@@ -511,19 +587,96 @@ export default function TouristQuotationPage() {
                       <p className="font-semibold">Quotation accepted</p>
 
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        You have accepted this quotation. You can now continue
-                        to secure payment.
+                        {paymentInfo?.state === "PAID"
+                          ? "You have accepted this quotation and your payment has been received."
+                          : paymentInfo?.state === "UNPAID" ||
+                              paymentInfo?.state === "IN_PROGRESS"
+                            ? "You have accepted this quotation. You can now continue to secure payment."
+                            : "You have accepted this quotation."}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <InitiatePaymentCard
-                quotationId={quotation.id}
-                amount={quotation.totalAmount}
-                currency={quotation.currency}
-              />
+              {/* PAYMENT (CR-030: never offered once paid) */}
+
+              {payments.isPending ? (
+                <LoadingState label="Checking payment status" />
+              ) : payments.isError ? (
+                <ErrorState
+                  headingLevel="h2"
+                  title="We couldn't check your payment status"
+                  description="Try again in a moment before starting a payment."
+                  onRetry={() => void payments.refetch()}
+                />
+              ) : paymentInfo?.state === "PAID" ? (
+                <Card data-testid="quotation-paid">
+                  <CardContent className="pt-6">
+                    <div className="flex gap-3">
+                      <Wallet className="mt-0.5 size-5 shrink-0 text-primary" />
+
+                      <div>
+                        <p className="font-semibold">Payment received</p>
+
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          This quotation is paid. There is nothing more to pay.
+                        </p>
+
+                        <Link
+                          href={
+                            paymentInfo.payment?.booking
+                              ? `/tourist/bookings/${paymentInfo.payment.booking.id}`
+                              : paymentInfo.payment
+                                ? `/tourist/payments/${paymentInfo.payment.id}`
+                                : "/tourist/bookings"
+                          }
+                          className={`${buttonVariants({ variant: "outline" })} mt-4`}
+                        >
+                          {paymentInfo.payment?.booking
+                            ? "View booking"
+                            : paymentInfo.payment
+                              ? "View payment"
+                              : "View bookings"}
+                        </Link>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : paymentInfo?.state === "AWAITING_CONFIRMATION" ? (
+                <Card data-testid="quotation-payment-confirming">
+                  <CardContent className="pt-6">
+                    <div className="flex gap-3">
+                      <Wallet className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+
+                      <div>
+                        <p className="font-semibold">Payment processing</p>
+
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          Your payment is being processed. Check its status on the
+                          payment page.
+                        </p>
+
+                        {paymentInfo.payment && (
+                          <Link
+                            href={`/tourist/payments/${paymentInfo.payment.id}`}
+                            className={`${buttonVariants({ variant: "outline" })} mt-4`}
+                          >
+                            View payment
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : paymentInfo?.state === "UNPAID" ||
+                paymentInfo?.state === "IN_PROGRESS" ? (
+                <InitiatePaymentCard
+                  quotationId={quotation.id}
+                  amount={quotation.totalAmount}
+                  currency={quotation.currency}
+                />
+              ) : null}
             </>
           )}
 

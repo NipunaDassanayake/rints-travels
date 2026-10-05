@@ -5,7 +5,8 @@
  *
  * Output is byte-identical to the per-page helpers it will
  * replace (pages adopt these progressively in CR-029..031), so
- * text that E2E tests assert on does not change.
+ * text that E2E tests assert on does not change -- except
+ * formatMoney, which groups thousands since CR-030.
  */
 
 /**
@@ -44,16 +45,32 @@ export function formatDate(
   }).format(new Date(value));
 }
 
+const groupedCents = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 /**
- * Money exactly as pages render it today: "<CURRENCY> <amount>",
- * e.g. "USD 1275.00". Locale-aware formatting is a later,
- * test-coordinated change.
+ * Portal money: "<CURRENCY> <amount>" with thousands separators
+ * and two decimals, e.g. "USD 2,360.00" (CR-030). Pages adopt it
+ * as they are redesigned; untouched pages still print the raw
+ * "USD 2360.00". Anything that is not a plain decimal is printed
+ * unchanged rather than as "NaN".
  */
 export function formatMoney(
   amount: string | number | null | undefined,
   currency: string | null | undefined,
 ) {
-  return `${currency ?? ""} ${amount ?? ""}`.trim();
+  const value =
+    typeof amount === "number"
+      ? amount
+      : typeof amount === "string" && DECIMAL_STRING.test(amount.trim())
+        ? Number(amount.trim())
+        : Number.NaN;
+
+  const shown = Number.isFinite(value) && value >= 0 ? groupedCents.format(value) : amount;
+
+  return `${currency ?? ""} ${shown ?? ""}`.trim();
 }
 
 const usdWhole = new Intl.NumberFormat("en-US", {
