@@ -65,15 +65,15 @@ export default async function PackagesPage({
     <>
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
-          <p className="text-sm font-medium uppercase tracking-wide text-primary">
+          <p className="text-overline text-tea-700">
             Discover Sri Lanka
           </p>
 
-          <h1 className="mt-2 text-4xl font-bold tracking-tight">
+          <h1 className="mt-3 text-balance font-display text-display-lg text-foreground">
             Travel packages built to inspire your journey
           </h1>
 
-          <p className="mt-4 text-muted-foreground">
+          <p className="mt-4 text-body-lg text-foreground-secondary">
             Browse our travel templates and customize your dates,
             destinations, guide, budget, and travel preferences.
           </p>
