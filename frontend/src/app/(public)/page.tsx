@@ -1,3 +1,5 @@
+import { CeylonConsidered } from "@/components/public/ceylon-considered";
+
 import { CustomTripCta } from "@/components/public/custom-trip-cta";
 
 import { DestinationGrid } from "@/components/public/destination-grid";
@@ -6,11 +8,9 @@ import { FeaturedPackages } from "@/components/public/featured-packages";
 
 import { HomeHero } from "@/components/public/home-hero";
 
-import { HowItWorks } from "@/components/public/how-it-works";
+import { HowTravoraWorks } from "@/components/public/how-travora-works";
 
 import { LocalGuides } from "@/components/public/local-guides";
-
-import { WhyTravora } from "@/components/public/why-travora";
 
 export default function HomePage() {
   return (
@@ -21,9 +21,9 @@ export default function HomePage() {
 
       <FeaturedPackages />
 
-      <WhyTravora />
+      <CeylonConsidered />
 
-      <HowItWorks />
+      <HowTravoraWorks />
 
       <LocalGuides />
 

@@ -6,7 +6,7 @@ test.describe("Travora public pages", () => {
 
     await expect(
       page.getByRole("heading", {
-        name: /your journey,\s*your way/i,
+        name: /sri lanka, shaped around you/i,
       }),
     ).toBeVisible();
 
