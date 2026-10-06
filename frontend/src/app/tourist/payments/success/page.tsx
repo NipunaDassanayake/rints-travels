@@ -25,6 +25,8 @@ import { Card, CardContent } from "@/components/ui/card";
 
 import { getPaymentById } from "@/features/payments/payment.api";
 
+import { formatMoney } from "@/lib/format";
+
 import type { Payment } from "@/features/payments/payment.types";
 
 /**
@@ -158,16 +160,16 @@ function getDescription(state: ConfirmationState, payment?: Payment) {
 function StateIcon({ state }: { state: ConfirmationState }) {
   if (state === "confirmed") {
     return (
-      <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-green-100">
-        <CheckCircle2 className="size-8 text-green-700" />
+      <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-success-soft">
+        <CheckCircle2 aria-hidden="true" className="size-8 text-success-ink" />
       </div>
     );
   }
 
   if (state === "delayed") {
     return (
-      <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100">
-        <Clock3 className="size-8 text-amber-700" />
+      <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-warning-soft">
+        <Clock3 aria-hidden="true" className="size-8 text-warning-ink" />
       </div>
     );
   }
@@ -175,22 +177,22 @@ function StateIcon({ state }: { state: ConfirmationState }) {
   if (state === "not-completed") {
     return (
       <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-muted">
-        <XCircle className="size-8 text-muted-foreground" />
+        <XCircle aria-hidden="true" className="size-8 text-muted-foreground" />
       </div>
     );
   }
 
   if (state === "error") {
     return (
-      <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-destructive/10">
-        <AlertTriangle className="size-8 text-destructive" />
+      <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-danger-soft">
+        <AlertTriangle aria-hidden="true" className="size-8 text-danger-ink" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-muted">
-      <LoaderCircle className="size-8 animate-spin text-muted-foreground" />
+      <LoaderCircle aria-hidden="true" className="size-8 animate-spin text-muted-foreground" />
     </div>
   );
 }
@@ -209,24 +211,23 @@ function ConfirmationCard({
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-3xl items-center px-4 py-12 sm:px-6">
       <Card className="w-full">
-        <CardContent
-          className="p-8 text-center sm:p-12"
-          role="status"
-          aria-live="polite"
-        >
+        <CardContent className="p-8 text-center sm:p-12">
           <StateIcon state={state} />
 
-          <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-            {content.eyebrow}
-          </p>
+          {/* Only the changing message is announced, not the actions. */}
+          <div role="status" aria-live="polite">
+            <p className="mt-6 text-overline text-tea-700">
+              {content.eyebrow}
+            </p>
 
-          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            {content.title}
-          </h1>
+            <h1 className="mt-2 font-display text-display-md text-foreground">
+              {content.title}
+            </h1>
 
-          <p className="mx-auto mt-4 max-w-xl leading-7 text-muted-foreground">
-            {getDescription(state, payment)}
-          </p>
+            <p className="mx-auto mt-4 max-w-xl text-body text-foreground-secondary">
+              {getDescription(state, payment)}
+            </p>
+          </div>
 
           {payment && (
             <div className="mt-8 rounded-2xl border bg-muted/30 p-5 text-left">
@@ -237,7 +238,7 @@ function ConfirmationCard({
               <p className="mt-3 text-sm text-muted-foreground">Amount</p>
 
               <p className="mt-1 font-medium">
-                {payment.currency} {payment.amount}
+                {formatMoney(payment.amount, payment.currency)}
               </p>
             </div>
           )}

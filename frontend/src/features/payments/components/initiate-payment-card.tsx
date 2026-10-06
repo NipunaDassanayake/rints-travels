@@ -1,14 +1,16 @@
 "use client";
 
+import { useState } from "react";
+
 import { useMutation } from "@tanstack/react-query";
 
 import { CreditCard, LoaderCircle, LockKeyhole } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { createCheckoutSession } from "@/features/payments/payment.api";
+
+import { formatMoney } from "@/lib/format";
 
 /**
  * Only 409 conflicts carry a message meant for the tourist
@@ -42,13 +44,26 @@ interface InitiatePaymentCardProps {
   amount: string;
 
   currency: string;
+
+  /**
+   * "resume" when a payment for this quotation was already started
+   * (PENDING): the same checkout endpoint reuses or renews its
+   * Stripe session, so it is presented as continuing, not as a new
+   * payment (CR-030 Stage 4).
+   */
+  mode?: "pay" | "resume";
 }
 
 export function InitiatePaymentCard({
   quotationId,
   amount,
   currency,
+  mode = "pay",
 }: InitiatePaymentCardProps) {
+  // Once checkout is ready the browser is leaving for Stripe: stay
+  // locked so a further click cannot start another request.
+  const [redirecting, setRedirecting] = useState(false);
+
   const mutation = useMutation({
     mutationFn: () =>
       createCheckoutSession({
@@ -56,75 +71,76 @@ export function InitiatePaymentCard({
       }),
 
     onSuccess: (checkout) => {
+      setRedirecting(true);
+
       window.location.href = checkout.checkoutUrl;
     },
   });
 
+  const total = formatMoney(amount, currency);
+
+  const busy = mutation.isPending || redirecting;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Payment</CardTitle>
-      </CardHeader>
+    <div data-testid="initiate-payment" className="space-y-4">
+      <div>
+        <p className="text-body-sm text-muted-foreground">
+          {mode === "resume" ? "Amount still to pay" : "Amount to pay"}
+        </p>
 
-      <CardContent className="space-y-5">
+        <p className="mt-1 text-heading-lg text-foreground">{total}</p>
+      </div>
+
+      <div className="flex gap-3 rounded-md border bg-sand-50 p-4">
+        <LockKeyhole aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+
         <div>
-          <p className="text-sm text-muted-foreground">Amount to pay</p>
+          <p className="font-medium text-foreground">
+            {mode === "resume" ? "Payment already started" : "Secure card payment"}
+          </p>
 
-          <p className="mt-1 text-2xl font-bold">
-            {currency} {amount}
+          <p className="mt-1 text-body-sm text-muted-foreground">
+            {mode === "resume"
+              ? "You started this payment earlier. Resume it to finish on Stripe's secure checkout page."
+              : "You'll be redirected to Stripe's secure checkout page to complete your payment."}
           </p>
         </div>
+      </div>
 
-        <div className="rounded-xl border bg-muted/30 p-4">
-          <div className="flex gap-3">
-            <LockKeyhole className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+      {mutation.isError && (
+        <div role="alert" className="rounded-md border border-danger-border bg-danger-soft p-4">
+          <p className="text-body-sm font-medium text-danger-ink">Unable to start payment</p>
 
-            <div>
-              <p className="font-medium">Secure card payment</p>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                You&apos;ll be redirected to Stripe&apos;s secure checkout page
-                to complete your payment.
-              </p>
-            </div>
-          </div>
+          <p className="mt-1 text-body-sm text-foreground-secondary">
+            {getConflictMessage(mutation.error) ?? "Please try again in a moment."}
+          </p>
         </div>
+      )}
 
-        {mutation.isError && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-destructive">
-              Unable to start payment
-            </p>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              {getConflictMessage(mutation.error) ??
-                "Please try again in a moment."}
-            </p>
-          </div>
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={busy}
+        onClick={() => {
+          if (!busy) {
+            mutation.mutate();
+          }
+        }}
+      >
+        {busy ? (
+          <>
+            <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+            Redirecting to Stripe...
+          </>
+        ) : (
+          <>
+            <CreditCard aria-hidden="true" className="size-4" />
+            {mode === "resume" ? `Resume payment of ${total}` : `Pay ${total}`}
+          </>
         )}
+      </Button>
 
-        <Button
-          className="w-full"
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
-          {mutation.isPending ? (
-            <>
-              <LoaderCircle className="size-4 animate-spin" />
-              Redirecting to Stripe...
-            </>
-          ) : (
-            <>
-              <CreditCard className="size-4" />
-              Pay {currency} {amount}
-            </>
-          )}
-        </Button>
-
-        <p className="text-center text-xs text-muted-foreground">
-          Payment is processed securely by Stripe.
-        </p>
-      </CardContent>
-    </Card>
+      <p className="text-center text-caption text-muted-foreground">Payment is processed securely by Stripe.</p>
+    </div>
   );
 }

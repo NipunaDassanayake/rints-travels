@@ -627,8 +627,18 @@ test.describe("Tourist quotation acceptance flow", () => {
      * Verify pricing.
      */
 
+    /**
+     * CR-030 Stage 4: traveler money uses the shared formatter
+     * (thousands separators, two decimals), e.g. "USD 2,150.00".
+     */
+
+    const formattedTotal = `USD ${Number(QUOTATION.total).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
     await expect(
-      page.getByText(`USD ${QUOTATION.total}`, {
+      page.getByTestId("price-summary").getByText(formattedTotal, {
         exact: true,
       }),
     ).toBeVisible();
