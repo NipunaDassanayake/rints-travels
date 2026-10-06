@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ArrowRight, Check, Circle, CircleDot, MapPin } from "lucide-react";
+import { ArrowRight, MapPin } from "lucide-react";
 
 import { StatusBadge } from "@/components/patterns/status-badge";
 
@@ -8,9 +8,9 @@ import { buttonVariants } from "@/components/ui/button";
 
 import { formatDate } from "@/lib/format";
 
-import { cn } from "@/lib/utils";
+import type { Journey } from "../journey";
 
-import { JOURNEY_STEPS, type Journey } from "../journey";
+import { JourneySteps } from "./journey-steps";
 
 /**
  * Where the latest trip request stands: the existing status badge,
@@ -44,43 +44,7 @@ export function JourneyProgressCard({ journey }: { journey: Journey }) {
         </p>
       )}
 
-      <ol aria-label="Trip progress" className="mt-5 grid grid-cols-4 gap-2">
-        {JOURNEY_STEPS.map((step, index) => {
-          const state =
-            index < journey.stepIndex ? "done" : index === journey.stepIndex ? "current" : "todo";
-
-          const Icon = state === "done" ? Check : state === "current" ? CircleDot : Circle;
-
-          return (
-            <li
-              key={step}
-              aria-current={state === "current" ? "step" : undefined}
-              className="flex min-w-0 flex-col items-start gap-1.5"
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "h-1 w-full rounded-full",
-                  state === "todo" ? "bg-sand-200" : "bg-tea-600",
-                )}
-              />
-
-              <span
-                className={cn(
-                  "flex items-center gap-1 text-caption",
-                  state === "todo" ? "text-muted-foreground" : "font-medium text-foreground",
-                )}
-              >
-                <Icon aria-hidden="true" className="size-3.5 shrink-0" />
-                <span className="truncate">{step}</span>
-                <span className="sr-only">
-                  {state === "done" ? " (done)" : state === "current" ? " (current step)" : " (not started)"}
-                </span>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <JourneySteps stepIndex={journey.stepIndex} className="mt-5" />
 
       {journey.waitingMessage && (
         <p className="mt-5 text-body-sm text-foreground-secondary">{journey.waitingMessage}</p>

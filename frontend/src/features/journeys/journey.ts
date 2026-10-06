@@ -3,6 +3,7 @@ import type { Payment } from "@/features/payments/payment.types";
 import type { Quotation } from "@/features/quotations/quotation.types";
 import type { Review } from "@/features/reviews/review.types";
 import type { TourRequest } from "@/features/tour-requests/tour-request.types";
+import { formatDate } from "@/lib/format";
 import type { StatusEntity } from "@/lib/status";
 
 /**
@@ -99,6 +100,8 @@ export interface Journey {
   endDate: string | null;
   request: TourRequest | null;
   quotation: Quotation | null;
+  /** How many quotations were sent for this request (revision context). */
+  quotationCount: number;
   payment: Payment | null;
   booking: Booking | null;
   guide: JourneyGuide | null;
@@ -359,10 +362,9 @@ export function buildJourneys(sources: JourneySources): Journey[] {
 
     const booking = bookings.find((candidate) => candidate.tourRequestId === id) ?? null;
 
-    const quotation = pickQuotation(
-      quotations.filter((candidate) => candidate.tourRequestId === id),
-      booking,
-    );
+    const requestQuotations = quotations.filter((candidate) => candidate.tourRequestId === id);
+
+    const quotation = pickQuotation(requestQuotations, booking);
 
     const paymentInfo = quotation
       ? getQuotationPaymentState(quotation, payments, booking)
@@ -376,6 +378,7 @@ export function buildJourneys(sources: JourneySources): Journey[] {
       id,
       request,
       quotation,
+      quotationCount: requestQuotations.length,
       payment,
       booking,
       paymentState: booking ? ("PAID" as const) : paymentInfo.state,
@@ -429,12 +432,93 @@ export function buildJourneys(sources: JourneySources): Journey[] {
   return journeys.sort((a, b) => b.lastActivityAt - a.lastActivityAt || a.id.localeCompare(b.id));
 }
 
+/**
+ * =========================================================
+ * Grouping (CR-030 Stage 2)
+ * =========================================================
+ *
+ * Read off the journey phase, which follows the booking when one
+ * exists -- so a cancelled booking is "closed" even though its
+ * request stays BOOKED.
+ */
+export type JourneyGroup = "active" | "past" | "closed";
+
+export function getJourneyGroup(journey: Pick<Journey, "phase">): JourneyGroup {
+  if (journey.phase === "completed") {
+    return "past";
+  }
+
+  if (journey.phase === "closed") {
+    return "closed";
+  }
+
+  return "active";
+}
+
+/** Splits journeys into groups, keeping their order. */
+export function groupJourneys(journeys: Journey[]): Record<JourneyGroup, Journey[]> {
+  const groups: Record<JourneyGroup, Journey[]> = { active: [], past: [], closed: [] };
+
+  for (const journey of journeys) {
+    groups[getJourneyGroup(journey)].push(journey);
+  }
+
+  return groups;
+}
+
+/**
+ * Screen-reader context that makes each journey card's links
+ * unique (CR-030 Stage 2), appended after the visible title:
+ * the traveler-facing reference (booking reference, else
+ * quotation number) and the submission date. Early requests with
+ * no reference that still share a title and date get a
+ * deterministic ordinal in list order ("journey 1 of 2"). Never
+ * uses internal ids.
+ */
+export function getJourneyNameContexts(journeys: Journey[]): Map<string, string> {
+  const contexts = journeys.map((journey) => {
+    const reference = journey.booking?.bookingReference ?? journey.quotation?.quotationNumber;
+
+    return {
+      id: journey.id,
+      key: journey.title,
+      context:
+        (reference ? `, ${reference}` : "") +
+        (journey.request ? `, submitted ${formatDate(journey.request.createdAt)}` : ""),
+    };
+  });
+
+  const counts = new Map<string, number>();
+
+  for (const { key, context } of contexts) {
+    counts.set(key + context, (counts.get(key + context) ?? 0) + 1);
+  }
+
+  const seen = new Map<string, number>();
+
+  return new Map(
+    contexts.map(({ id, key, context }) => {
+      const total = counts.get(key + context) ?? 1;
+
+      if (total === 1) {
+        return [id, context];
+      }
+
+      const position = (seen.get(key + context) ?? 0) + 1;
+
+      seen.set(key + context, position);
+
+      return [id, `${context}, journey ${position} of ${total}`];
+    }),
+  );
+}
+
 export interface DashboardSummary {
   /** Journeys that need the traveler, most urgent first. */
   attention: Journey[];
   /** The trip in progress, else the next upcoming one. */
   currentTrip: Journey | null;
-  /** The most recent journey still moving (not the current trip). */
+  /** The most recent journey still moving. */
   latestJourney: Journey | null;
   /** Other recent journeys, newest first. */
   recent: Journey[];
@@ -442,6 +526,12 @@ export interface DashboardSummary {
 
 const RECENT_LIMIT = 4;
 
+/**
+ * Dashboard sections in precedence order -- attention, current
+ * trip, latest journey, recent activity. A journey shown in an
+ * earlier section is never repeated in a later one; a section
+ * with no remaining journey is omitted (CR-030 Stage 2).
+ */
 export function summarizeJourneys(journeys: Journey[]): DashboardSummary {
   const attention = journeys
     .filter((journey) => journey.action?.needsTraveler)
@@ -452,23 +542,31 @@ export function summarizeJourneys(journeys: Journey[]): DashboardSummary {
         a.id.localeCompare(b.id),
     );
 
+  const shown = new Set<string>(attention.map((journey) => journey.id));
+
+  const remaining = () => journeys.filter((journey) => !shown.has(journey.id));
+
   const currentTrip =
-    journeys.find((journey) => journey.phase === "current") ??
-    [...journeys]
+    remaining().find((journey) => journey.phase === "current") ??
+    remaining()
       .filter((journey) => journey.phase === "upcoming")
       .sort((a, b) => time(a.startDate) - time(b.startDate) || a.id.localeCompare(b.id))[0] ??
     null;
 
+  if (currentTrip) {
+    shown.add(currentTrip.id);
+  }
+
   const latestJourney =
-    journeys.find(
-      (journey) =>
-        journey !== currentTrip &&
-        ["planning", "quotation", "payment"].includes(journey.phase),
+    remaining().find((journey) =>
+      ["planning", "quotation", "payment"].includes(journey.phase),
     ) ?? null;
 
-  const recent = journeys
-    .filter((journey) => journey !== currentTrip && journey !== latestJourney)
-    .slice(0, RECENT_LIMIT);
+  if (latestJourney) {
+    shown.add(latestJourney.id);
+  }
+
+  const recent = remaining().slice(0, RECENT_LIMIT);
 
   return { attention, currentTrip, latestJourney, recent };
 }

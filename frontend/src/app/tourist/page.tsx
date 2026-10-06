@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 
-import { useQuery } from "@tanstack/react-query";
-
 import { Map as MapIcon, Plus } from "lucide-react";
 
 import { EmptyState } from "@/components/patterns/empty-state";
@@ -16,8 +14,6 @@ import { PageHeader } from "@/components/patterns/page-header";
 
 import { buttonVariants } from "@/components/ui/button";
 
-import { getMyBookings } from "@/features/bookings/booking.api";
-
 import { CurrentTripCard } from "@/features/journeys/components/current-trip-card";
 
 import { JourneyAttention } from "@/features/journeys/components/journey-attention";
@@ -26,15 +22,9 @@ import { JourneyProgressCard } from "@/features/journeys/components/journey-prog
 
 import { RecentJourneys } from "@/features/journeys/components/recent-journeys";
 
-import { buildJourneys, summarizeJourneys } from "@/features/journeys/journey";
+import { summarizeJourneys } from "@/features/journeys/journey";
 
-import { getMyPayments } from "@/features/payments/payment.api";
-
-import { getMyQuotations } from "@/features/quotations/quotation.api";
-
-import { getMyReviews } from "@/features/reviews/review.api";
-
-import { getMyTourRequests } from "@/features/tour-requests/tour-request.api";
+import { useTravelerJourneys } from "@/features/journeys/use-traveler-journeys";
 
 import { useAuth } from "@/providers/auth-provider";
 
@@ -51,38 +41,7 @@ import { useAuth } from "@/providers/auth-provider";
 export default function TouristDashboard() {
   const { user } = useAuth();
 
-  const requests = useQuery({
-    queryKey: ["tour-requests", "me"],
-    queryFn: getMyTourRequests,
-  });
-
-  const quotations = useQuery({
-    queryKey: ["quotations", "me"],
-    queryFn: getMyQuotations,
-  });
-
-  const payments = useQuery({
-    queryKey: ["payments", "me"],
-    queryFn: getMyPayments,
-  });
-
-  const bookings = useQuery({
-    queryKey: ["bookings", "me"],
-    queryFn: getMyBookings,
-  });
-
-  // Only decides whether to ask for a review; a failure here
-  // degrades to "View trip" instead of failing the dashboard.
-  const reviews = useQuery({
-    queryKey: ["reviews", "me"],
-    queryFn: getMyReviews,
-  });
-
-  const required = [requests, quotations, payments, bookings];
-
-  const isLoading = required.some((query) => query.isLoading) || reviews.isLoading;
-
-  const failed = required.filter((query) => query.isError);
+  const { journeys, isLoading, isError, retry } = useTravelerJourneys();
 
   const header = (showPlanAction: boolean) => (
     <PageHeader
@@ -116,7 +75,7 @@ export default function TouristDashboard() {
     );
   }
 
-  if (failed.length > 0) {
+  if (isError) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         {header(false)}
@@ -125,22 +84,12 @@ export default function TouristDashboard() {
           headingLevel="h2"
           title="Unable to load your dashboard"
           description="Some travel information could not be retrieved."
-          onRetry={() => {
-            failed.forEach((query) => void query.refetch());
-          }}
+          onRetry={retry}
           className="mt-8"
         />
       </main>
     );
   }
-
-  const journeys = buildJourneys({
-    requests: requests.data ?? [],
-    quotations: quotations.data ?? [],
-    payments: payments.data ?? [],
-    bookings: bookings.data ?? [],
-    reviews: reviews.isError ? null : (reviews.data ?? []),
-  });
 
   if (journeys.length === 0) {
     return (

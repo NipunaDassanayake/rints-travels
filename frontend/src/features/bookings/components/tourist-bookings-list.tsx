@@ -1,10 +1,16 @@
-"use client";
+import Link from "next/link";
 
-import { CalendarDays, LoaderCircle } from "lucide-react";
+import { CalendarCheck2 } from "lucide-react";
 
-import { TouristBookingCard } from "./tourist-booking-card";
+import { EmptyState } from "@/components/patterns/empty-state";
+
+import { LoadingState } from "@/components/patterns/loading-state";
+
+import { buttonVariants } from "@/components/ui/button";
 
 import type { Booking } from "@/features/bookings/booking.types";
+
+import { TouristBookingCard } from "./tourist-booking-card";
 
 interface TouristBookingsListProps {
   bookings: Booking[];
@@ -16,35 +22,33 @@ export function TouristBookingsList({
   isLoading = false,
 }: TouristBookingsListProps) {
   if (isLoading) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        <LoaderCircle className="size-7 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState variant="skeleton" rows={2} label="Loading your bookings" />;
   }
 
   if (bookings.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed px-6 py-16 text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
-          <CalendarDays className="size-6 text-muted-foreground" />
-        </div>
-
-        <h2 className="mt-4 text-lg font-semibold">No bookings yet</h2>
-
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-          Your confirmed trips will appear here after you accept a quotation and
-          complete the payment.
-        </p>
-      </div>
+      <EmptyState
+        headingLevel="h2"
+        icon={CalendarCheck2}
+        title="No bookings yet"
+        description="Your confirmed trips will appear here after you accept a quotation and complete the payment."
+        action={
+          <Link href="/tourist/requests" className={buttonVariants({ variant: "outline" })}>
+            View my journeys
+          </Link>
+        }
+        className="py-14"
+      />
     );
   }
 
   return (
-    <div className="space-y-5">
+    <ul className="space-y-4 sm:space-y-5">
       {bookings.map((booking) => (
-        <TouristBookingCard key={booking.id} booking={booking} />
+        <li key={booking.id}>
+          <TouristBookingCard booking={booking} />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
