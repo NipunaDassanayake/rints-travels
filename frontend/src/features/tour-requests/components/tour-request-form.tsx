@@ -1,12 +1,14 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { useForm, useWatch } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { useForm, useWatch, type FieldPath } from "react-hook-form";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -14,40 +16,38 @@ import { z } from "zod";
 
 import { AxiosError } from "axios";
 
-import {
-  CalendarDays,
-  CircleDollarSign,
-  Clock3,
-  Hotel,
-  LoaderCircle,
-  MapPin,
-  Route,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { CircleAlert, Info, LoaderCircle } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 import { Input } from "@/components/ui/input";
 
-import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 
 import { Textarea } from "@/components/ui/textarea";
-
-import { getPackageImageUrl } from "@/features/packages/admin-package.api";
 
 import type { TravelPackage } from "@/features/packages/package.types";
 
 import type { TourGuide } from "@/features/tour-guides/tour-guide.types";
+
+import { formatMoney } from "@/lib/format";
+
+import { cn } from "@/lib/utils";
 
 import {
   createCustomTourRequest,
   createPackageBasedTourRequest,
 } from "../tour-request.api";
 
+import { FormField } from "./form-field";
+
+import { PackageContextCard } from "./package-context-card";
+
+import { RequestTypeField } from "./request-type-field";
+
 /**
  * =========================================================
- * Validation
+ * Validation (rules unchanged; limits match the API)
  * =========================================================
  */
 
@@ -56,37 +56,27 @@ const optionalNumber = z.string().optional();
 const tourRequestSchema = z
   .object({
     requestType: z.enum(["PACKAGE_BASED", "CUSTOM"]),
-
     packageId: z.string().optional(),
-
-    title: z.string().trim().optional(),
-
+    title: z.string().trim().max(200, "Trip title must be 200 characters or fewer").optional(),
     destinationPreferences: z.string().trim().optional(),
-
     preferredStartDate: z.string().min(1, "Preferred start date is required"),
-
     preferredEndDate: z.string().optional(),
-
     adultCount: z.string().min(1, "Adult count is required"),
-
     childCount: z.string().min(1, "Child count is required"),
-
     budget: optionalNumber,
-
     currency: z
       .string()
       .trim()
       .min(1, "Currency is required")
       .max(10, "Currency must be 10 characters or less"),
-
     preferredGuideId: z.string().optional(),
-
-    hotelPreference: z.string().trim().optional(),
-
-    transportPreference: z.string().trim().optional(),
-
+    hotelPreference: z.string().trim().max(100, "Hotel preference must be 100 characters or fewer").optional(),
+    transportPreference: z
+      .string()
+      .trim()
+      .max(100, "Transport preference must be 100 characters or fewer")
+      .optional(),
     specialRequirements: z.string().trim().optional(),
-
     contactMethod: z.enum(["WHATSAPP", "PHONE", "EMAIL"]).or(z.literal("")),
   })
   .superRefine((data, ctx) => {
@@ -95,69 +85,27 @@ const tourRequestSchema = z
     const children = Number(data.childCount);
 
     if (!Number.isInteger(adults) || adults < 1) {
-      ctx.addIssue({
-        code: "custom",
-
-        path: ["adultCount"],
-
-        message: "At least one adult is required",
-      });
+      ctx.addIssue({ code: "custom", path: ["adultCount"], message: "At least one adult is required" });
     }
 
     if (!Number.isInteger(children) || children < 0) {
-      ctx.addIssue({
-        code: "custom",
-
-        path: ["childCount"],
-
-        message: "Child count cannot be negative",
-      });
+      ctx.addIssue({ code: "custom", path: ["childCount"], message: "Child count cannot be negative" });
     }
 
     if (data.budget && Number(data.budget) <= 0) {
-      ctx.addIssue({
-        code: "custom",
-
-        path: ["budget"],
-
-        message: "Budget must be greater than zero",
-      });
+      ctx.addIssue({ code: "custom", path: ["budget"], message: "Budget must be greater than zero" });
     }
 
-    if (
-      data.preferredEndDate &&
-      new Date(data.preferredEndDate) < new Date(data.preferredStartDate)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-
-        path: ["preferredEndDate"],
-
-        message: "End date cannot be before start date",
-      });
+    if (data.preferredEndDate && new Date(data.preferredEndDate) < new Date(data.preferredStartDate)) {
+      ctx.addIssue({ code: "custom", path: ["preferredEndDate"], message: "End date cannot be before start date" });
     }
 
     if (data.requestType === "PACKAGE_BASED" && !data.packageId) {
-      ctx.addIssue({
-        code: "custom",
-
-        path: ["packageId"],
-
-        message: "Please select a travel package",
-      });
+      ctx.addIssue({ code: "custom", path: ["packageId"], message: "Please select a travel package" });
     }
 
-    if (
-      data.requestType === "CUSTOM" &&
-      (!data.title || data.title.length < 3)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-
-        path: ["title"],
-
-        message: "Trip title must contain at least 3 characters",
-      });
+    if (data.requestType === "CUSTOM" && (!data.title || data.title.length < 3)) {
+      ctx.addIssue({ code: "custom", path: ["title"], message: "Trip title must contain at least 3 characters" });
     }
 
     if (
@@ -166,9 +114,7 @@ const tourRequestSchema = z
     ) {
       ctx.addIssue({
         code: "custom",
-
         path: ["destinationPreferences"],
-
         message: "Please enter your destination preferences",
       });
     }
@@ -176,21 +122,118 @@ const tourRequestSchema = z
 
 type TourRequestFormValues = z.infer<typeof tourRequestSchema>;
 
+type FieldName = FieldPath<TourRequestFormValues>;
+
+/** Fields in page order, with the element each error links to. */
+const FIELD_ORDER: { name: FieldName; id: string }[] = [
+  { name: "requestType", id: "requestType-PACKAGE_BASED" },
+  { name: "packageId", id: "packageId" },
+  { name: "title", id: "title" },
+  { name: "destinationPreferences", id: "destinationPreferences" },
+  { name: "preferredStartDate", id: "preferredStartDate" },
+  { name: "preferredEndDate", id: "preferredEndDate" },
+  { name: "adultCount", id: "adultCount" },
+  { name: "childCount", id: "childCount" },
+  { name: "budget", id: "budget" },
+  { name: "currency", id: "currency" },
+  { name: "preferredGuideId", id: "preferredGuideId" },
+  { name: "hotelPreference", id: "hotelPreference" },
+  { name: "transportPreference", id: "transportPreference" },
+  { name: "contactMethod", id: "contactMethod" },
+  { name: "specialRequirements", id: "specialRequirements" },
+];
+
 /**
  * =========================================================
- * Props
+ * Server errors -> traveler-facing messages
  * =========================================================
+ *
+ * The API answers 400 "Validation failed" with Joi messages such as
+ * `"preferredEndDate" must be greater than or equal to ...`. Known
+ * fields are mapped to plain messages (and marked on the field);
+ * anything else falls back to a general message. Joi wording is
+ * never shown.
  */
-
-type TourRequestFormProps = {
-  packages: TravelPackage[];
-
-  guides: TourGuide[];
-
-  initialPackageId?: string;
-
-  initialGuideId?: string;
+const SERVER_FIELD_MESSAGES: Partial<Record<FieldName, string>> = {
+  packageId: "Please choose a travel package from the list.",
+  title: "Trip title must be between 3 and 200 characters.",
+  destinationPreferences: "Please tell us which places you would like to visit.",
+  preferredStartDate: "Please enter a valid start date.",
+  preferredEndDate: "The end date cannot be before the start date.",
+  adultCount: "At least one adult is required.",
+  childCount: "The number of children cannot be negative.",
+  budget: "Budget must be greater than zero.",
+  currency: "Currency must be 10 characters or fewer.",
+  preferredGuideId: "Please choose a guide from the list.",
+  hotelPreference: "Hotel preference must be 100 characters or fewer.",
+  transportPreference: "Transport preference must be 100 characters or fewer.",
+  contactMethod: "Please choose a contact method from the list.",
 };
+
+const PACKAGE_UNAVAILABLE =
+  "That package is no longer available. Please choose another package or create a journey from scratch.";
+
+const GUIDE_UNAVAILABLE =
+  "That guide is not available right now. Please choose another guide or continue without one.";
+
+const GENERAL_FAILURE = "We couldn't submit your request right now. Please try again in a moment.";
+
+interface ServerProblem {
+  messages: string[];
+  fields: { name: FieldName; message: string }[];
+}
+
+function describeServerError(error: unknown): ServerProblem {
+  if (!(error instanceof AxiosError) || !error.response) {
+    return { messages: [GENERAL_FAILURE], fields: [] };
+  }
+
+  const { status, data } = error.response as {
+    status: number;
+    data?: { message?: string; errors?: unknown };
+  };
+
+  if (status === 404 && data?.message === "Travel package not found") {
+    return { messages: [PACKAGE_UNAVAILABLE], fields: [{ name: "packageId", message: PACKAGE_UNAVAILABLE }] };
+  }
+
+  if (status === 404 && data?.message === "Available preferred tour guide not found") {
+    return {
+      messages: [GUIDE_UNAVAILABLE],
+      fields: [{ name: "preferredGuideId", message: GUIDE_UNAVAILABLE }],
+    };
+  }
+
+  if (status === 400 && Array.isArray(data?.errors)) {
+    const fields: ServerProblem["fields"] = [];
+
+    let unknown = false;
+
+    for (const detail of data.errors) {
+      const field = typeof detail === "string" ? detail.match(/^"([A-Za-z]+)"/)?.[1] : undefined;
+
+      const message = field ? SERVER_FIELD_MESSAGES[field as FieldName] : undefined;
+
+      if (field && message) {
+        if (!fields.some((existing) => existing.name === field)) {
+          fields.push({ name: field as FieldName, message });
+        }
+      } else {
+        unknown = true;
+      }
+    }
+
+    const messages = fields.map((field) => field.message);
+
+    if (unknown || messages.length === 0) {
+      messages.push("Some details could not be accepted. Please review the form and try again.");
+    }
+
+    return { messages, fields };
+  }
+
+  return { messages: [GENERAL_FAILURE], fields: [] };
+}
 
 /**
  * =========================================================
@@ -198,716 +241,553 @@ type TourRequestFormProps = {
  * =========================================================
  */
 
-export function TourRequestForm({
-  packages,
-  guides,
-  initialPackageId,
-  initialGuideId,
-}: TourRequestFormProps) {
+type TourRequestFormProps = {
+  packages: TravelPackage[];
+  guides: TourGuide[];
+  initialPackageId?: string;
+  initialGuideId?: string;
+};
+
+const SECTION = "rounded-card border bg-card p-5 sm:p-6";
+
+function WhatHappensNext({ className }: { className?: string }) {
+  return (
+    <div className={cn("rounded-card border bg-sand-50 p-5", className)}>
+      <h2 className="text-heading-sm text-foreground">What happens next</h2>
+
+      <ol className="mt-3 space-y-3 text-body-sm text-foreground-secondary">
+        <li>
+          <span className="font-medium text-foreground">1. Travora reviews your request.</span> Our team works through
+          your details with you.
+        </li>
+        <li>
+          <span className="font-medium text-foreground">2. You receive a quotation.</span> A personalized itinerary
+          and price appear in My Travora.
+        </li>
+        <li>
+          <span className="font-medium text-foreground">3. Accept and pay to book.</span> If it suits you, accept the
+          quotation and pay securely to confirm your booking.
+        </li>
+      </ol>
+
+    </div>
+  );
+}
+
+export function TourRequestForm({ packages, guides, initialPackageId, initialGuideId }: TourRequestFormProps) {
   const router = useRouter();
 
-  const [serverError, setServerError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const defaultRequestType: "PACKAGE_BASED" | "CUSTOM" = initialPackageId
-    ? "PACKAGE_BASED"
-    : "CUSTOM";
+  const availableGuides = useMemo(() => guides.filter((guide) => guide.isAvailable), [guides]);
+
+  /**
+   * Context from the URL is only used when it resolves to an option
+   * the traveler can actually pick; otherwise it is cleared (never
+   * submitted) and a notice explains why.
+   */
+  const initialPackage = initialPackageId
+    ? (packages.find((travelPackage) => String(travelPackage.id) === initialPackageId) ?? null)
+    : null;
+
+  const packageNotice = Boolean(initialPackageId) && !initialPackage;
+
+  const initialGuide = initialGuideId
+    ? (availableGuides.find((guide) => guide.id === initialGuideId) ?? null)
+    : null;
+
+  const guideNotice = Boolean(initialGuideId) && !initialGuide;
+
+  const [serverProblem, setServerProblem] = useState<string[] | null>(null);
+
+  // One create request per submission: the ref blocks re-entry
+  // synchronously; `submitted` keeps the form locked after success
+  // until navigation completes.
+  const submissionLock = useRef(false);
+
+  const [submitted, setSubmitted] = useState(false);
 
   const {
     register,
     handleSubmit,
     control,
-
-    formState: { errors, isSubmitting },
+    setError,
+    setFocus,
+    formState: { errors, isSubmitting, submitCount },
   } = useForm<TourRequestFormValues>({
     resolver: zodResolver(tourRequestSchema),
-
+    shouldFocusError: true,
     defaultValues: {
-      requestType: defaultRequestType,
-
-      packageId: initialPackageId ?? "",
-
-      preferredGuideId: initialGuideId ?? "",
-
+      requestType: initialPackageId ? "PACKAGE_BASED" : "CUSTOM",
+      packageId: initialPackage ? String(initialPackage.id) : "",
+      preferredGuideId: initialGuide?.id ?? "",
       title: "",
-
       destinationPreferences: "",
-
       preferredStartDate: "",
-
       preferredEndDate: "",
-
       adultCount: "1",
-
       childCount: "0",
-
       budget: "",
-
       currency: "USD",
-
       hotelPreference: "",
-
       transportPreference: "",
-
       specialRequirements: "",
-
       contactMethod: "",
     },
   });
 
-  /**
-   * =========================================================
-   * Watch fields
-   * =========================================================
-   */
+  const requestType = useWatch({ control, name: "requestType" });
 
-  const requestType = useWatch({
-    control,
+  const selectedPackageId = useWatch({ control, name: "packageId" });
 
-    name: "requestType",
-  });
+  const selectedGuideId = useWatch({ control, name: "preferredGuideId" });
 
-  const selectedPackageId = useWatch({
-    control,
+  const selectedPackage =
+    packages.find((travelPackage) => String(travelPackage.id) === selectedPackageId) ?? null;
 
-    name: "packageId",
-  });
+  const selectedGuide = availableGuides.find((guide) => guide.id === selectedGuideId) ?? null;
 
-  const selectedGuideId = useWatch({
-    control,
-
-    name: "preferredGuideId",
-  });
-
-  /**
-   * =========================================================
-   * Selected entities
-   * =========================================================
-   */
-
-  const selectedPackage = useMemo(
-    () =>
-      packages.find(
-        (travelPackage) => String(travelPackage.id) === selectedPackageId,
-      ),
-    [packages, selectedPackageId],
-  );
-
-  const selectedGuide = useMemo(
-    () => guides.find((guide) => guide.id === selectedGuideId),
-    [guides, selectedGuideId],
-  );
-
-  const selectedPackageImage = selectedPackage
-    ? (selectedPackage.images.find((image) => image.isPrimary) ??
-      selectedPackage.images[0])
-    : null;
-
-  const selectedPackageImageUrl = selectedPackageImage
-    ? getPackageImageUrl(selectedPackageImage.imageUrl)
-    : null;
-
-  /**
-   * =========================================================
-   * Submit
-   * =========================================================
-   */
+  const cancelHref = initialPackage ? `/packages/${initialPackage.slug}` : "/tourist/requests";
 
   const onSubmit = async (values: TourRequestFormValues) => {
+    if (submissionLock.current) {
+      return;
+    }
+
+    // Only selectable options are ever submitted.
+    if (values.requestType === "PACKAGE_BASED" && !selectedPackage) {
+      setError("packageId", { type: "manual", message: "Please select a travel package" });
+
+      setFocus("packageId");
+
+      return;
+    }
+
+    if (values.preferredGuideId && !selectedGuide) {
+      setError("preferredGuideId", { type: "manual", message: "Please choose a guide from the list" });
+
+      setFocus("preferredGuideId");
+
+      return;
+    }
+
+    submissionLock.current = true;
+
     try {
-      setServerError(null);
+      setServerProblem(null);
 
       const commonData = {
         preferredStartDate: values.preferredStartDate,
-
         preferredEndDate: values.preferredEndDate || null,
-
         adultCount: Number(values.adultCount),
-
         childCount: Number(values.childCount),
-
         budget: values.budget ? Number(values.budget) : null,
-
         currency: values.currency.trim().toUpperCase(),
-
         preferredGuideId: values.preferredGuideId || null,
-
         hotelPreference: values.hotelPreference || null,
-
         transportPreference: values.transportPreference || null,
-
         specialRequirements: values.specialRequirements || null,
-
         contactMethod: values.contactMethod || null,
       };
 
-      let createdRequest;
+      const createdRequest =
+        values.requestType === "PACKAGE_BASED"
+          ? await createPackageBasedTourRequest({
+              packageId: Number(values.packageId),
+              ...commonData,
+            })
+          : await createCustomTourRequest({
+              title: values.title!.trim(),
+              destinationPreferences: values.destinationPreferences!.trim(),
+              ...commonData,
+            });
 
-      if (values.requestType === "PACKAGE_BASED") {
-        createdRequest = await createPackageBasedTourRequest({
-          packageId: Number(values.packageId),
+      setSubmitted(true);
 
-          ...commonData,
-        });
-      } else {
-        createdRequest = await createCustomTourRequest({
-          title: values.title!.trim(),
-
-          destinationPreferences: values.destinationPreferences!.trim(),
-
-          ...commonData,
-        });
-      }
+      // The new request is the root of a new journey: refresh the
+      // traveler's request list used by My journeys and the dashboard.
+      await queryClient.invalidateQueries({ queryKey: ["tour-requests", "me"] });
 
       router.push(`/tourist/requests/${createdRequest.id}`);
     } catch (error) {
-      if (error instanceof AxiosError) {
-        setServerError(
-          error.response?.data?.message ??
-            "Unable to submit your tour request.",
-        );
+      submissionLock.current = false;
 
-        return;
+      const problem = describeServerError(error);
+
+      for (const field of problem.fields) {
+        setError(field.name, { type: "server", message: field.message });
       }
 
-      setServerError("Unable to submit your tour request.");
+      setServerProblem(problem.messages);
     }
   };
 
+  const fieldError = (name: FieldName) => errors[name]?.message as string | undefined;
+
+  const summary =
+    submitCount > 0 && !serverProblem
+      ? FIELD_ORDER.filter(({ name }) => errors[name]?.message).map(({ name, id }) => ({
+          id,
+          message: errors[name]!.message as string,
+        }))
+      : [];
+
+  const locked = isSubmitting || submitted;
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-      {/* =====================================================
-          REQUEST TYPE
-      ===================================================== */}
+    <form
+      noValidate
+      onSubmit={(event) => {
+        // A new attempt replaces any previous server message.
+        setServerProblem(null);
 
-      <section className="rounded-2xl border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Route className="size-5 text-primary" />
+        return handleSubmit(onSubmit)(event);
+      }}
+    >
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-8">
+        {/* Context: compact first on phones, a sticky side panel on desktop. */}
+        <aside aria-label="Journey context" className="lg:order-2">
+          <div className="space-y-4 lg:sticky lg:top-6">
+            {requestType === "PACKAGE_BASED" && selectedPackage ? (
+              <PackageContextCard travelPackage={selectedPackage} />
+            ) : (
+              requestType === "CUSTOM" && (
+                <div className="hidden rounded-card border bg-card p-5 lg:block">
+                  <p className="text-overline text-tea-700">Your custom journey</p>
 
-          <h2 className="text-xl font-semibold">
-            How would you like to start?
-          </h2>
-        </div>
-
-        <p className="mt-2 text-sm text-muted-foreground">
-          Customize one of our existing journeys or ask us to design something
-          completely new.
-        </p>
-
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label
-            className={`cursor-pointer rounded-xl border p-4 transition ${
-              requestType === "PACKAGE_BASED"
-                ? "border-primary bg-primary/5 ring-1 ring-primary"
-                : "hover:bg-muted/40"
-            }`}
-          >
-            <div className="flex gap-3">
-              <input
-                type="radio"
-                value="PACKAGE_BASED"
-                {...register("requestType")}
-                className="mt-1"
-              />
-
-              <div>
-                <p className="font-medium">Customize a package</p>
-
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Start from an existing Travora journey and personalize the
-                  dates, travelers, accommodation, guide and experiences.
-                </p>
-              </div>
-            </div>
-          </label>
-
-          <label
-            className={`cursor-pointer rounded-xl border p-4 transition ${
-              requestType === "CUSTOM"
-                ? "border-primary bg-primary/5 ring-1 ring-primary"
-                : "hover:bg-muted/40"
-            }`}
-          >
-            <div className="flex gap-3">
-              <input
-                type="radio"
-                value="CUSTOM"
-                {...register("requestType")}
-                className="mt-1"
-              />
-
-              <div>
-                <p className="font-medium">Create from scratch</p>
-
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Tell us what you have in mind and our team will design a
-                  completely custom Sri Lanka journey.
-                </p>
-              </div>
-            </div>
-          </label>
-        </div>
-      </section>
-
-      {/* =====================================================
-          PACKAGE
-      ===================================================== */}
-
-      {requestType === "PACKAGE_BASED" && (
-        <section className="rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" />
-
-            <h2 className="text-xl font-semibold">Selected journey</h2>
-          </div>
-
-          <p className="mt-2 text-sm text-muted-foreground">
-            Use this journey as your starting point. Your preferences below will
-            be sent to our team for customization.
-          </p>
-
-          {/* Selected package card */}
-
-          {selectedPackage && (
-            <div className="mt-5 overflow-hidden rounded-2xl border">
-              <div className="grid md:grid-cols-[220px_1fr]">
-                <div className="relative min-h-[180px] bg-muted">
-                  {selectedPackageImage && selectedPackageImageUrl ? (
-                    <Image
-                      src={selectedPackageImageUrl}
-                      alt={
-                        selectedPackageImage.altText ?? selectedPackage.title
-                      }
-                      fill
-                      unoptimized
-                      sizes="(max-width: 768px) 100vw, 220px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center p-5 text-sm text-muted-foreground">
-                      No image available
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-5">
-                  <h3 className="text-lg font-semibold">
-                    {selectedPackage.title}
-                  </h3>
-
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="size-4" />
-
-                      {selectedPackage.destination}
-                    </span>
-
-                    <span className="flex items-center gap-1.5">
-                      <Clock3 className="size-4" />
-                      {selectedPackage.durationDays}{" "}
-                      {selectedPackage.durationDays === 1 ? "day" : "days"}
-                    </span>
-                  </div>
-
-                  <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                    {selectedPackage.description}
+                  <p className="mt-2 text-body-sm text-foreground-secondary">
+                    Tell us where you would like to go and what matters to you. Travora designs the itinerary around
+                    your dates, travelers and budget.
                   </p>
-
-                  <div className="mt-4 border-t pt-4">
-                    <p className="text-xs text-muted-foreground">
-                      Starting from
-                    </p>
-
-                    <p className="mt-1 text-xl font-bold">
-                      ${selectedPackage.price}
-                    </p>
-                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )
+            )}
 
-          {/* Package selector */}
+            <WhatHappensNext className="hidden lg:block" />
+          </div>
+        </aside>
 
-          <div className="mt-5 space-y-2">
-            <Label htmlFor="packageId">Travel package</Label>
-
-            <select
-              id="packageId"
-              {...register("packageId")}
-              className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+        <div className="space-y-4 sm:space-y-6 lg:order-1">
+          {summary.length > 0 && (
+            <div
+              role="alert"
+              data-testid="error-summary"
+              className="rounded-card border border-danger-border bg-danger-soft p-4"
             >
-              <option value="">Select a package</option>
-
-              {packages.map((travelPackage) => (
-                <option key={travelPackage.id} value={travelPackage.id}>
-                  {travelPackage.title}
-                </option>
-              ))}
-            </select>
-
-            {errors.packageId && (
-              <p className="text-sm text-destructive">
-                {errors.packageId.message}
-              </p>
-            )}
-
-            {initialPackageId && selectedPackage && (
-              <p className="text-xs text-muted-foreground">
-                This package was selected from the journey page. You can change
-                it if you prefer another package.
-              </p>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* =====================================================
-          CUSTOM REQUEST
-      ===================================================== */}
-
-      {requestType === "CUSTOM" && (
-        <section className="space-y-5 rounded-2xl border bg-white p-6 shadow-sm">
-          <div>
-            <h2 className="text-xl font-semibold">Your custom journey</h2>
-
-            <p className="mt-2 text-sm text-muted-foreground">
-              Give us a starting idea and we&apos;ll shape the itinerary with
-              you.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="title">Trip title</Label>
-
-            <Input
-              id="title"
-              placeholder="My Sri Lanka adventure"
-              {...register("title")}
-            />
-
-            {errors.title && (
-              <p className="text-sm text-destructive">{errors.title.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="destinationPreferences">
-              Destination preferences
-            </Label>
-
-            <Textarea
-              id="destinationPreferences"
-              placeholder="Example: Kandy, Ella, Mirissa, Yala, Sigiriya..."
-              rows={4}
-              {...register("destinationPreferences")}
-            />
-
-            {errors.destinationPreferences && (
-              <p className="text-sm text-destructive">
-                {errors.destinationPreferences.message}
-              </p>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* =====================================================
-          DATES
-      ===================================================== */}
-
-      <section className="rounded-2xl border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="size-5 text-primary" />
-
-          <h2 className="text-xl font-semibold">Travel dates</h2>
-        </div>
-
-        <p className="mt-2 text-sm text-muted-foreground">
-          Tell us when you would like to travel. The end date can remain
-          flexible if your plans are not final.
-        </p>
-
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="preferredStartDate">Preferred start date</Label>
-
-            <Input
-              id="preferredStartDate"
-              type="date"
-              {...register("preferredStartDate")}
-            />
-
-            {errors.preferredStartDate && (
-              <p className="text-sm text-destructive">
-                {errors.preferredStartDate.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="preferredEndDate">Preferred end date</Label>
-
-            <Input
-              id="preferredEndDate"
-              type="date"
-              {...register("preferredEndDate")}
-            />
-
-            {errors.preferredEndDate && (
-              <p className="text-sm text-destructive">
-                {errors.preferredEndDate.message}
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          TRAVELERS
-      ===================================================== */}
-
-      <section className="rounded-2xl border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Users className="size-5 text-primary" />
-
-          <h2 className="text-xl font-semibold">Travelers</h2>
-        </div>
-
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="adultCount">Adults</Label>
-
-            <Input
-              id="adultCount"
-              type="number"
-              min="1"
-              {...register("adultCount")}
-            />
-
-            {errors.adultCount && (
-              <p className="text-sm text-destructive">
-                {errors.adultCount.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="childCount">Children</Label>
-
-            <Input
-              id="childCount"
-              type="number"
-              min="0"
-              {...register("childCount")}
-            />
-
-            {errors.childCount && (
-              <p className="text-sm text-destructive">
-                {errors.childCount.message}
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          BUDGET
-      ===================================================== */}
-
-      <section className="rounded-2xl border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <CircleDollarSign className="size-5 text-primary" />
-
-          <h2 className="text-xl font-semibold">Budget</h2>
-        </div>
-
-        <p className="mt-2 text-sm text-muted-foreground">
-          An approximate budget helps our team prepare a realistic quotation.
-        </p>
-
-        <div className="mt-6 grid gap-5 sm:grid-cols-[1fr_180px]">
-          <div className="space-y-2">
-            <Label htmlFor="budget">Approximate budget</Label>
-
-            <Input
-              id="budget"
-              type="number"
-              min="1"
-              placeholder={
-                selectedPackage ? String(selectedPackage.price) : "2000"
-              }
-              {...register("budget")}
-            />
-
-            {errors.budget && (
-              <p className="text-sm text-destructive">
-                {errors.budget.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="currency">Currency</Label>
-
-            <Input id="currency" maxLength={10} {...register("currency")} />
-
-            {errors.currency && (
-              <p className="text-sm text-destructive">
-                {errors.currency.message}
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          PREFERENCES
-      ===================================================== */}
-
-      <section className="rounded-2xl border bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold">Travel preferences</h2>
-
-        <p className="mt-2 text-sm text-muted-foreground">
-          These details are optional, but they help us personalize the proposal.
-        </p>
-
-        {/* Guide */}
-
-        <div className="mt-6 space-y-2">
-          <Label htmlFor="preferredGuideId">Preferred tour guide</Label>
-
-          <select
-            id="preferredGuideId"
-            {...register("preferredGuideId")}
-            className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">No preference</option>
-
-            {guides
-              .filter((guide) => guide.isAvailable)
-              .map((guide) => (
-                <option key={guide.id} value={guide.id}>
-                  {guide.user.firstName} {guide.user.lastName}
-                </option>
-              ))}
-          </select>
-
-          {selectedGuide && (
-            <div className="rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">
-                {selectedGuide.user.firstName} {selectedGuide.user.lastName}
+              <p className="flex items-center gap-2 font-medium text-foreground">
+                <CircleAlert aria-hidden="true" className="size-5 text-danger-ink" />
+                Please check {summary.length === 1 ? "this field" : `these ${summary.length} fields`}
               </p>
 
-              <p className="mt-1">
-                {selectedGuide.experienceYears}{" "}
-                {selectedGuide.experienceYears === 1 ? "year" : "years"}{" "}
-                experience
-                {selectedGuide.languages.length > 0
-                  ? ` · ${selectedGuide.languages.join(", ")}`
-                  : ""}
-              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-9 text-body-sm">
+                {summary.map(({ id, message }) => (
+                  <li key={id}>
+                    <a href={`#${id}`} className="text-danger-ink underline underline-offset-4">
+                      {message}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-        </div>
 
-        {/* Hotel + transport */}
+          {/* 1. How would you like to start? */}
+          <section className={SECTION}>
+            <RequestTypeField value={requestType} registration={register("requestType")} />
+          </section>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="hotelPreference">Hotel preference</Label>
+          {/* 2. Your journey */}
+          <section aria-labelledby="section-journey" className={SECTION}>
+            <h2 id="section-journey" className="text-heading-md text-foreground">
+              Your journey
+            </h2>
 
-            <div className="relative">
-              <Hotel className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            {requestType === "PACKAGE_BASED" ? (
+              <div className="mt-4 space-y-4">
+                {packageNotice && (
+                  <p
+                    role="status"
+                    data-testid="package-notice"
+                    className="flex gap-2 rounded-md border border-info-border bg-info-soft p-3 text-body-sm text-info-ink"
+                  >
+                    <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    We couldn&apos;t find that package among the journeys currently available. Choose another package
+                    below or create a journey from scratch.
+                  </p>
+                )}
 
-              <Input
-                id="hotelPreference"
-                placeholder="3-star, boutique, luxury..."
-                className="pl-9"
-                {...register("hotelPreference")}
-              />
+                <FormField
+                  id="packageId"
+                  label="Travel package"
+                  hint="Your preferences below are sent to our team, who personalize this journey for you."
+                  error={fieldError("packageId")}
+                >
+                  {(aria) => (
+                    <NativeSelect {...aria} {...register("packageId")}>
+                      <option value="">{packages.length ? "Select a package" : "No packages available"}</option>
+                      {packages.map((travelPackage) => (
+                        <option key={travelPackage.id} value={travelPackage.id}>
+                          {travelPackage.title}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  )}
+                </FormField>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <FormField id="title" label="Trip title" error={fieldError("title")}>
+                  {(aria) => <Input {...aria} maxLength={200} placeholder="My Sri Lanka adventure" {...register("title")} />}
+                </FormField>
+
+                <FormField
+                  id="destinationPreferences"
+                  label="Destination preferences"
+                  hint="Places, regions or experiences you have in mind."
+                  error={fieldError("destinationPreferences")}
+                >
+                  {(aria) => (
+                    <Textarea
+                      {...aria}
+                      rows={3}
+                      placeholder="Example: Kandy, Ella, Mirissa, Yala, Sigiriya..."
+                      {...register("destinationPreferences")}
+                    />
+                  )}
+                </FormField>
+              </div>
+            )}
+          </section>
+
+          {/* 3. When are you travelling? */}
+          <section aria-labelledby="section-dates" className={SECTION}>
+            <h2 id="section-dates" className="text-heading-md text-foreground">
+              When are you travelling?
+            </h2>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <FormField id="preferredStartDate" label="Preferred start date" error={fieldError("preferredStartDate")}>
+                {(aria) => <Input {...aria} type="date" {...register("preferredStartDate")} />}
+              </FormField>
+
+              <FormField
+                id="preferredEndDate"
+                label="Preferred end date"
+                optional
+                hint="Leave empty if your dates are flexible."
+                error={fieldError("preferredEndDate")}
+              >
+                {(aria) => <Input {...aria} type="date" {...register("preferredEndDate")} />}
+              </FormField>
+            </div>
+          </section>
+
+          {/* 4. Who is travelling? */}
+          <section aria-labelledby="section-travelers" className={SECTION}>
+            <h2 id="section-travelers" className="text-heading-md text-foreground">
+              Who is travelling?
+            </h2>
+
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <FormField id="adultCount" label="Adults" error={fieldError("adultCount")}>
+                {(aria) => <Input {...aria} type="number" min="1" inputMode="numeric" {...register("adultCount")} />}
+              </FormField>
+
+              <FormField id="childCount" label="Children" error={fieldError("childCount")}>
+                {(aria) => <Input {...aria} type="number" min="0" inputMode="numeric" {...register("childCount")} />}
+              </FormField>
+            </div>
+          </section>
+
+          {/* 5. Budget */}
+          <section aria-labelledby="section-budget" className={SECTION}>
+            <h2 id="section-budget" className="text-heading-md text-foreground">
+              Budget
+            </h2>
+
+            <div className="mt-4 grid grid-cols-[minmax(0,1fr)_7rem] gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
+              <FormField
+                id="budget"
+                label="Approximate budget"
+                optional
+                hint={
+                  requestType === "PACKAGE_BASED" && selectedPackage
+                    ? `This package starts from ${formatMoney(selectedPackage.price, "USD")}.`
+                    : "An approximate budget helps our team prepare a realistic quotation."
+                }
+                error={fieldError("budget")}
+              >
+                {(aria) => <Input {...aria} type="number" min="1" inputMode="decimal" {...register("budget")} />}
+              </FormField>
+
+              <FormField id="currency" label="Currency" hint="For example USD." error={fieldError("currency")}>
+                {(aria) => <Input {...aria} maxLength={10} autoCapitalize="characters" {...register("currency")} />}
+              </FormField>
+            </div>
+          </section>
+
+          {/* 6. Preferences */}
+          <section aria-labelledby="section-preferences" className={SECTION}>
+            <h2 id="section-preferences" className="text-heading-md text-foreground">
+              Preferences
+            </h2>
+
+            <div className="mt-4 space-y-4">
+              {guideNotice && (
+                <p
+                  role="status"
+                  data-testid="guide-notice"
+                  className="flex gap-2 rounded-md border border-info-border bg-info-soft p-3 text-body-sm text-info-ink"
+                >
+                  <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                  The guide you selected isn&apos;t available right now. Choose another guide or continue without one.
+                </p>
+              )}
+
+              <FormField
+                id="preferredGuideId"
+                label="Preferred tour guide"
+                optional
+                error={fieldError("preferredGuideId")}
+              >
+                {(aria) => (
+                  <NativeSelect {...aria} {...register("preferredGuideId")}>
+                    <option value="">No preference</option>
+                    {availableGuides.map((guide) => (
+                      <option key={guide.id} value={guide.id}>
+                        {guide.user.firstName} {guide.user.lastName}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                )}
+              </FormField>
+
+              {selectedGuide && (
+                <p className="rounded-md bg-sand-50 px-4 py-3 text-body-sm text-foreground-secondary">
+                  <span className="font-medium text-foreground">
+                    {selectedGuide.user.firstName} {selectedGuide.user.lastName}
+                  </span>
+                  {" · "}
+                  {selectedGuide.experienceYears} {selectedGuide.experienceYears === 1 ? "year" : "years"} experience
+                  {selectedGuide.languages.length > 0 ? ` · ${selectedGuide.languages.join(", ")}` : ""}
+                </p>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  id="hotelPreference"
+                  label="Hotel preference"
+                  optional
+                  error={fieldError("hotelPreference")}
+                >
+                  {(aria) => (
+                    <Input
+                      {...aria}
+                      maxLength={100}
+                      placeholder="3-star, boutique, luxury..."
+                      {...register("hotelPreference")}
+                    />
+                  )}
+                </FormField>
+
+                <FormField
+                  id="transportPreference"
+                  label="Transport preference"
+                  optional
+                  error={fieldError("transportPreference")}
+                >
+                  {(aria) => (
+                    <Input
+                      {...aria}
+                      maxLength={100}
+                      placeholder="Private car, van, train..."
+                      {...register("transportPreference")}
+                    />
+                  )}
+                </FormField>
+              </div>
+
+              <FormField
+                id="contactMethod"
+                label="Preferred contact method"
+                optional
+                error={fieldError("contactMethod")}
+              >
+                {(aria) => (
+                  <NativeSelect {...aria} {...register("contactMethod")}>
+                    <option value="">No preference</option>
+                    <option value="WHATSAPP">WhatsApp</option>
+                    <option value="PHONE">Phone</option>
+                    <option value="EMAIL">Email</option>
+                  </NativeSelect>
+                )}
+              </FormField>
+            </div>
+          </section>
+
+          {/* 7. Anything else? */}
+          <section aria-labelledby="section-else" className={SECTION}>
+            <h2 id="section-else" className="text-heading-md text-foreground">
+              Anything else?
+            </h2>
+
+            <FormField
+              id="specialRequirements"
+              label="Special requirements"
+              optional
+              className="mt-4"
+              error={fieldError("specialRequirements")}
+            >
+              {(aria) => (
+                <Textarea
+                  {...aria}
+                  rows={4}
+                  placeholder="Vegetarian meals, accessibility requirements, honeymoon arrangements, activities you want to include..."
+                  {...register("specialRequirements")}
+                />
+              )}
+            </FormField>
+          </section>
+
+          {/* 8. Submit */}
+          <WhatHappensNext className="lg:hidden" />
+
+          {serverProblem && (
+            <div
+              role="alert"
+              data-testid="server-error"
+              className="rounded-card border border-danger-border bg-danger-soft p-4"
+            >
+              <p className="flex items-center gap-2 font-medium text-foreground">
+                <CircleAlert aria-hidden="true" className="size-5 text-danger-ink" />
+                We couldn&apos;t submit your request
+              </p>
+
+              <ul className="mt-2 list-disc space-y-1 pl-9 text-body-sm text-danger-ink">
+                {serverProblem.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link href={cancelHref} className={buttonVariants({ variant: "ghost" })}>
+              Cancel
+            </Link>
+
+            <div className="flex flex-col gap-2 sm:items-end">
+              <Button type="submit" size="lg" disabled={locked} className="w-full sm:w-auto">
+                {locked && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
+                {locked ? "Submitting..." : "Submit tour request"}
+              </Button>
+
+              <p className="text-caption text-muted-foreground">
+                No booking or payment is made until you accept a quotation.
+              </p>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="transportPreference">Transport preference</Label>
-
-            <div className="relative">
-              <Route className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-
-              <Input
-                id="transportPreference"
-                placeholder="Private car, van, train..."
-                className="pl-9"
-                {...register("transportPreference")}
-              />
-            </div>
-          </div>
         </div>
-
-        {/* Contact */}
-
-        <div className="mt-6 space-y-2">
-          <Label htmlFor="contactMethod">Preferred contact method</Label>
-
-          <select
-            id="contactMethod"
-            {...register("contactMethod")}
-            className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">No preference</option>
-
-            <option value="WHATSAPP">WhatsApp</option>
-
-            <option value="PHONE">Phone</option>
-
-            <option value="EMAIL">Email</option>
-          </select>
-        </div>
-
-        {/* Requirements */}
-
-        <div className="mt-6 space-y-2">
-          <Label htmlFor="specialRequirements">Special requirements</Label>
-
-          <Textarea
-            id="specialRequirements"
-            placeholder="Vegetarian meals, accessibility requirements, honeymoon arrangements, activities you want to include..."
-            rows={5}
-            {...register("specialRequirements")}
-          />
-        </div>
-      </section>
-
-      {/* =====================================================
-          SERVER ERROR
-      ===================================================== */}
-
-      {serverError && (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-          {serverError}
-        </div>
-      )}
-
-      {/* =====================================================
-          SUBMIT
-      ===================================================== */}
-
-      <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-          Submitting this request does not create a booking or charge you.
-          Travora will review your preferences and prepare a quotation.
-        </p>
-
-        <Button
-          type="submit"
-          size="lg"
-          disabled={isSubmitting}
-          className="shrink-0"
-        >
-          {isSubmitting && <LoaderCircle className="size-4 animate-spin" />}
-
-          {isSubmitting ? "Submitting..." : "Submit tour request"}
-        </Button>
       </div>
     </form>
   );
