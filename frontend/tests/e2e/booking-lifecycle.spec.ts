@@ -551,10 +551,10 @@ test.describe("Travora booking lifecycle", () => {
      */
 
     await page
-      .getByRole("button", {
-        name: "Rate 5 out of 5",
+      .getByRole("radio", {
+        name: "5 stars – Excellent",
       })
-      .click();
+      .check();
 
     await expect(
       page.getByText("Excellent", {

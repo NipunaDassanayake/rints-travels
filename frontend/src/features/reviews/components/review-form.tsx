@@ -1,212 +1,250 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 
-import { CheckCircle2, LoaderCircle, Send, Star } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+
+import { Send, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+
+import { Textarea } from "@/components/ui/textarea";
+
+import { cn } from "@/lib/utils";
 
 import { createReview } from "../review.api";
+
+import type { Review } from "../review.types";
+
+import { RATING_WORDS, ratingLabel } from "./submitted-review";
+
+/** Matches the backend's limit for a review comment. */
+export const REVIEW_COMMENT_MAX = 2000;
+
+const RATINGS = [1, 2, 3, 4, 5];
+
+const count = new Intl.NumberFormat("en-US");
+
+export type ReviewOutcome = { kind: "created"; review: Review } | { kind: "conflict" };
 
 interface ReviewFormProps {
   bookingId: string;
 
   guideName: string;
 
-  onSuccess?: () => void;
+  /**
+   * Resolves the saved review once the server has accepted it, or
+   * after a 409 says one already exists. Returns false when the
+   * saved review could not be shown.
+   */
+  onSubmitted: (outcome: ReviewOutcome) => Promise<boolean>;
 }
 
-export function ReviewForm({
-  bookingId,
-  guideName,
-  onSuccess,
-}: ReviewFormProps) {
-  const queryClient = useQueryClient();
-
+/**
+ * Review form for a completed trip (CR-030 Stage 5).
+ *
+ * The rating is a native radio group (arrow keys, one tab stop);
+ * each transparent radio sits over its star, so a click lands on
+ * the real control.
+ * Submit stays enabled: without a rating it explains why and moves
+ * focus to the group. A second click while a review is being sent
+ * is ignored.
+ */
+export function ReviewForm({ bookingId, guideName, onSubmitted }: ReviewFormProps) {
   const [rating, setRating] = useState(0);
 
   const [hoveredRating, setHoveredRating] = useState(0);
 
   const [comment, setComment] = useState("");
 
-  const [submitted, setSubmitted] = useState(false);
+  const [ratingError, setRatingError] = useState(false);
 
-  const reviewMutation = useMutation({
-    mutationFn: () =>
-      createReview({
-        bookingId,
-        rating,
-        comment: comment.trim() || undefined,
-      }),
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-    onSuccess: async () => {
-      setSubmitted(true);
+  const [busy, setBusy] = useState(false);
 
-      await queryClient.invalidateQueries({
-        queryKey: ["review", "booking", bookingId],
-      });
+  const sending = useRef(false);
 
-      await queryClient.invalidateQueries({
-        queryKey: ["reviews", "me"],
-      });
+  const firstOption = useRef<HTMLInputElement>(null);
 
-      await queryClient.invalidateQueries({
-        queryKey: ["bookings", "me"],
-      });
-
-      onSuccess?.();
-    },
-  });
+  const reviewMutation = useMutation({ mutationFn: createReview });
 
   const displayRating = hoveredRating || rating;
 
-  const handleSubmit = () => {
-    if (rating < 1 || rating > 5) {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (sending.current) {
       return;
     }
 
-    reviewMutation.mutate();
+    if (rating < 1 || rating > 5) {
+      setRatingError(true);
+
+      firstOption.current?.focus();
+
+      return;
+    }
+
+    sending.current = true;
+
+    setBusy(true);
+
+    setSubmitError(null);
+
+    try {
+      const review = await reviewMutation.mutateAsync({
+        bookingId,
+        rating,
+        comment: comment.trim() || undefined,
+      });
+
+      await onSubmitted({ kind: "created", review });
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        const shown = await onSubmitted({ kind: "conflict" });
+
+        if (!shown) {
+          setSubmitError("We couldn't load your review just now. Please try again.");
+        }
+      } else {
+        setSubmitError("We couldn't submit your review. Please try again.");
+      }
+    } finally {
+      sending.current = false;
+
+      setBusy(false);
+    }
   };
 
-  if (submitted) {
-    return (
-      <Card>
-        <CardContent className="py-10">
-          <div className="flex flex-col items-center text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
-              <CheckCircle2 className="size-7 text-primary" />
-            </div>
-
-            <h3 className="mt-4 text-xl font-semibold">
-              Thank you for your review
-            </h3>
-
-            <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              Your feedback about {guideName} has been submitted successfully.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const atLimit = comment.length >= REVIEW_COMMENT_MAX;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Rate your tour guide</CardTitle>
+    <section aria-labelledby="rate-guide" data-testid="review-form" className="rounded-card border bg-card p-5 sm:p-6">
+      <h2 id="rate-guide" className="text-heading-md text-foreground">
+        Rate your tour guide
+      </h2>
 
-        <CardDescription>
-          How was your experience with {guideName}? Your feedback helps other
-          travelers choose the right guide.
-        </CardDescription>
-      </CardHeader>
+      <p className="mt-1 text-body-sm text-foreground-secondary">
+        How was your trip with {guideName}? Your review helps other travelers choose their guide.
+      </p>
 
-      <CardContent className="space-y-6">
-        <div>
-          <p className="mb-3 text-sm font-medium">Your rating</p>
+      <form noValidate onSubmit={handleSubmit} className="mt-5 space-y-6">
+        <fieldset
+          role="radiogroup"
+          aria-labelledby="review-rating-legend"
+          aria-required="true"
+          aria-invalid={ratingError || undefined}
+          aria-describedby={ratingError ? "review-rating-error" : undefined}
+        >
+          <legend id="review-rating-legend" className="text-label text-foreground">
+            Your rating
+          </legend>
 
-          <div
-            className="flex items-center gap-1"
-            onMouseLeave={() => setHoveredRating(0)}
-          >
-            {[1, 2, 3, 4, 5].map((star) => {
-              const active = star <= displayRating;
+          <div className="mt-2 flex flex-wrap items-center gap-1" onMouseLeave={() => setHoveredRating(0)}>
+            {RATINGS.map((value) => {
+              const id = `review-rating-${value}`;
 
               return (
-                <button
-                  key={star}
-                  type="button"
-                  className="rounded-md p-1 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                  onMouseEnter={() => setHoveredRating(star)}
-                  onClick={() => setRating(star)}
-                  aria-label={`Rate ${star} out of 5`}
-                >
-                  <Star
-                    className={`size-8 ${
-                      active
-                        ? "fill-yellow-400 text-yellow-400"
-                        : "text-muted-foreground/40"
-                    }`}
+                <div key={value} className="relative" onMouseEnter={() => setHoveredRating(value)}>
+                  <input
+                    ref={value === 1 ? firstOption : undefined}
+                    id={id}
+                    type="radio"
+                    name="review-rating"
+                    value={value}
+                    checked={rating === value}
+                    onChange={() => {
+                      setRating(value);
+
+                      setHoveredRating(0);
+
+                      setRatingError(false);
+                    }}
+                    className="peer absolute inset-0 z-10 size-full cursor-pointer appearance-none opacity-0"
                   />
-                </button>
+
+                  <label
+                    htmlFor={id}
+                    className="flex size-11 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-sand-100 peer-checked:bg-tea-50 peer-checked:ring-1 peer-checked:ring-tea-300 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring"
+                  >
+                    <Star
+                      aria-hidden="true"
+                      className={cn(
+                        "size-7",
+                        value <= displayRating ? "fill-cinnamon-500 text-cinnamon-600" : "text-ink-400",
+                      )}
+                    />
+
+                    <span className="sr-only">{ratingLabel(value)}</span>
+                  </label>
+                </div>
               );
             })}
-          </div>
 
-          {rating > 0 && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {rating === 1 && "Poor experience"}
-
-              {rating === 2 && "Could be better"}
-
-              {rating === 3 && "Good"}
-
-              {rating === 4 && "Very good"}
-
-              {rating === 5 && "Excellent"}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="review-comment" className="text-sm font-medium">
-            Tell us about your experience
-          </label>
-
-          <textarea
-            id="review-comment"
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            maxLength={1000}
-            rows={5}
-            placeholder={`Share your experience with ${guideName}...`}
-            className="mt-2 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-
-          <div className="mt-1 flex justify-end">
-            <span className="text-xs text-muted-foreground">
-              {comment.length}/1000
+            <span aria-hidden="true" data-testid="rating-caption" className="ml-2 text-body-sm text-foreground-secondary">
+              {rating ? RATING_WORDS[rating] : ""}
             </span>
           </div>
+
+          {ratingError && (
+            <p id="review-rating-error" role="alert" className="mt-2 text-body-sm font-medium text-destructive">
+              Choose a rating
+            </p>
+          )}
+        </fieldset>
+
+        <div>
+          <label htmlFor="review-comment" className="text-label text-foreground">
+            Tell us about your experience
+            <span className="font-normal text-muted-foreground"> (optional)</span>
+          </label>
+
+          <Textarea
+            id="review-comment"
+            value={comment}
+            onChange={(event) => setComment(event.target.value.slice(0, REVIEW_COMMENT_MAX))}
+            maxLength={REVIEW_COMMENT_MAX}
+            rows={5}
+            aria-describedby="review-comment-count"
+            placeholder={`What made the trip with ${guideName} memorable?`}
+            className="mt-2 max-h-80 min-h-32 resize-y [overflow-wrap:anywhere]"
+          />
+
+          <p
+            id="review-comment-count"
+            data-testid="comment-count"
+            className={cn("mt-1 text-right text-caption", atLimit ? "text-foreground" : "text-muted-foreground")}
+          >
+            {count.format(comment.length)} / {count.format(REVIEW_COMMENT_MAX)} characters
+            {atLimit && <span className="sr-only"> – limit reached</span>}
+          </p>
         </div>
 
-        {reviewMutation.isError && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-            <p className="text-sm text-destructive">
-              Unable to submit your review. Please try again.
-            </p>
-          </div>
+        {submitError && (
+          <p role="alert" className="rounded-md border border-danger-border bg-danger-soft px-3 py-2 text-body-sm text-danger-ink">
+            {submitError}
+          </p>
         )}
 
-        <Button
-          type="button"
-          onClick={handleSubmit}
-          disabled={rating === 0 || reviewMutation.isPending}
-          className="w-full sm:w-auto"
-        >
-          {reviewMutation.isPending ? (
+        <Button type="submit" aria-disabled={busy || undefined} className="w-full sm:w-auto">
+          {busy ? (
             <>
-              <LoaderCircle className="mr-2 size-4 animate-spin" />
-              Submitting...
+              <Spinner size="sm" className="text-current" />
+              Submitting…
             </>
           ) : (
             <>
-              <Send className="mr-2 size-4" />
+              <Send aria-hidden="true" />
               Submit review
             </>
           )}
         </Button>
-      </CardContent>
-    </Card>
+      </form>
+    </section>
   );
 }

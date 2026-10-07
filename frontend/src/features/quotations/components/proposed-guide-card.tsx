@@ -11,8 +11,15 @@ import type { QuotationGuide } from "../quotation.types";
  * the public profile -- name, location, experience, languages,
  * specializations, rating and bio. Contact details are never
  * rendered (CR-009), even if a response were to carry them.
+ * Bookings reuse it with their own heading ("Your tour guide").
  */
-export function ProposedGuideCard({ guide }: { guide: QuotationGuide }) {
+export function ProposedGuideCard({
+  guide,
+  title = "Your proposed guide",
+}: {
+  guide: QuotationGuide;
+  title?: string;
+}) {
   const name = `${guide.user.firstName} ${guide.user.lastName}`;
 
   const reviews = guide.totalReviews ?? 0;
@@ -26,7 +33,7 @@ export function ProposedGuideCard({ guide }: { guide: QuotationGuide }) {
   return (
     <Card data-testid="proposed-guide">
       <CardHeader>
-        <CardTitle as="h2">Your proposed guide</CardTitle>
+        <CardTitle as="h2">{title}</CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-5">

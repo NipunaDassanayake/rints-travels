@@ -614,7 +614,7 @@ test.describe("Travora admin guide management", () => {
       page.getByText("Rate your tour guide", { exact: true }),
     ).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole("button", { name: "Rate 5 out of 5" }).click();
+    await page.getByRole("radio", { name: "5 stars – Excellent" }).check();
 
     const reviewComment = `Playwright admin-guide-management review ${uniqueSuffix}`;
 
