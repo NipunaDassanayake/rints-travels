@@ -2,11 +2,11 @@
 
 import {
   CalendarCheck2,
-  FileText,
   LayoutDashboard,
-  MessageSquareText,
   PlusCircle,
   ReceiptText,
+  Route,
+  UsersRound,
   WalletCards,
 } from "lucide-react";
 
@@ -25,9 +25,10 @@ const touristNavigation: PortalNavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    label: "My requests",
+    // CR-030: a tour request is the root of a traveler's journey.
+    label: "My journeys",
     href: "/tourist/requests",
-    icon: FileText,
+    icon: Route,
   },
   {
     label: "Quotations",
@@ -35,14 +36,14 @@ const touristNavigation: PortalNavItem[] = [
     icon: ReceiptText,
   },
   {
-    label: "Payments",
-    href: "/tourist/payments",
-    icon: WalletCards,
-  },
-  {
     label: "Bookings",
     href: "/tourist/bookings",
     icon: CalendarCheck2,
+  },
+  {
+    label: "Payments",
+    href: "/tourist/payments",
+    icon: WalletCards,
   },
 ];
 
@@ -53,12 +54,15 @@ export default function TouristLayout({
 }) {
   const { user, isLoggingOut, logout } = usePortalSession();
 
+  // Travelers see a human role label; the account role is unchanged.
+  const shellUser = user ? { ...user, role: "Traveler" } : null;
+
   return (
     <RoleGuard allowedRoles={["TOURIST"]}>
       <PortalShell
         area="traveler"
-        title="Traveler Portal"
-        mobileTitle="Travora Traveler"
+        title="My Travora"
+        mobileTitle="My Travora"
         homeHref="/tourist"
         navigationLabel="Traveler navigation"
         toggleLabel="Toggle traveler navigation"
@@ -72,7 +76,7 @@ export default function TouristLayout({
           {
             label: "Browse guides",
             href: "/guides",
-            icon: MessageSquareText,
+            icon: UsersRound,
             variant: "outline",
           },
           {
@@ -81,7 +85,7 @@ export default function TouristLayout({
             variant: "ghost",
           },
         ]}
-        user={user}
+        user={shellUser}
         isLoggingOut={isLoggingOut}
         onLogout={logout}
       >

@@ -9,19 +9,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   CalendarDays,
   Circle,
   CircleCheck,
   Clock3,
   Hotel,
-  LoaderCircle,
   MapPin,
   MessageCircle,
   Route,
   Users,
   Wallet,
 } from "lucide-react";
+
+import { ErrorState } from "@/components/patterns/error-state";
+
+import { LoadingState } from "@/components/patterns/loading-state";
+
+import { StatusBadge } from "@/components/patterns/status-badge";
 
 import { buttonVariants } from "@/components/ui/button";
 
@@ -39,6 +45,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import { isQuotationExpired, type Journey } from "@/features/journeys/journey";
+
+import { useTravelerJourneys } from "@/features/journeys/use-traveler-journeys";
+
 import { getPackageImageUrl } from "@/features/packages/admin-package.api";
 
 import { getPackageBySlug } from "@/features/packages/package.api";
@@ -52,8 +62,15 @@ import { getTourRequestQuotations } from "@/features/quotations/quotation.api";
 
 import {
   CANCELLABLE_TOUR_REQUEST_STATUSES,
+  type TourRequest,
   type TourRequestStatus,
 } from "@/features/tour-requests/tour-request.types";
+
+import { formatDate, formatMoney, formatStatusLabel, formatUsdPrice } from "@/lib/format";
+
+import type { StatusEntity } from "@/lib/status";
+
+import { cn } from "@/lib/utils";
 
 const STATUS_ORDER: TourRequestStatus[] = [
   "PENDING_REVIEW",
@@ -64,31 +81,187 @@ const STATUS_ORDER: TourRequestStatus[] = [
   "BOOKED",
 ];
 
-function formatStatus(status: string) {
-  return status
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
+const CONTACT_METHODS: Record<string, string> = {
+  WHATSAPP: "WhatsApp",
+  PHONE: "Phone",
+  EMAIL: "Email",
+};
 
-function formatDate(value: string | null) {
-  if (!value) {
-    return "Flexible";
-  }
+/** Caption under the tracker's last reached step once a booking exists. */
+const BOOKING_STAGE: Record<string, string> = {
+  CONFIRMED: "Trip confirmed",
+  IN_PROGRESS: "Trip underway",
+  COMPLETED: "Trip completed",
+};
 
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-
-    month: "short",
-
-    year: "numeric",
-
-    timeZone: "UTC",
-  }).format(new Date(value));
+function formatTravelDate(value: string | null) {
+  return formatDate(value, { fallback: "Flexible" });
 }
 
 function getProgressIndex(status: TourRequestStatus) {
   return STATUS_ORDER.indexOf(status);
+}
+
+/**
+ * The line under the title. Once a booking exists it speaks for the
+ * trip (CR-030 Stage 6): cancelling a booking leaves the request
+ * BOOKED, so the request status alone would still read as booked.
+ * Without the booking (still loading, or the lists failed) a BOOKED
+ * request only states the stage it reached.
+ */
+function describeRequest(request: TourRequest, journey: Journey | null) {
+  const booking = journey?.booking;
+
+  if (booking) {
+    switch (booking.status) {
+      case "CONFIRMED":
+        return "Your trip is confirmed.";
+      case "IN_PROGRESS":
+        return "Your trip is underway.";
+      case "COMPLETED":
+        return "Your trip is complete.";
+      case "CANCELLED":
+        return "This trip's booking was cancelled. This booking is no longer active.";
+    }
+  }
+
+  if (request.status === "BOOKED") {
+    return "This journey reached the booking stage.";
+  }
+
+  if (request.status === "QUOTATION_SENT" && journey?.quotationExpired) {
+    return "Your quotation has expired. Any updated quotation from Travora will appear here.";
+  }
+
+  switch (request.status) {
+    case "PENDING_REVIEW":
+      return "Your request has been submitted and is waiting for our travel team to review it.";
+    case "UNDER_DISCUSSION":
+      return "Our team is currently reviewing and discussing your travel requirements.";
+    case "READY_FOR_QUOTATION":
+      return "Your travel requirements are ready for quotation preparation.";
+    case "QUOTATION_SENT":
+      return "A quotation has been prepared for your request.";
+    case "ACCEPTED":
+      return "Your quotation has been accepted and the booking process can continue.";
+    case "REJECTED":
+    case "CANCELLED":
+      return "This request is no longer progressing through the standard booking process.";
+    default:
+      return "Track the progress of your travel request here.";
+  }
+}
+
+/** The badge beside the title: the booking once there is one, else the request. */
+function headerStatus(
+  request: TourRequest,
+  journey: Journey | null,
+): { entity: StatusEntity; value: string } | null {
+  if (journey?.booking) {
+    return { entity: "booking", value: journey.booking.status };
+  }
+
+  if (request.status === "QUOTATION_SENT" && journey?.quotationExpired) {
+    return { entity: "quotation", value: "EXPIRED" };
+  }
+
+  // A BOOKED request without its booking cannot say how the trip
+  // stands now, so it shows no current-state badge.
+  if (request.status === "BOOKED") {
+    return null;
+  }
+
+  return { entity: "tourRequest", value: request.status };
+}
+
+interface NextStep {
+  title: string;
+  text: string;
+  label: string;
+  href: string;
+  primary: boolean;
+}
+
+/**
+ * Where to go from the request, from the shared journey model's own
+ * action (never a second lifecycle). Payment and checkout stay on
+ * the quotation and payment pages; this only links there.
+ */
+function nextStepFor(journey: Journey): NextStep | null {
+  const { booking, action } = journey;
+
+  if (booking) {
+    if (action?.kind === "LEAVE_REVIEW") {
+      return {
+        title: "Next step",
+        text: "Your trip is complete. Tell other travelers how it went.",
+        label: action.label,
+        href: action.href,
+        primary: true,
+      };
+    }
+
+    return {
+      title: "Your booking",
+      text:
+        booking.status === "CANCELLED"
+          ? "See the details of the cancelled booking."
+          : "See your booking for dates, itinerary and guide details.",
+      label: "View booking",
+      href: `/tourist/bookings/${booking.id}`,
+      primary: false,
+    };
+  }
+
+  if (!action) {
+    return null;
+  }
+
+  switch (action.kind) {
+    case "REVIEW_QUOTATION":
+      return {
+        title: "Next step",
+        text: "Your quotation is ready. Review it to accept or decline.",
+        label: action.label,
+        href: action.href,
+        primary: true,
+      };
+    case "PAY":
+      return {
+        title: "Next step",
+        text: "You accepted the quotation. Complete the payment to confirm your booking.",
+        label: action.label,
+        href: action.href,
+        primary: true,
+      };
+    case "RESUME_PAYMENT":
+      return {
+        title: "Next step",
+        text: "You started a payment. Resume it to confirm your booking.",
+        label: action.label,
+        href: action.href,
+        primary: true,
+      };
+    case "CHECK_PAYMENT":
+      return {
+        title: "Your payment",
+        text:
+          journey.paymentState === "PAID"
+            ? "Your payment has been received. Travora is finalizing your booking."
+            : "Your payment is being processed.",
+        label: action.label,
+        href: action.href,
+        primary: false,
+      };
+    default:
+      return {
+        title: "Your booking",
+        text: "See your booking for dates, itinerary and guide details.",
+        label: action.label,
+        href: action.href,
+        primary: false,
+      };
+  }
 }
 
 export default function TourRequestDetailsPage() {
@@ -104,6 +277,7 @@ export default function TourRequestDetailsPage() {
     data: request,
     isLoading,
     isError,
+    refetch,
   } = useQuery({
     queryKey: ["tour-request", requestId],
 
@@ -111,6 +285,12 @@ export default function TourRequestDetailsPage() {
 
     enabled: Boolean(requestId),
   });
+
+  // The quotation, payment, booking and review of this journey, from
+  // the same shared lists the dashboard and My journeys use.
+  const journeys = useTravelerJourneys();
+
+  const journey = journeys.journeys.find((candidate) => candidate.id === requestId) ?? null;
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelTourRequest(requestId),
@@ -130,6 +310,7 @@ export default function TourRequestDetailsPage() {
     data: quotations,
     isLoading: areQuotationsLoading,
     isError: areQuotationsError,
+    refetch: refetchQuotations,
   } = useQuery({
     queryKey: ["tour-request", requestId, "quotations"],
 
@@ -151,10 +332,20 @@ export default function TourRequestDetailsPage() {
     enabled: Boolean(packageSlug),
   });
 
+  const backLink = (
+    <Link
+      href="/tourist/requests"
+      className="inline-flex min-h-10 items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+    >
+      <ArrowLeft aria-hidden="true" className="size-4" />
+      Back to my journeys
+    </Link>
+  );
+
   if (isLoading) {
     return (
-      <main className="flex min-h-[60vh] items-center justify-center">
-        <LoaderCircle className="size-7 animate-spin text-muted-foreground" />
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <LoadingState label="Loading your request" className="min-h-[50vh]" />
       </main>
     );
   }
@@ -162,23 +353,14 @@ export default function TourRequestDetailsPage() {
   if (isError || !request) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-        <div className="rounded-2xl border border-destructive/40 p-6">
-          <h1 className="text-xl font-semibold">Unable to load request</h1>
+        <ErrorState
+          headingLevel="h1"
+          title="Unable to load request"
+          description="The request could not be loaded or you may not have permission to view it."
+          onRetry={() => void refetch()}
+        />
 
-          <p className="mt-2 text-sm text-muted-foreground">
-            The request could not be loaded or you may not have permission to
-            view it.
-          </p>
-
-          <Link
-            href="/tourist"
-            className={`${buttonVariants({
-              variant: "outline",
-            })} mt-5`}
-          >
-            Back to dashboard
-          </Link>
-        </div>
+        <div className="mt-4 text-center">{backLink}</div>
       </main>
     );
   }
@@ -196,9 +378,27 @@ export default function TourRequestDetailsPage() {
   const isTerminalStatus =
     request.status === "REJECTED" || request.status === "CANCELLED";
 
+  const booking = journey?.booking ?? null;
+
+  const bookingCancelled = booking?.status === "CANCELLED";
+
+  const status = headerStatus(request, journey);
+
+  const nextStep = journey ? nextStepFor(journey) : null;
+
+  const currentStageCaption = booking
+    ? (BOOKING_STAGE[booking.status] ?? "Current stage")
+    : request.status === "BOOKED"
+      ? "Stage reached"
+      : "Current stage";
+
   const canCancel = CANCELLABLE_TOUR_REQUEST_STATUSES.includes(
     request.status,
   );
+
+  const packagePrice = request.travelPackage
+    ? formatUsdPrice(request.travelPackage.price)
+    : null;
 
   const packagePrimaryImage = fullPackage
     ? (fullPackage.images.find((image) => image.isPrimary) ??
@@ -216,15 +416,9 @@ export default function TourRequestDetailsPage() {
       ===================================================== */}
 
       <div className="mb-8">
-        <Link
-          href="/tourist"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to dashboard
-        </Link>
+        {backLink}
 
-        <div className="mt-5 flex flex-wrap items-start justify-between gap-5">
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.15em] text-primary">
               {request.requestType === "PACKAGE_BASED"
@@ -236,34 +430,61 @@ export default function TourRequestDetailsPage() {
               {title}
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {request.status === "PENDING_REVIEW"
-                ? "Your request has been submitted and is waiting for our travel team to review it."
-                : request.status === "UNDER_DISCUSSION"
-                  ? "Our team is currently reviewing and discussing your travel requirements."
-                  : request.status === "READY_FOR_QUOTATION"
-                    ? "Your travel requirements are ready for quotation preparation."
-                    : request.status === "QUOTATION_SENT"
-                      ? "A quotation has been prepared for your request."
-                      : request.status === "ACCEPTED"
-                        ? "Your quotation has been accepted and the booking process can continue."
-                        : request.status === "BOOKED"
-                          ? "Your journey has been booked."
-                          : isTerminalStatus
-                            ? "This request is no longer progressing through the standard booking process."
-                            : "Track the progress of your travel request here."}
-            </p>
-
-            <p className="mt-2 text-xs text-muted-foreground">
-              Request ID: {request.id}
+            <p
+              data-testid="request-summary"
+              className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground"
+            >
+              {describeRequest(request, journey)}
             </p>
           </div>
 
-          <span className="rounded-full border bg-background px-4 py-2 text-sm font-medium shadow-sm">
-            {formatStatus(request.status)}
-          </span>
+          {status && <StatusBadge entity={status.entity} status={status.value} />}
         </div>
       </div>
+
+      {/* =====================================================
+          NEXT STEP (CR-030 Stage 6)
+      ===================================================== */}
+
+      {journeys.isLoading ? (
+        <LoadingState
+          label="Checking the latest status of this trip"
+          className="mb-8 min-h-24 rounded-2xl border bg-card"
+        />
+      ) : journeys.isError ? (
+        <ErrorState
+          headingLevel="h2"
+          title="We couldn't load this trip's latest status"
+          description="Your request details are below. Try again to see its quotation, payment and booking."
+          onRetry={journeys.retry}
+          className="mb-8 py-6"
+        />
+      ) : nextStep ? (
+        <section
+          aria-labelledby="request-next-step"
+          data-testid="request-next-step"
+          className="mb-8 flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6"
+        >
+          <div className="min-w-0">
+            <h2 id="request-next-step" className="text-lg font-semibold">
+              {nextStep.title}
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{nextStep.text}</p>
+          </div>
+
+          <Link
+            href={nextStep.href}
+            className={cn(
+              buttonVariants({ variant: nextStep.primary ? "default" : "outline" }),
+              "w-full shrink-0 sm:w-auto",
+            )}
+          >
+            {nextStep.label}
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </section>
+      ) : null}
 
       {/* =====================================================
           PACKAGE PREVIEW
@@ -274,9 +495,7 @@ export default function TourRequestDetailsPage() {
           <div className="grid md:grid-cols-[300px_1fr]">
             <div className="relative min-h-[220px] bg-muted">
               {isPackageLoading ? (
-                <div className="flex size-full min-h-[220px] items-center justify-center">
-                  <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
-                </div>
+                <LoadingState label="Loading package details" className="min-h-[220px]" />
               ) : packagePrimaryImage && packageImageUrl ? (
                 <Image
                   src={packageImageUrl}
@@ -306,13 +525,13 @@ export default function TourRequestDetailsPage() {
 
               <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <MapPin className="size-4" />
+                  <MapPin aria-hidden="true" className="size-4" />
 
                   {request.travelPackage.destination}
                 </span>
 
                 <span className="flex items-center gap-1.5">
-                  <Clock3 className="size-4" />
+                  <Clock3 aria-hidden="true" className="size-4" />
                   {request.travelPackage.durationDays}{" "}
                   {request.travelPackage.durationDays === 1 ? "day" : "days"}
                 </span>
@@ -323,15 +542,17 @@ export default function TourRequestDetailsPage() {
               </p>
 
               <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t pt-5">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Starting package price
-                  </p>
+                {packagePrice && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Starting package price
+                    </p>
 
-                  <p className="mt-1 text-xl font-bold">
-                    ${request.travelPackage.price}
-                  </p>
-                </div>
+                    <p data-testid="package-price" className="mt-1 text-xl font-bold">
+                      {packagePrice}
+                    </p>
+                  </div>
+                )}
 
                 <Link
                   href={`/packages/${request.travelPackage.slug}`}
@@ -340,7 +561,7 @@ export default function TourRequestDetailsPage() {
                   className="inline-flex items-center gap-2 text-sm font-semibold"
                 >
                   View original package
-                  <ArrowUpRight className="size-4" />
+                  <ArrowUpRight aria-hidden="true" className="size-4" />
                 </Link>
               </div>
             </div>
@@ -364,7 +585,7 @@ export default function TourRequestDetailsPage() {
             <CardContent>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="flex gap-3">
-                  <MapPin className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <MapPin aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">Destination</p>
@@ -374,7 +595,7 @@ export default function TourRequestDetailsPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <CalendarDays className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <CalendarDays aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">
@@ -382,17 +603,17 @@ export default function TourRequestDetailsPage() {
                     </p>
 
                     <p className="mt-1 font-medium">
-                      {formatDate(request.preferredStartDate)}
+                      {formatTravelDate(request.preferredStartDate)}
 
                       {" → "}
 
-                      {formatDate(request.preferredEndDate)}
+                      {formatTravelDate(request.preferredEndDate)}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex gap-3">
-                  <Users className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <Users aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">Travelers</p>
@@ -408,14 +629,14 @@ export default function TourRequestDetailsPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Wallet className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <Wallet aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">Budget</p>
 
-                    <p className="mt-1 font-medium">
+                    <p data-testid="request-budget" className="mt-1 font-medium">
                       {request.budget
-                        ? `${request.currency} ${request.budget}`
+                        ? formatMoney(request.budget, request.currency)
                         : "Not specified"}
                     </p>
                   </div>
@@ -434,7 +655,7 @@ export default function TourRequestDetailsPage() {
             <CardContent>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="flex gap-3">
-                  <Hotel className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <Hotel aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">
@@ -448,7 +669,7 @@ export default function TourRequestDetailsPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Route className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <Route aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">
@@ -462,7 +683,7 @@ export default function TourRequestDetailsPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <MessageCircle className="mt-1 size-5 shrink-0 text-muted-foreground" />
+                  <MessageCircle aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground" />
 
                   <div>
                     <p className="text-sm text-muted-foreground">
@@ -471,7 +692,8 @@ export default function TourRequestDetailsPage() {
 
                     <p className="mt-1 font-medium">
                       {request.contactMethod
-                        ? formatStatus(request.contactMethod)
+                        ? (CONTACT_METHODS[request.contactMethod] ??
+                          formatStatusLabel(request.contactMethod))
                         : "Not specified"}
                     </p>
                   </div>
@@ -539,9 +761,21 @@ export default function TourRequestDetailsPage() {
             </CardHeader>
 
             <CardContent>
-              {isTerminalStatus ? (
+              {bookingCancelled ? (
+                <div
+                  data-testid="request-booking-cancelled"
+                  className="rounded-xl border bg-sand-100 p-4"
+                >
+                  <p className="font-medium">Booking cancelled</p>
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    This trip&apos;s booking was cancelled. This booking is no
+                    longer active.
+                  </p>
+                </div>
+              ) : isTerminalStatus ? (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-                  <p className="font-medium">{formatStatus(request.status)}</p>
+                  <p className="font-medium">{formatStatusLabel(request.status)}</p>
 
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     This request is no longer progressing through the standard
@@ -549,8 +783,8 @@ export default function TourRequestDetailsPage() {
                   </p>
                 </div>
               ) : (
-                <div>
-                  {STATUS_ORDER.map((status, index) => {
+                <div data-testid="request-tracker">
+                  {STATUS_ORDER.map((step, index) => {
                     const completed = index <= progressIndex;
 
                     const current = index === progressIndex;
@@ -559,11 +793,12 @@ export default function TourRequestDetailsPage() {
 
                     return (
                       <div
-                        key={status}
+                        key={step}
                         className="relative flex gap-3 pb-6 last:pb-0"
                       >
                         {!isLast && (
                           <div
+                            aria-hidden="true"
                             className={`absolute left-[9px] top-5 h-[calc(100%-4px)] w-px ${
                               index < progressIndex
                                 ? "bg-foreground"
@@ -575,12 +810,13 @@ export default function TourRequestDetailsPage() {
                         <div className="relative z-10 bg-background">
                           {completed ? (
                             <CircleCheck
+                              aria-hidden="true"
                               className={`size-5 shrink-0 ${
                                 current ? "text-primary" : ""
                               }`}
                             />
                           ) : (
-                            <Circle className="size-5 shrink-0 text-muted-foreground" />
+                            <Circle aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
                           )}
                         </div>
 
@@ -592,12 +828,12 @@ export default function TourRequestDetailsPage() {
                                 : "text-muted-foreground"
                             }
                           >
-                            {formatStatus(status)}
+                            {formatStatusLabel(step)}
                           </p>
 
                           {current && (
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              Current stage
+                              {currentStageCaption}
                             </p>
                           )}
                         </div>
@@ -648,6 +884,14 @@ export default function TourRequestDetailsPage() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
 
+                    {/* The dialog stays open when cancelling fails, so the
+                        error is announced here, where the traveler is. */}
+                    {cancelMutation.isError && (
+                      <p role="alert" className="text-sm text-destructive">
+                        Unable to cancel this request. Please try again.
+                      </p>
+                    )}
+
                     <AlertDialogFooter>
                       <AlertDialogCancel>Keep request</AlertDialogCancel>
 
@@ -680,14 +924,15 @@ export default function TourRequestDetailsPage() {
 
             <CardContent>
               {areQuotationsLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <LoaderCircle className="size-4 animate-spin" />
-                  Loading quotations...
-                </div>
+                <LoadingState label="Loading quotations" className="min-h-24" />
               ) : areQuotationsError ? (
-                <p className="text-sm text-destructive">
-                  Unable to load quotations.
-                </p>
+                <ErrorState
+                  headingLevel="h3"
+                  title="Unable to load quotations"
+                  description="Your quotations for this request could not be retrieved."
+                  onRetry={() => void refetchQuotations()}
+                  className="px-4 py-6"
+                />
               ) : quotations && quotations.length > 0 ? (
                 <div className="space-y-4">
                   {quotations.map((quotation) => (
@@ -707,16 +952,17 @@ export default function TourRequestDetailsPage() {
                           </p>
                         </div>
 
-                        <span className="rounded-full border px-3 py-1 text-xs font-medium">
-                          {formatStatus(quotation.status)}
-                        </span>
+                        <StatusBadge
+                          entity="quotation"
+                          status={isQuotationExpired(quotation) ? "EXPIRED" : quotation.status}
+                        />
                       </div>
 
                       <div className="mt-4">
                         <p className="text-sm text-muted-foreground">Total</p>
 
-                        <p className="text-2xl font-bold">
-                          {quotation.currency} {quotation.totalAmount}
+                        <p data-testid="request-quotation-total" className="text-2xl font-bold">
+                          {formatMoney(quotation.totalAmount, quotation.currency)}
                         </p>
                       </div>
 

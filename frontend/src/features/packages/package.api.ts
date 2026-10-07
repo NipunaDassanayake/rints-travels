@@ -13,11 +13,20 @@ const API_BASE_URL =
  * existing case-insensitive "contains" filters; sorting uses its
  * existing sortBy/sortOrder. Callers pass values produced by
  * `toPackageApiQuery` (package-query.ts), never raw browser input.
+ *
+ * `limit` uses the API's existing page size (default 10, at most
+ * 100). Only the tour-request form passes it (CR-030 Stage 3), so
+ * its package selector is not limited to the 10 newest packages.
  */
 export async function getPackages(
   filters: Partial<PackageApiQuery> = {},
+  { limit }: { limit?: number } = {},
 ): Promise<PackageListData> {
   const query = new URLSearchParams();
+
+  if (limit) {
+    query.set("limit", String(limit));
+  }
 
   if (filters.destination) {
     query.set("destination", filters.destination);

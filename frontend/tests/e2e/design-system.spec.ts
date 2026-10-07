@@ -130,14 +130,15 @@ const PORTALS = [
     role: "traveler",
     account: TOURIST,
     home: "/tourist",
-    title: "Traveler Portal",
+    // CR-030 Stage 2: traveler-facing title and journey-first navigation.
+    title: "My Travora",
     toggle: "Toggle traveler navigation",
     navigation: [
       ["Dashboard", "/tourist"],
-      ["My requests", "/tourist/requests"],
+      ["My journeys", "/tourist/requests"],
       ["Quotations", "/tourist/quotations"],
-      ["Payments", "/tourist/payments"],
       ["Bookings", "/tourist/bookings"],
+      ["Payments", "/tourist/payments"],
     ],
     extras: ["Plan a trip", "Browse guides", "View public site"],
   },
