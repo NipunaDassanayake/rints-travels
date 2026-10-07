@@ -30,7 +30,7 @@ export function RecentJourneys({ journeys }: { journeys: Journey[] }) {
         </h2>
 
         <Link href="/tourist/requests" className={buttonVariants({ variant: "ghost" })}>
-          View all requests
+          View all journeys
           <ArrowRight aria-hidden="true" />
         </Link>
       </div>

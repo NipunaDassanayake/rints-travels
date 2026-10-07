@@ -1,5 +1,6 @@
 import type { Booking } from "@/features/bookings/booking.types";
 import type { Payment } from "@/features/payments/payment.types";
+import { isExpiredForAction } from "@/features/quotations/quotation-validity";
 import type { Quotation } from "@/features/quotations/quotation.types";
 import type { Review } from "@/features/reviews/review.types";
 import type { TourRequest } from "@/features/tour-requests/tour-request.types";
@@ -114,6 +115,12 @@ export interface Journey {
     value: string;
   };
   paymentState: QuotationPaymentState;
+  /**
+   * The quotation can no longer be accepted: EXPIRED, or still SENT
+   * past its validUntil (the API refuses to accept it). Read-only --
+   * the quotation status itself is never changed here.
+   */
+  quotationExpired: boolean;
   action: JourneyAction | null;
   /** Shown when Travora, not the traveler, has the next step. */
   waitingMessage: string | null;
@@ -138,6 +145,21 @@ const WAITING_MESSAGES: Partial<Record<TourRequest["status"], string>> = {
   READY_FOR_QUOTATION: "Travora is preparing your quotation.",
   QUOTATION_SENT: "Travora is preparing your quotation.",
 };
+
+const EXPIRED_MESSAGE =
+  "This quotation has expired. Any updated quotation from Travora will appear here.";
+
+/**
+ * Frontend-effective expiry (CR-030 Stage 6): EXPIRED, or SENT past
+ * validUntil, mirroring the accept check the API itself makes.
+ * Presentation only; the backend stays authoritative.
+ */
+export function isQuotationExpired(
+  quotation: Pick<Quotation, "status" | "validUntil">,
+  now: number = Date.now(),
+) {
+  return quotation.status === "EXPIRED" || isExpiredForAction(quotation, now);
+}
 
 function time(value: string | null | undefined) {
   const parsed = value ? Date.parse(value) : Number.NaN;
@@ -211,7 +233,10 @@ function pickQuotation(quotations: Quotation[], booking: Booking | null) {
 }
 
 function deriveAction(
-  journey: Pick<Journey, "booking" | "quotation" | "payment" | "paymentState" | "request" | "id">,
+  journey: Pick<
+    Journey,
+    "booking" | "quotation" | "payment" | "paymentState" | "request" | "id" | "quotationExpired"
+  >,
   reviewedBookingIds: Set<string> | null,
 ): JourneyAction | null {
   const { booking, quotation, payment, paymentState, request } = journey;
@@ -270,6 +295,7 @@ function deriveAction(
 
   if (
     quotation?.status === "SENT" &&
+    !journey.quotationExpired &&
     (!request || request.status === "QUOTATION_SENT")
   ) {
     return {
@@ -283,7 +309,21 @@ function deriveAction(
   return null;
 }
 
-function derivePhase(journey: Pick<Journey, "booking" | "quotation" | "request" | "action">): {
+/**
+ * An expired quotation describes the journey only while there is no
+ * booking and the request is still waiting on that quotation.
+ */
+function showsExpiredQuotation(journey: Pick<Journey, "booking" | "request" | "quotationExpired">) {
+  return (
+    !journey.booking &&
+    journey.quotationExpired &&
+    (!journey.request || journey.request.status === "QUOTATION_SENT")
+  );
+}
+
+function derivePhase(
+  journey: Pick<Journey, "booking" | "quotation" | "request" | "action" | "quotationExpired">,
+): {
   phase: JourneyPhase;
   stepIndex: number;
 } {
@@ -310,18 +350,24 @@ function derivePhase(journey: Pick<Journey, "booking" | "quotation" | "request" 
     return { phase: "closed", stepIndex: 0 };
   }
 
-  if (action?.kind === "REVIEW_QUOTATION") {
+  if (action?.kind === "REVIEW_QUOTATION" || showsExpiredQuotation(journey)) {
     return { phase: "quotation", stepIndex: 1 };
   }
 
   return { phase: "planning", stepIndex: 0 };
 }
 
-function deriveStatus(journey: Pick<Journey, "booking" | "quotation" | "payment" | "request">): Journey["status"] {
+function deriveStatus(
+  journey: Pick<Journey, "booking" | "quotation" | "payment" | "request" | "quotationExpired">,
+): Journey["status"] {
   const { booking, quotation, payment, request } = journey;
 
   if (booking) {
     return { entity: "booking", value: booking.status };
+  }
+
+  if (quotation && showsExpiredQuotation(journey)) {
+    return { entity: "quotation", value: "EXPIRED" };
   }
 
   if (quotation?.status === "ACCEPTED" && payment) {
@@ -342,7 +388,7 @@ function deriveStatus(journey: Pick<Journey, "booking" | "quotation" | "payment"
 /**
  * Joins the traveler's lists into journeys, most recent first.
  */
-export function buildJourneys(sources: JourneySources): Journey[] {
+export function buildJourneys(sources: JourneySources, now: number = Date.now()): Journey[] {
   const { requests, quotations, payments, bookings, reviews } = sources;
 
   const reviewedBookingIds = reviews
@@ -382,6 +428,7 @@ export function buildJourneys(sources: JourneySources): Journey[] {
       payment,
       booking,
       paymentState: booking ? ("PAID" as const) : paymentInfo.state,
+      quotationExpired: quotation ? isQuotationExpired(quotation, now) : false,
     };
 
     const action = deriveAction(base, reviewedBookingIds);
@@ -421,8 +468,9 @@ export function buildJourneys(sources: JourneySources): Journey[] {
       stepIndex,
       status: deriveStatus(base),
       action,
-      waitingMessage:
-        !action && request && phase === "planning"
+      waitingMessage: showsExpiredQuotation(base)
+        ? EXPIRED_MESSAGE
+        : !action && request && phase === "planning"
           ? (WAITING_MESSAGES[request.status] ?? null)
           : null,
       lastActivityAt,

@@ -4,9 +4,11 @@ import { ArrowRight, BellRing, CreditCard, ReceiptText, Star } from "lucide-reac
 
 import { buttonVariants } from "@/components/ui/button";
 
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 
 import { cn } from "@/lib/utils";
+
+import { formatMoment } from "@/features/quotations/quotation-validity";
 
 import type { Journey, JourneyActionKind } from "../journey";
 
@@ -68,7 +70,8 @@ export function JourneyAttention({ journeys }: { journeys: Journey[] }) {
 
   const amount = amountFor(primary);
 
-  const validUntil =
+  // The precise moment, as on the quotation itself (CR-030 Stage 6).
+  const expiresAt =
     primary.action.kind === "REVIEW_QUOTATION" ? primary.quotation?.validUntil : null;
 
   return (
@@ -98,7 +101,7 @@ export function JourneyAttention({ journeys }: { journeys: Journey[] }) {
                 </p>
               )}
 
-              {(amount || validUntil) && (
+              {(amount || expiresAt) && (
                 <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-body-sm">
                   {amount && (
                     <span>
@@ -107,9 +110,9 @@ export function JourneyAttention({ journeys }: { journeys: Journey[] }) {
                     </span>
                   )}
 
-                  {validUntil && (
+                  {expiresAt && (
                     <span className="text-foreground-secondary">
-                      Valid until {formatDate(validUntil)}
+                      Expires {formatMoment(expiresAt)}
                     </span>
                   )}
                 </p>

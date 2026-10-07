@@ -27,6 +27,20 @@ const API_BASE_URL =
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
+/**
+ * The traveler's "now" for every test: Oct 7, 2026, 10:00 UTC.
+ *
+ * Journey states read quotation validity (a SENT quotation past its
+ * validUntil is expired, CR-030 Stage 6), so the fixtures are judged
+ * against this fixed instant instead of the wall clock: the default
+ * SENT quotation (valid until Dec 1, 2026) stays actionable whatever
+ * day the suite runs. Expired journeys are covered by
+ * request-detail.spec.ts.
+ */
+const NOW = new Date("2026-10-07T10:00:00.000Z");
+
+test.use({ timezoneId: "UTC" });
+
 /* ----------------------------------------------------------------
  * Fictional traveler data
  * ---------------------------------------------------------------- */
@@ -108,6 +122,7 @@ function quotation(id: string, req: Json, overrides: Json = {}): Json {
     currency: "USD",
     notes: null,
     termsConditions: null,
+    // Valid relative to NOW (Oct 7, 2026); see NOW above.
     validUntil: "2026-12-01T00:00:00.000Z",
     status: "SENT",
     sentAt: "2026-10-01T09:00:00.000Z",
@@ -317,6 +332,8 @@ async function loginAsTourist(page: Page) {
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+
+  await page.clock.setFixedTime(NOW);
 }
 
 async function openDashboard(page: Page, state: TravelerState) {
