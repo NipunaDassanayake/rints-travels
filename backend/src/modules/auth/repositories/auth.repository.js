@@ -22,6 +22,26 @@ const createUser = async (data) => {
   });
 };
 
+const findActiveAdmins = async () => {
+  return prisma.user.findMany({
+    where: {
+      role: {
+        in: ["ADMIN", "SYSTEM_ADMIN"],
+      },
+      status: "ACTIVE",
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+    orderBy: {
+      firstName: "asc",
+    },
+  });
+};
+
 const createRefreshToken = async (data) => {
   return prisma.refreshToken.create({
     data,
@@ -50,16 +70,31 @@ const findRefreshTokenBySessionId = async (sessionId) => {
   });
 };
 
-const updateRefreshTokenUsage = async (id, data) => {
-  return prisma.refreshToken.update({
+/**
+ * Atomic refresh-token rotation (compare-and-swap).
+ *
+ * Only succeeds while the session still holds expectedTokenHash
+ * and is not revoked, so each refresh token can be rotated at
+ * most once, even by concurrent requests, and a concurrent
+ * logout always wins. In the same single UPDATE the replaced
+ * hash becomes previousTokenHash and the new hash becomes
+ * current. Returns true when this call rotated it.
+ */
+const rotateRefreshToken = async (id, expectedTokenHash, data) => {
+  const result = await prisma.refreshToken.updateMany({
     where: {
       id,
+      tokenHash: expectedTokenHash,
+      revokedAt: null,
     },
     data: {
       ...data,
+      previousTokenHash: expectedTokenHash,
       lastUsedAt: new Date(),
     },
   });
+
+  return result.count === 1;
 };
 
 const revokeRefreshToken = async (id) => {
@@ -89,10 +124,11 @@ module.exports = {
   findUserByEmail,
   findUserById,
   createUser,
+  findActiveAdmins,
   createRefreshToken,
   findRefreshTokenByHash,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
   findRefreshTokenBySessionId,
-  updateRefreshTokenUsage,
+  rotateRefreshToken,
 };

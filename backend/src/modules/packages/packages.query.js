@@ -1,5 +1,7 @@
 const getPagination = require("../../core/pagination/getPagination");
+
 const buildFilters = require("../../core/query/buildFilters");
+
 const buildSorting = require("../../core/query/buildSorting");
 
 const buildPackageQueryOptions = (query) => {
@@ -7,7 +9,9 @@ const buildPackageQueryOptions = (query) => {
 
   const filters = buildFilters(query, {
     status: "equals",
+
     destination: "contains",
+
     title: "contains",
   });
 

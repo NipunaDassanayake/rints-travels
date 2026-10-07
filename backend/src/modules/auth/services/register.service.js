@@ -2,6 +2,7 @@ const authRepository = require("../repositories/auth.repository");
 const { hashPassword } = require("../helpers/auth.password");
 const { ConflictError } = require("../../../utils/AppError");
 const { AUTH_MESSAGES } = require("../auth.constants");
+const { USER_ROLES } = require("../../../core/constants/auth.constants");
 
 const register = async (registerDto) => {
   const existingUser = await authRepository.findUserByEmail(

@@ -4,15 +4,16 @@ const {
   verifyRefreshToken,
 } = require("../helpers/auth.token");
 
-const {
-  hashToken,
-} = require("../helpers/auth.tokenHash");
-
 /**
- * Revoke the current refresh-token session.
+ * Revoke the refresh-token session.
  *
  * Logout is intentionally idempotent. Missing, invalid, expired,
  * or previously revoked tokens do not cause logout to fail.
+ *
+ * Any validly signed, unexpired refresh token of the session
+ * ends it -- not only the current one -- so whoever holds a
+ * newer token (e.g. after a theft) cannot stop the user from
+ * terminating the session (CR-012).
  */
 const logout = async (rawRefreshToken) => {
   if (!rawRefreshToken) {
@@ -40,15 +41,10 @@ const logout = async (rawRefreshToken) => {
       payload.jti
     );
 
-  if (!session || session.revokedAt) {
-    return;
-  }
-
-  const presentedTokenHash = hashToken(rawRefreshToken);
-
   if (
-    session.userId !== payload.sub ||
-    session.tokenHash !== presentedTokenHash
+    !session ||
+    session.revokedAt ||
+    session.userId !== payload.sub
   ) {
     return;
   }
