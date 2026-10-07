@@ -821,26 +821,32 @@ test.describe("CR-030 Stage 6 expired quotations", () => {
   });
 });
 
+/**
+ * One test per request state and width, so every page gets its own
+ * test budget and a failure names the state it belongs to.
+ */
+const ACCESSIBILITY_STATES: { name: string; make: (world: World) => { req: Json } }[] = [
+  { name: "waiting for Travora", make: waiting },
+  { name: "accepted, unpaid", make: acceptedUnpaid },
+  { name: "payment pending", make: paymentPending },
+  { name: "booking confirmed", make: confirmed },
+  { name: "trip completed", make: completed },
+  { name: "booking cancelled", make: cancelled },
+  { name: "quotation expired", make: sentPastValidity },
+];
+
 test.describe("CR-030 Stage 6 request detail accessibility", () => {
   for (const width of [390, 1440]) {
-    test(`request states pass axe with one h1 and no overflow at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
+    for (const state of ACCESSIBILITY_STATES) {
+      test(`request detail (${state.name}) passes axe with one h1 and no overflow at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
 
-      const world = newWorld();
+        const world = newWorld();
 
-      const states = [
-        waiting(world),
-        acceptedUnpaid(world),
-        paymentPending(world),
-        confirmed(world),
-        completed(world),
-        cancelled(world),
-        sentPastValidity(world),
-      ];
+        const j = state.make(world);
 
-      await start(page, world);
+        await start(page, world);
 
-      for (const j of states) {
         await openRequest(page, j.req);
 
         await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
@@ -848,8 +854,8 @@ test.describe("CR-030 Stage 6 request detail accessibility", () => {
         await expectNoAxeViolations(page);
 
         await expectNoHorizontalOverflow(page);
-      }
-    });
+      });
+    }
   }
 
   test("the next step is reachable and visibly focused from the keyboard", async ({ page }) => {

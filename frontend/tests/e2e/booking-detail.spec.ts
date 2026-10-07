@@ -1100,21 +1100,43 @@ test.describe("CR-030 Stage 5 layout and accessibility", () => {
     expect(state).toBeLessThan(844);
   });
 
+  /*
+   * One test per booking state and width, so every page gets its own
+   * test budget and a failure names the state it belongs to.
+   */
+  const accessibilityStates: { name: string; setup: (world: World) => Json }[] = [
+    { name: "confirmed with a guide", setup: () => booking(30) },
+    { name: "completed with the review form", setup: () => completed(31) },
+    {
+      name: "completed with a 2,000-character review",
+      setup: (world) => {
+        const record = completed(32);
+
+        world.reviews[String(record.id)] = review(record, { comment: "Q".repeat(2000) });
+
+        return record;
+      },
+    },
+    { name: "cancelled", setup: () => cancelledBooking(33) },
+    {
+      name: "confirmed without a guide or itinerary",
+      setup: () => booking(34, {}, { guide: null, guideId: null, itineraries: [] }),
+    },
+  ];
+
   for (const width of [390, 1440]) {
-    test(`booking states pass axe with no overflow at ${width}px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
+    for (const state of accessibilityStates) {
+      test(`booking (${state.name}) passes axe with no overflow at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
 
-      const world = newWorld();
+        const world = newWorld();
 
-      const records = [booking(30), completed(31), completed(32), cancelledBooking(33), booking(34, {}, { guide: null, guideId: null, itineraries: [] })];
+        const record = state.setup(world);
 
-      world.bookings.push(...records);
+        world.bookings.push(record);
 
-      world.reviews[String(records[2].id)] = review(records[2], { comment: "Q".repeat(2000) });
+        await start(page, world);
 
-      await start(page, world);
-
-      for (const record of records) {
         await openBooking(page, record);
 
         if (record.status === "COMPLETED") {
@@ -1128,10 +1150,21 @@ test.describe("CR-030 Stage 5 layout and accessibility", () => {
         await expectNoAxeViolations(page);
 
         await expectNoHorizontalOverflow(page);
-      }
+      });
+    }
 
-      // The invalid rating state passes too.
-      await openBooking(page, records[1]);
+    test(`the invalid rating state passes axe at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+
+      const world = newWorld();
+
+      const record = completed(31);
+
+      world.bookings.push(record);
+
+      await start(page, world);
+
+      await openBooking(page, record);
 
       await page.getByRole("button", { name: "Submit review" }).click();
 
