@@ -323,6 +323,33 @@ const persistedExpired = (w: World) => {
   return journey(w, r, quotation(11, r, { status: "EXPIRED", validUntil: "2026-10-01T00:00:00.000Z" }));
 };
 
+/**
+ * CR-031 state T: Travora revised the sent quotation. Revising
+ * supersedes revision 1 and creates revision 2 as a DRAFT while the
+ * request stays QUOTATION_SENT; the API never returns a draft to the
+ * traveler, so revision 1 (SUPERSEDED) is all they can see.
+ */
+const revisionInPreparation = (w: World) => {
+  const r = request(15, "Hill country revision", { status: "QUOTATION_SENT" });
+
+  return journey(w, r, quotation(15, r, { status: "SUPERSEDED", revisionNumber: 1 }));
+};
+
+/** CR-031 state N: the revision was sent, so revision 2 is SENT. */
+const revisionSent = (w: World) => {
+  const r = request(16, "South coast revision", { status: "QUOTATION_SENT" });
+
+  const previous = quotation(16, r, { status: "SUPERSEDED", revisionNumber: 1 });
+
+  const latest = quotation(17, r, { status: "SENT", revisionNumber: 2, quotationNumber: "QT-CR030-S6-16B" });
+
+  w.quotations.push(previous);
+
+  return journey(w, r, latest);
+};
+
+const REVISION_MESSAGE = "Travora is preparing an updated quotation.";
+
 async function mockApi(page: Page, world: World) {
   await page.route(`${API_BASE_URL}/**`, async (route) => {
     const req = route.request();
@@ -821,6 +848,155 @@ test.describe("CR-030 Stage 6 expired quotations", () => {
   });
 });
 
+test.describe("CR-031 revision in preparation", () => {
+  test("the dashboard says an updated quotation is being prepared, with no attention item", async ({ page }) => {
+    const world = newWorld();
+
+    const j = revisionInPreparation(world);
+
+    await start(page, world);
+
+    await page.goto("/tourist");
+
+    await expect(page.getByTestId("journey-all-clear")).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.getByTestId("journey-attention")).toHaveCount(0);
+
+    const latest = page.getByTestId("journey-progress");
+
+    await expect(latest).toContainText(j.req.title as string);
+
+    await expect(latest).toContainText(REVISION_MESSAGE);
+
+    await expect(latest.locator("[aria-current='step']")).toContainText("Quotation");
+
+    // The existing request-status badge is unchanged.
+    await expect(latest.locator("[data-status]")).toHaveAttribute("data-status", "QUOTATION_SENT");
+
+    await expect(page.getByRole("link", { name: /Review quotation/ })).toHaveCount(0);
+  });
+
+  test("My journeys shows the revision in preparation at the Quotation step", async ({ page }) => {
+    const world = newWorld();
+
+    const j = revisionInPreparation(world);
+
+    await start(page, world);
+
+    await page.goto("/tourist/requests");
+
+    const card = page.getByTestId("journey-card").filter({ hasText: j.req.title as string });
+
+    await expect(card).toBeVisible({ timeout: 15_000 });
+
+    await expect(card).toContainText(REVISION_MESSAGE);
+
+    await expect(card).not.toContainText("Travora is preparing your quotation.");
+
+    await expect(card.locator("[aria-current='step']")).toContainText("Quotation");
+
+    await expect(card.locator("[data-status]")).toHaveAttribute("data-status", "QUOTATION_SENT");
+
+    await expect(card).toHaveAttribute("data-group", "active");
+
+    await expect(card.getByRole("link", { name: /Review quotation/ })).toHaveCount(0);
+  });
+
+  test("the request page uses the same interpretation and never says a quotation is ready", async ({ page }) => {
+    const world = newWorld();
+
+    const j = revisionInPreparation(world);
+
+    await start(page, world);
+
+    await openRequest(page, j.req);
+
+    await expect(page.getByTestId("request-summary")).toHaveText(REVISION_MESSAGE);
+
+    await expect(page.locator("main")).not.toContainText("A quotation has been prepared");
+
+    await expect(page.getByTestId("request-next-step")).toHaveCount(0);
+
+    await expect(page.getByRole("link", { name: /Review quotation/ })).toHaveCount(0);
+
+    // Header badge unchanged; the superseded revision stays listed as such.
+    await expect(page.locator("main [data-status='QUOTATION_SENT']")).toHaveCount(1);
+
+    await expect(page.locator("main aside [data-status]")).toHaveAttribute("data-status", "SUPERSEDED");
+  });
+
+  test("a superseded revision with a newer sent revision still asks for review", async ({ page }) => {
+    const world = newWorld();
+
+    const j = revisionSent(world);
+
+    await start(page, world);
+
+    await page.goto("/tourist");
+
+    const attention = page.getByTestId("journey-attention");
+
+    await expect(attention).toContainText(j.req.title as string, { timeout: 15_000 });
+
+    await expect(attention.getByRole("link", { name: /^Review quotation/ })).toHaveAttribute(
+      "href",
+      `/tourist/quotations/${j.quote!.id}`,
+    );
+
+    await page.goto("/tourist/requests");
+
+    const card = page.getByTestId("journey-card").filter({ hasText: j.req.title as string });
+
+    await expect(card.locator("[data-status]")).toHaveAttribute("data-status", "SENT", { timeout: 15_000 });
+
+    await expect(card.getByRole("link", { name: /^Review quotation/ })).toBeVisible();
+
+    await expect(card).not.toContainText(REVISION_MESSAGE);
+
+    await openRequest(page, j.req);
+
+    await expect(page.getByTestId("request-summary")).toHaveText("A quotation has been prepared for your request.");
+
+    await expect(page.getByTestId("request-next-step").getByRole("link", { name: "Review quotation" })).toHaveAttribute(
+      "href",
+      `/tourist/quotations/${j.quote!.id}`,
+    );
+
+    const badges = await page
+      .locator("main aside [data-status]")
+      .evaluateAll((elements) => elements.map((element) => element.getAttribute("data-status")));
+
+    expect(badges).toEqual(["SUPERSEDED", "SENT"]);
+  });
+
+  for (const [label, make] of [
+    ["a revision in preparation", revisionInPreparation],
+    ["a valid sent quotation", sent],
+  ] as const) {
+    test(`without the journey lists, ${label} is never called ready for review`, async ({ page }) => {
+      const world = newWorld();
+
+      const j = make(world);
+
+      world.fail.add("/quotations/me");
+
+      await start(page, world);
+
+      await page.goto(`/tourist/requests/${j.req.id}`);
+
+      await expect(
+        page.locator("main").getByRole("alert").getByRole("heading", { name: "We couldn't load this trip's latest status" }),
+      ).toBeVisible({ timeout: 15_000 });
+
+      await expect(page.getByTestId("request-summary")).toHaveText("This request is at the quotation stage.");
+
+      await expect(page.locator("main")).not.toContainText("A quotation has been prepared");
+
+      await expect(page.getByRole("link", { name: /Review quotation/ })).toHaveCount(0);
+    });
+  }
+});
+
 /**
  * One test per request state and width, so every page gets its own
  * test budget and a failure names the state it belongs to.
@@ -833,6 +1009,7 @@ const ACCESSIBILITY_STATES: { name: string; make: (world: World) => { req: Json 
   { name: "trip completed", make: completed },
   { name: "booking cancelled", make: cancelled },
   { name: "quotation expired", make: sentPastValidity },
+  { name: "revision in preparation", make: revisionInPreparation },
 ];
 
 test.describe("CR-030 Stage 6 request detail accessibility", () => {

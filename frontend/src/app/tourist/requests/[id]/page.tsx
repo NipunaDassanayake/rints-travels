@@ -129,8 +129,23 @@ function describeRequest(request: TourRequest, journey: Journey | null) {
     return "This journey reached the booking stage.";
   }
 
-  if (request.status === "QUOTATION_SENT" && journey?.quotationExpired) {
-    return "Your quotation has expired. Any updated quotation from Travora will appear here.";
+  // What the quotation stage means right now comes from the shared
+  // journey model (CR-031). Until it is available, make no claim
+  // that a quotation is ready.
+  if (request.status === "QUOTATION_SENT") {
+    if (!journey) {
+      return "This request is at the quotation stage.";
+    }
+
+    if (journey.quotationExpired) {
+      return "Your quotation has expired. Any updated quotation from Travora will appear here.";
+    }
+
+    if (journey.action?.kind === "REVIEW_QUOTATION") {
+      return "A quotation has been prepared for your request.";
+    }
+
+    return journey.waitingMessage ?? "This request is at the quotation stage.";
   }
 
   switch (request.status) {
@@ -140,8 +155,6 @@ function describeRequest(request: TourRequest, journey: Journey | null) {
       return "Our team is currently reviewing and discussing your travel requirements.";
     case "READY_FOR_QUOTATION":
       return "Your travel requirements are ready for quotation preparation.";
-    case "QUOTATION_SENT":
-      return "A quotation has been prepared for your request.";
     case "ACCEPTED":
       return "Your quotation has been accepted and the booking process can continue.";
     case "REJECTED":
