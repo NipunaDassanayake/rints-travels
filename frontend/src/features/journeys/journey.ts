@@ -121,6 +121,14 @@ export interface Journey {
    * the quotation status itself is never changed here.
    */
   quotationExpired: boolean;
+  /**
+   * Travora is preparing a revision (CR-031): the request is still
+   * QUOTATION_SENT, but the latest quotation the traveler can see was
+   * SUPERSEDED and nothing is waiting for their answer. The backend
+   * only supersedes the sent quotation this way when it creates the
+   * replacement DRAFT, which travelers never see until it is sent.
+   */
+  revisionInPreparation: boolean;
   action: JourneyAction | null;
   /** Shown when Travora, not the traveler, has the next step. */
   waitingMessage: string | null;
@@ -145,6 +153,8 @@ const WAITING_MESSAGES: Partial<Record<TourRequest["status"], string>> = {
   READY_FOR_QUOTATION: "Travora is preparing your quotation.",
   QUOTATION_SENT: "Travora is preparing your quotation.",
 };
+
+const REVISION_MESSAGE = "Travora is preparing an updated quotation.";
 
 const EXPIRED_MESSAGE =
   "This quotation has expired. Any updated quotation from Travora will appear here.";
@@ -321,8 +331,22 @@ function showsExpiredQuotation(journey: Pick<Journey, "booking" | "request" | "q
   );
 }
 
+/** See Journey.revisionInPreparation. */
+function isRevisionInPreparation(journey: Pick<Journey, "booking" | "quotation" | "request">) {
+  const { booking, quotation, request } = journey;
+
+  return (
+    !booking &&
+    quotation?.status === "SUPERSEDED" &&
+    (request?.status ?? quotation.tourRequest?.status) === "QUOTATION_SENT"
+  );
+}
+
 function derivePhase(
-  journey: Pick<Journey, "booking" | "quotation" | "request" | "action" | "quotationExpired">,
+  journey: Pick<
+    Journey,
+    "booking" | "quotation" | "request" | "action" | "quotationExpired" | "revisionInPreparation"
+  >,
 ): {
   phase: JourneyPhase;
   stepIndex: number;
@@ -350,7 +374,11 @@ function derivePhase(
     return { phase: "closed", stepIndex: 0 };
   }
 
-  if (action?.kind === "REVIEW_QUOTATION" || showsExpiredQuotation(journey)) {
+  if (
+    action?.kind === "REVIEW_QUOTATION" ||
+    showsExpiredQuotation(journey) ||
+    journey.revisionInPreparation
+  ) {
     return { phase: "quotation", stepIndex: 1 };
   }
 
@@ -429,6 +457,7 @@ export function buildJourneys(sources: JourneySources, now: number = Date.now())
       booking,
       paymentState: booking ? ("PAID" as const) : paymentInfo.state,
       quotationExpired: quotation ? isQuotationExpired(quotation, now) : false,
+      revisionInPreparation: isRevisionInPreparation({ booking, quotation, request }),
     };
 
     const action = deriveAction(base, reviewedBookingIds);
@@ -470,9 +499,11 @@ export function buildJourneys(sources: JourneySources, now: number = Date.now())
       action,
       waitingMessage: showsExpiredQuotation(base)
         ? EXPIRED_MESSAGE
-        : !action && request && phase === "planning"
-          ? (WAITING_MESSAGES[request.status] ?? null)
-          : null,
+        : base.revisionInPreparation
+          ? REVISION_MESSAGE
+          : !action && request && phase === "planning"
+            ? (WAITING_MESSAGES[request.status] ?? null)
+            : null,
       lastActivityAt,
     };
   });
