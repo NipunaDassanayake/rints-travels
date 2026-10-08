@@ -397,6 +397,10 @@ test.describe("CR-032 traveler confirmation: tour start", () => {
     const dialog = await openConfirmation(page, "Confirm tour start");
 
     // Keyboard only: the focused Generate button activates with Enter.
+    const generateCodeButton = dialog.getByRole("button", { name: "Generate code" });
+
+    await expect(generateCodeButton).toBeFocused();
+
     await page.keyboard.press("Enter");
 
     const panel = dialog.getByTestId("confirmation-code-panel");
