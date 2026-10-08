@@ -80,6 +80,23 @@ enum BookingStatus {
   CANCELLED
 }
 
+// CR-032: the two booking transitions that need the traveler's
+// confirmation code.
+enum BookingLifecycleAction {
+  START
+  COMPLETE
+}
+
+// CR-032: why a confirmation code stopped being usable before it
+// was redeemed.
+enum BookingLifecycleChallengeInvalidation {
+  REPLACED
+  EXPIRED
+  ATTEMPTS_EXHAUSTED
+  BOOKING_CANCELLED
+  GUIDE_REASSIGNED
+}
+
 enum StripeWebhookEventStatus {
   PROCESSING
   PROCESSED
@@ -492,6 +509,8 @@ model Booking {
   currency    String  @default("USD") @db.VarChar(10)
 
   confirmedAt DateTime  @default(now()) @map("confirmed_at")
+  // Set only by CONFIRMED -> IN_PROGRESS (CR-032).
+  startedAt   DateTime? @map("started_at")
   completedAt DateTime? @map("completed_at")
   cancelledAt DateTime? @map("cancelled_at")
 
@@ -505,10 +524,41 @@ model Booking {
 
   review GuideReview?
 
+  // Never included in booking API responses (CR-032).
+  lifecycleChallenges BookingLifecycleChallenge[]
+
   @@index([touristId])
   @@index([status])
   @@index([startDate])
   @@map("bookings")
+}
+
+/**
+ * CR-032: a traveler-generated, single-use confirmation code that
+ * the assigned guide must redeem to start or complete a tour. Only
+ * an HMAC of the code is stored. Every write happens while holding
+ * the booking's row lock (see bookingLifecycle.lock.js), which is
+ * what keeps at most one usable code per booking and action.
+ */
+model BookingLifecycleChallenge {
+  id                 String                                 @id @default(uuid()) @db.Uuid
+  bookingId          String                                 @map("booking_id") @db.Uuid
+  action             BookingLifecycleAction
+  codeHash           String                                 @map("code_hash") @db.VarChar(64)
+  expiresAt          DateTime                               @map("expires_at")
+  failedAttempts     Int                                    @default(0) @map("failed_attempts")
+  createdByUserId    String                                 @map("created_by_user_id") @db.Uuid
+  consumedAt         DateTime?                              @map("consumed_at")
+  consumedByUserId   String?                                @map("consumed_by_user_id") @db.Uuid
+  invalidatedAt      DateTime?                              @map("invalidated_at")
+  invalidationReason BookingLifecycleChallengeInvalidation? @map("invalidation_reason")
+  createdAt          DateTime                               @default(now()) @map("created_at")
+  updatedAt          DateTime                               @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, action, createdAt])
+  @@map("booking_lifecycle_challenges")
 }
 
 model GuideReview {

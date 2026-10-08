@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 import crypto from "node:crypto";
 
 /**
@@ -8,9 +10,15 @@ import crypto from "node:crypto";
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("request-life");
+});
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
@@ -71,7 +79,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 async function loginAsTourist(page: Page) {
-  await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+  await login(page, e2eTourist.email, e2eTourist.password);
 }
 
 async function loginAsAdmin(page: Page) {

@@ -53,7 +53,7 @@ const createLimiter = (name, options) => {
           path: req.originalUrl,
           correlationId: req.correlationId || null,
         },
-        "Auth rate limit exceeded",
+        "Rate limit exceeded",
       );
 
       return sendError(
@@ -113,6 +113,32 @@ const createRefreshLimiter = (overrides = {}) =>
     ...overrides,
   });
 
+/**
+ * Booking lifecycle confirmation codes (CR-032). Keyed by actor +
+ * booking + action, so one user's retries never block another
+ * booking. The per-code limit of 5 incorrect attempts (stored in
+ * the database) remains the primary brute-force control; these
+ * only cap request volume. They run after authenticate and
+ * validateRequest, so req.user and req.body.action are set.
+ */
+const LIFECYCLE_WINDOW_MS = 15 * 60 * 1000;
+
+const createLifecycleGenerateLimiter = (overrides = {}) =>
+  createLimiter("lifecycle-generate", {
+    windowMs: LIFECYCLE_WINDOW_MS,
+    limit: 10,
+    keyGenerator: (req) => `${req.user?.id}|${req.params.id}|${req.body?.action}`,
+    ...overrides,
+  });
+
+const createLifecycleVerifyLimiter = (action, overrides = {}) =>
+  createLimiter(`lifecycle-verify-${action.toLowerCase()}`, {
+    windowMs: LIFECYCLE_WINDOW_MS,
+    limit: 20,
+    keyGenerator: (req) => `${req.user?.id}|${req.params.id}|${action}`,
+    ...overrides,
+  });
+
 module.exports = {
   IPV6_SUBNET,
   TOO_MANY_ATTEMPTS,
@@ -120,6 +146,12 @@ module.exports = {
   createLoginIpLimiter,
   createRegisterLimiter,
   createRefreshLimiter,
+  createLifecycleGenerateLimiter,
+  createLifecycleVerifyLimiter,
+
+  lifecycleGenerateLimiter: createLifecycleGenerateLimiter(),
+  lifecycleStartVerifyLimiter: createLifecycleVerifyLimiter("START"),
+  lifecycleCompleteVerifyLimiter: createLifecycleVerifyLimiter("COMPLETE"),
 
   // Application instances (one store each, created at startup).
   loginAccountLimiter: createLoginAccountLimiter(),

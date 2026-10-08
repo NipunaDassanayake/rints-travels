@@ -11,8 +11,16 @@ const validateRequest = require("../../middlewares/validateRequest");
 const { USER_ROLES } = require("../../core/constants/auth.constants");
 
 const {
+  lifecycleGenerateLimiter,
+  lifecycleStartVerifyLimiter,
+  lifecycleCompleteVerifyLimiter,
+} = require("../../middlewares/rateLimiters");
+
+const {
   updateBookingStatusSchema,
   assignBookingGuideSchema,
+  createLifecycleChallengeSchema,
+  verifyLifecycleCodeSchema,
 } = require("./bookings.validation");
 
 const router = express.Router();
@@ -51,34 +59,62 @@ router.get(
 
 /**
  * =========================================================
- * Tour Guide - Start Assigned Tour
+ * Tour Guide - Start Assigned Tour (traveler's code, CR-032)
  * =========================================================
  */
 
-router.patch(
+router.post(
   "/guide/:id/start",
 
   authenticate,
 
   authorize(USER_ROLES.TOUR_GUIDE),
 
+  validateRequest(verifyLifecycleCodeSchema),
+
+  lifecycleStartVerifyLimiter,
+
   bookingsController.startGuideTour,
 );
 
 /**
  * =========================================================
- * Tour Guide - Complete Assigned Tour
+ * Tour Guide - Complete Assigned Tour (traveler's code, CR-032)
  * =========================================================
  */
 
-router.patch(
+router.post(
   "/guide/:id/complete",
 
   authenticate,
 
   authorize(USER_ROLES.TOUR_GUIDE),
 
+  validateRequest(verifyLifecycleCodeSchema),
+
+  lifecycleCompleteVerifyLimiter,
+
   bookingsController.completeGuideTour,
+);
+
+/**
+ * =========================================================
+ * Tourist - Generate Tour Confirmation Code (CR-032)
+ * =========================================================
+ */
+
+router.post(
+  "/:id/lifecycle-challenges",
+
+  authenticate,
+
+  authorize(USER_ROLES.TOURIST),
+
+  validateRequest(createLifecycleChallengeSchema),
+
+  lifecycleGenerateLimiter,
+
+  bookingsController.createLifecycleChallenge,
 );
 
 /**

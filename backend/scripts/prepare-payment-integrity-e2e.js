@@ -128,7 +128,10 @@ const paymentsService = require("../src/modules/payments/payments.service");
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+// A throwaway e2e-*@travora.com tourist, required (CR-032 Stage 3A).
+const { requireFixtureAccountEmail } = require("./lib/e2e-guards");
+
+const TOURIST_EMAIL = requireFixtureAccountEmail("E2E_TOURIST_EMAIL", "Payment integrity E2E fixture");
 
 const AGED_CLAIM_MS = 5 * 60 * 1000;
 

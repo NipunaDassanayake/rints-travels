@@ -12,6 +12,10 @@
  *    no environment override: E2E_TOURIST_EMAIL (which the specs
  *    log in with) can never widen the scope. If it names an
  *    account outside the allow-list, cleanup refuses to run.
+ *    The list is currently EMPTY (CR-032): nipuna@example.com
+ *    now holds user-owned manual development data and must never
+ *    be cleaned. Specs that need a tourist create a throwaway
+ *    e2e-*@travora.com account (scope 2) instead.
  * 2. TOURIST / TOUR_GUIDE accounts created by the suite, and
  *    their data / guide profiles:
  *      - e2e-*@travora.com   (registration.spec.ts,
@@ -30,6 +34,12 @@
  * Usage:
  *   node scripts/cleanup-e2e-data.js --dry-run [--json]
  *   node scripts/cleanup-e2e-data.js [--json]
+ *
+ * After a test batch (CR-032 Stage 3A), from backend/:
+ *   npm run e2e:cleanup:dry-run   show exactly what would be deleted
+ *   npm run e2e:cleanup           delete it (one transaction)
+ * Playwright global setup still runs the same cleanup before each
+ * run; no spec has to be run just to trigger it.
  */
 
 const {
@@ -51,8 +61,13 @@ const JSON_OUTPUT = process.argv.includes("--json");
  * The ONLY pre-existing tourist accounts whose data may be
  * deleted. Changing this list is a code change (reviewed and
  * committed), never a configuration change.
+ *
+ * Empty since CR-032: nipuna@example.com (previously listed) now
+ * holds user-owned manual data. Specs still logging in as that
+ * account leave their data behind until they move to throwaway
+ * fixture accounts.
  */
-const E2E_CLEANUP_TOURIST_ALLOWLIST = Object.freeze(["nipuna@example.com"]);
+const E2E_CLEANUP_TOURIST_ALLOWLIST = Object.freeze([]);
 
 class CleanupConfigurationError extends Error {}
 

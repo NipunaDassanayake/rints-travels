@@ -1,12 +1,14 @@
 "use client";
 
+import { useCallback, useRef, useState } from "react";
+
 import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ArrowLeft, Check, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Play, X } from "lucide-react";
 
 import { ErrorState } from "@/components/patterns/error-state";
 
@@ -16,15 +18,22 @@ import { PageHeader } from "@/components/patterns/page-header";
 
 import { StatusBadge } from "@/components/patterns/status-badge";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+import { formatStatusLabel } from "@/lib/format";
 
 import { getBookingById } from "@/features/bookings/booking.api";
 
-import type { Booking } from "@/features/bookings/booking.types";
+import type { Booking, BookingLifecycleAction, BookingStatus } from "@/features/bookings/booking.types";
 
 import { BookingFacts } from "@/features/bookings/components/booking-facts";
 
 import { BookingStatePanel } from "@/features/bookings/components/booking-state-panel";
+
+import {
+  LIFECYCLE_CONFIRMATION,
+  TourConfirmationCodeDialog,
+} from "@/features/bookings/components/tour-confirmation-code-dialog";
 
 import { ProposedGuideCard } from "@/features/quotations/components/proposed-guide-card";
 
@@ -63,6 +72,36 @@ function getTripPreferences(booking: Booking) {
   return preferences.filter((item): item is { term: string; value: string } => Boolean(item.value?.trim()));
 }
 
+/**
+ * The confirmation the traveler can give now (CR-032): starting a
+ * confirmed trip or completing one underway -- only with an assigned
+ * guide, who is the one entering the code.
+ */
+function lifecycleActionFor(booking: Booking): BookingLifecycleAction | null {
+  if (!booking.quotation?.guide) {
+    return null;
+  }
+
+  if (booking.status === "CONFIRMED") return "START";
+
+  if (booking.status === "IN_PROGRESS") return "COMPLETE";
+
+  return null;
+}
+
+function describeStatusChange(status: BookingStatus) {
+  switch (status) {
+    case "IN_PROGRESS":
+      return "Your guide started the tour.";
+    case "COMPLETED":
+      return "Your tour is complete.";
+    case "CANCELLED":
+      return "This booking was cancelled.";
+    default:
+      return `This booking is now ${formatStatusLabel(String(status))}.`;
+  }
+}
+
 export default function TouristBookingDetailsPage() {
   const params = useParams<{ id: string }>();
 
@@ -80,6 +119,27 @@ export default function TouristBookingDetailsPage() {
 
     enabled: Boolean(bookingId),
   });
+
+  const queryClient = useQueryClient();
+
+  const [confirmAction, setConfirmAction] = useState<BookingLifecycleAction | null>(null);
+
+  const [announcement, setAnnouncement] = useState("");
+
+  const stateHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  const refreshBooking = useCallback(() => refetch(), [refetch]);
+
+  const handleBookingChanged = useCallback(
+    (status: BookingStatus) => {
+      setConfirmAction(null);
+
+      setAnnouncement(describeStatusChange(status));
+
+      void queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+    },
+    [queryClient],
+  );
 
   if (isLoading) {
     return (
@@ -122,6 +182,8 @@ export default function TouristBookingDetailsPage() {
 
   const preferences = getTripPreferences(booking);
 
+  const lifecycleAction = lifecycleActionFor(booking);
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <Link
@@ -153,7 +215,45 @@ export default function TouristBookingDetailsPage() {
       */}
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
         <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
-          <BookingStatePanel booking={booking} />
+          <BookingStatePanel
+            booking={booking}
+            headingRef={stateHeadingRef}
+            action={
+              lifecycleAction && (
+                <Button
+                  onClick={() => {
+                    setAnnouncement("");
+
+                    setConfirmAction(lifecycleAction);
+                  }}
+                >
+                  {lifecycleAction === "START" ? (
+                    <Play aria-hidden="true" className="size-4" />
+                  ) : (
+                    <CheckCircle2 aria-hidden="true" className="size-4" />
+                  )}
+                  {LIFECYCLE_CONFIRMATION[lifecycleAction].trigger}
+                </Button>
+              )
+            }
+          />
+
+          <p role="status" className="sr-only">
+            {announcement}
+          </p>
+
+          <TourConfirmationCodeDialog
+            booking={booking}
+            action={confirmAction}
+            onOpenChange={(open) => {
+              if (!open) {
+                setConfirmAction(null);
+              }
+            }}
+            refreshBooking={refreshBooking}
+            onBookingChanged={handleBookingChanged}
+            changeFocusRef={stateHeadingRef}
+          />
 
           <BookingReviewSection booking={booking} />
         </div>

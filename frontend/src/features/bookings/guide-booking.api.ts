@@ -48,14 +48,20 @@ export async function getGuideBookingById(bookingId: string): Promise<Booking> {
  */
 
 /**
- * Starts a confirmed tour.
+ * Starts a confirmed tour with the traveler's
+ * confirmation code (CR-032).
  *
  * CONFIRMED -> IN_PROGRESS
  *
- * PATCH /bookings/guide/:id/start
+ * POST /bookings/guide/:id/start
  */
-export async function startGuideTour(bookingId: string): Promise<Booking> {
-  const response = await apiClient.patch(`/bookings/guide/${bookingId}/start`);
+export async function startGuideTour(
+  bookingId: string,
+  code: string,
+): Promise<Booking> {
+  const response = await apiClient.post(`/bookings/guide/${bookingId}/start`, {
+    code,
+  });
 
   return response.data.data;
 }
@@ -67,15 +73,20 @@ export async function startGuideTour(bookingId: string): Promise<Booking> {
  */
 
 /**
- * Completes an active tour.
+ * Completes an active tour with the traveler's
+ * confirmation code (CR-032).
  *
  * IN_PROGRESS -> COMPLETED
  *
- * PATCH /bookings/guide/:id/complete
+ * POST /bookings/guide/:id/complete
  */
-export async function completeGuideTour(bookingId: string): Promise<Booking> {
-  const response = await apiClient.patch(
+export async function completeGuideTour(
+  bookingId: string,
+  code: string,
+): Promise<Booking> {
+  const response = await apiClient.post(
     `/bookings/guide/${bookingId}/complete`,
+    { code },
   );
 
   return response.data.data;
