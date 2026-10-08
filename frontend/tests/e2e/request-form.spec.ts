@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test, type Page, type Request } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 /**
  * =========================================================
  * CR-030 Stage 3 -- Traveler request form
@@ -18,9 +20,15 @@ import { expect, test, type Page, type Request } from "@playwright/test";
  * skip if fewer than two exist.
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("request-form");
+});
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
 
@@ -170,9 +178,9 @@ async function login(page: Page) {
 
   await page.goto("/login");
 
-  await page.getByLabel("Email").fill(TOURIST_EMAIL);
+  await page.getByLabel("Email").fill(e2eTourist.email);
 
-  await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+  await page.getByLabel("Password").fill(e2eTourist.password);
 
   await page.getByRole("button", { name: "Sign in" }).click();
 

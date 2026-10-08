@@ -6,6 +6,8 @@ import {
   type TestInfo,
 } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 import { execFile } from "node:child_process";
 
 import path from "node:path";
@@ -29,9 +31,15 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("guide-privacy");
+});
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
@@ -96,7 +104,7 @@ async function runPrivacyScenario<T>(scenario: string): Promise<T> {
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: e2eTourist.email,
       },
 
       timeout: 30_000,
@@ -192,7 +200,7 @@ function api(page: Page, authorization: string) {
 }
 
 async function asTourist(page: Page) {
-  await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+  await login(page, e2eTourist.email, e2eTourist.password);
 
   return api(page, await captureAuthorizationHeader(page, "/tourist/quotations"));
 }
@@ -310,7 +318,7 @@ test.describe("CR-009 tourist responses exclude guide contact details", () => {
     expectPublicGuide(request.data.preferredGuide, fixture);
 
     // The tourist still receives their OWN contact details.
-    expect(request.data.tourist.email).toBe(TOURIST_EMAIL);
+    expect(request.data.tourist.email).toBe(e2eTourist.email);
   });
 
   test("the accept response never includes the guide's email or phone", async ({
@@ -481,7 +489,7 @@ test.describe("CR-009 tourist UI", () => {
         response.request().method() === "GET",
     );
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, e2eTourist.email, e2eTourist.password);
 
     await page.goto("/tourist/quotations");
 

@@ -86,25 +86,53 @@ const assignBookingGuide = asyncHandler(async (req, res) => {
 
 /**
  * =========================================================
- * Guide - Start Tour
+ * Tourist - Generate Tour Confirmation Code (CR-032)
+ * =========================================================
+ *
+ * The response carries the plaintext code, so it must never be
+ * cached.
+ */
+
+const createLifecycleChallenge = asyncHandler(async (req, res) => {
+  const challenge = await bookingsService.createLifecycleChallenge(
+    req.params.id,
+    req.body.action,
+    req.user,
+  );
+
+  res.set("Cache-Control", "no-store");
+
+  return sendSuccess(res, "Confirmation code created", challenge, 201);
+});
+
+/**
+ * =========================================================
+ * Guide - Start Tour (traveler's code, CR-032)
  * =========================================================
  */
 
 const startGuideTour = asyncHandler(async (req, res) => {
-  const booking = await bookingsService.startGuideTour(req.params.id, req.user);
+  const booking = await bookingsService.verifyLifecycleChallenge(
+    req.params.id,
+    "START",
+    req.body.code,
+    req.user,
+  );
 
   return sendSuccess(res, "Tour started successfully", booking);
 });
 
 /**
  * =========================================================
- * Guide - Complete Tour
+ * Guide - Complete Tour (traveler's code, CR-032)
  * =========================================================
  */
 
 const completeGuideTour = asyncHandler(async (req, res) => {
-  const booking = await bookingsService.completeGuideTour(
+  const booking = await bookingsService.verifyLifecycleChallenge(
     req.params.id,
+    "COMPLETE",
+    req.body.code,
     req.user,
   );
 
@@ -123,6 +151,8 @@ module.exports = {
   updateBookingStatus,
 
   assignBookingGuide,
+
+  createLifecycleChallenge,
 
   startGuideTour,
   completeGuideTour,

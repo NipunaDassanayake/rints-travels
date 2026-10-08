@@ -92,6 +92,13 @@ const envSchema = Joi.object({
   STRIPE_SECRET_KEY: Joi.string().trim().required(),
 
   STRIPE_WEBHOOK_SECRET: Joi.string().trim().optional(),
+
+  /*
+   * Booking lifecycle confirmation codes (CR-032): HMAC key for
+   * the traveler's start/complete codes. Server-side only, never
+   * logged; deliberately separate from the JWT secrets.
+   */
+  BOOKING_CONFIRMATION_SECRET: Joi.string().min(32).required(),
 }).unknown(true);
 
 const { value, error } = envSchema.validate(process.env, {
@@ -249,6 +256,10 @@ const env = {
     secretKey: value.STRIPE_SECRET_KEY,
 
     webhookSecret: value.STRIPE_WEBHOOK_SECRET,
+  },
+
+  bookingConfirmation: {
+    secret: value.BOOKING_CONFIRMATION_SECRET,
   },
 };
 

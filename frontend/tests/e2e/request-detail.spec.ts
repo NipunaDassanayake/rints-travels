@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 /**
  * =========================================================
  * CR-030 Stage 6 -- Request detail and journey closeout
@@ -15,9 +17,18 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.use({ timezoneId: "UTC" });
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("request-detail");
+});
+
+/** Mocked responses only; never used to sign in. */
+const MOCK_TOURIST_EMAIL = "traveler@example.test";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
 
@@ -159,7 +170,7 @@ function payment(n: number, quote: Json, overrides: Json = {}): Json {
       tourRequest: { id: quote.tourRequestId, touristId: TOURIST_ID, status: "ACCEPTED" },
       guide: null,
     },
-    tourist: { id: TOURIST_ID, firstName: "Nipuna", lastName: "Tourist", email: TOURIST_EMAIL },
+    tourist: { id: TOURIST_ID, firstName: "Test", lastName: "Traveler", email: MOCK_TOURIST_EMAIL },
     booking: null,
     ...overrides,
   };
@@ -186,7 +197,7 @@ function booking(n: number, req: Json, quote: Json, pay: Json, overrides: Json =
     tourRequest: req,
     quotation: quote,
     payment: pay,
-    tourist: { id: TOURIST_ID, firstName: "Nipuna", lastName: "Tourist", email: TOURIST_EMAIL },
+    tourist: { id: TOURIST_ID, firstName: "Test", lastName: "Traveler", email: MOCK_TOURIST_EMAIL },
     ...overrides,
   };
 }
@@ -434,9 +445,9 @@ async function start(page: Page, world: World) {
 
   await page.goto("/login");
 
-  await page.getByLabel("Email").fill(TOURIST_EMAIL);
+  await page.getByLabel("Email").fill(e2eTourist.email);
 
-  await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+  await page.getByLabel("Password").fill(e2eTourist.password);
 
   await page.getByRole("button", { name: "Sign in" }).click();
 

@@ -1,5 +1,7 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 import { execFile } from "node:child_process";
 
 import path from "node:path";
@@ -29,9 +31,15 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("payment-int");
+});
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
@@ -61,7 +69,7 @@ async function runPaymentScenario<T>(
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: e2eTourist.email,
 
         PAYMENT_E2E_API_BASE_URL: API_BASE_URL,
       },
@@ -101,9 +109,9 @@ async function loginAsTourist(page: Page) {
 
   await page.goto("/login");
 
-  await page.getByLabel("Email").fill(TOURIST_EMAIL);
+  await page.getByLabel("Email").fill(e2eTourist.email);
 
-  await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+  await page.getByLabel("Password").fill(e2eTourist.password);
 
   await page
     .getByRole("button", {

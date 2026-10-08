@@ -16,7 +16,8 @@
  *   status <id> [<id> ...]     does each user still exist + request count
  *   remove <id> [<id> ...]     delete helper-created users and their data
  *                              -- ONLY accounts matching REMOVABLE_EMAIL_PATTERNS
- *   allocation-check           allocate a window for the shared guide and
+ *   allocation-check           allocate a window for the fixture guide
+ *                              (E2E_GUIDE_EMAIL, a throwaway e2e-guide-*) and
  *                              confirm the real conflict query finds none
  */
 
@@ -25,6 +26,7 @@ const crypto = require("crypto");
 const {
   loadBackendEnv,
   assertSafeE2EEnvironment,
+  requireFixtureAccountEmail,
 } = require("./lib/e2e-guards");
 
 loadBackendEnv();
@@ -36,8 +38,6 @@ const prisma = require("../src/config/prisma");
 const bookingsRepository = require("../src/modules/bookings/bookings.repository");
 
 const { allocateGuideWindow } = require("./lib/guide-window");
-
-const GUIDE_EMAIL = process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com";
 
 /**
  * The only accounts `remove` may delete: exactly the ones this
@@ -241,6 +241,9 @@ async function remove(userIds) {
 }
 
 async function allocationCheck() {
+  // A throwaway fixture guide, required (CR-032 Stage 3A).
+  const GUIDE_EMAIL = requireFixtureAccountEmail("E2E_GUIDE_EMAIL", "E2E reliability helpers");
+
   const guide = await prisma.tourGuideProfile.findFirst({
     where: {
       user: {

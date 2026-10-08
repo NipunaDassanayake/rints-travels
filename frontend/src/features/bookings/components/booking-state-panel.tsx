@@ -1,3 +1,5 @@
+import type { ReactNode, Ref } from "react";
+
 import { CalendarClock, CircleMinus, Compass, Flag, UserRound } from "lucide-react";
 
 import { formatStatusLabel } from "@/lib/format";
@@ -19,8 +21,21 @@ const completedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "nu
  * to "underway" or "completed" on their own. A cancelled booking gets
  * neutral framing -- no success colour, nothing upcoming, and no
  * promise about money.
+ *
+ * `action` holds the traveler's next step for this state (CR-032 tour
+ * confirmation); the heading takes focus when the state changes.
  */
-export function BookingStatePanel({ booking, now = new Date() }: { booking: Booking; now?: Date }) {
+export function BookingStatePanel({
+  booking,
+  now = new Date(),
+  action,
+  headingRef,
+}: {
+  booking: Booking;
+  now?: Date;
+  action?: ReactNode;
+  headingRef?: Ref<HTMLHeadingElement>;
+}) {
   const guide = booking.quotation?.guide ?? null;
 
   const guideName = guide ? `${guide.user.firstName} ${guide.user.lastName}` : null;
@@ -106,7 +121,7 @@ export function BookingStatePanel({ booking, now = new Date() }: { booking: Book
         </span>
 
         <div className="min-w-0">
-          <h2 id="booking-state" className="text-heading-md text-foreground">
+          <h2 id="booking-state" ref={headingRef} tabIndex={-1} className="text-heading-md text-foreground outline-none">
             {view.title}
           </h2>
 
@@ -124,6 +139,8 @@ export function BookingStatePanel({ booking, now = new Date() }: { booking: Book
               {view.note}
             </p>
           )}
+
+          {action && <div className="mt-4">{action}</div>}
         </div>
       </div>
     </section>

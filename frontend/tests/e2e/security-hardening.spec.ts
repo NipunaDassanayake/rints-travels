@@ -1,5 +1,7 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 import { execFile } from "node:child_process";
 
 import crypto from "node:crypto";
@@ -40,9 +42,15 @@ const REFRESH_COOKIE = "travora_refresh_token";
 
 const PASSWORD = "SecurityE2e123";
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("security");
+});
 
 const ADMIN_EMAIL = "admin@travora.com";
 
@@ -945,7 +953,7 @@ test.describe("CR-012 rate limiting", () => {
     }
 
     // Another account from the same address still signs in.
-    const tourist = await login(TOURIST_EMAIL, TOURIST_PASSWORD);
+    const tourist = await login(e2eTourist.email, e2eTourist.password);
 
     expect(await me(tourist.accessToken)).toBe(200);
   });

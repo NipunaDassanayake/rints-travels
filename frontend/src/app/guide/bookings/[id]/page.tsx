@@ -1,10 +1,12 @@
 "use client";
 
+import { useRef, useState } from "react";
+
 import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   ArrowLeft,
@@ -27,11 +29,12 @@ import { Button, buttonVariants } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { getGuideBookingById } from "@/features/bookings/guide-booking.api";
+
 import {
-  completeGuideTour,
-  getGuideBookingById,
-  startGuideTour,
-} from "@/features/bookings/guide-booking.api";
+  GuideTourConfirmationDialog,
+  type GuideTourAction,
+} from "@/features/bookings/components/guide-tour-confirmation-dialog";
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -67,29 +70,10 @@ function formatStatus(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getErrorMessage(error: unknown) {
-  if (typeof error === "object" && error !== null && "response" in error) {
-    const response = (
-      error as {
-        response?: {
-          data?: {
-            message?: string;
-          };
-        };
-      }
-    ).response;
-
-    if (response?.data?.message) {
-      return response.data.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Something went wrong.";
-}
+const CONFIRMED_ANNOUNCEMENTS: Record<GuideTourAction, string> = {
+  START: "Tour started. This booking is now in progress.",
+  COMPLETE: "Tour completed. The traveler can now leave a review.",
+};
 
 export default function GuideBookingDetailsPage() {
   const params = useParams<{
@@ -113,49 +97,39 @@ export default function GuideBookingDetailsPage() {
     enabled: Boolean(bookingId),
   });
 
-  const startMutation = useMutation({
-    mutationFn: () => startGuideTour(bookingId),
+  const [confirmAction, setConfirmAction] = useState<GuideTourAction | null>(
+    null,
+  );
 
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["guide", "booking", bookingId],
-      });
+  const [announcement, setAnnouncement] = useState("");
 
-      await queryClient.invalidateQueries({
-        queryKey: ["guide", "bookings"],
-      });
+  const tourActionsTitleRef = useRef<HTMLDivElement>(null);
 
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "bookings"],
-      });
+  const refreshStatus = async () => {
+    const result = await refetch();
 
-      await queryClient.invalidateQueries({
-        queryKey: ["bookings", "me"],
-      });
-    },
-  });
+    return result.data?.status;
+  };
 
-  const completeMutation = useMutation({
-    mutationFn: () => completeGuideTour(bookingId),
+  const handleConfirmed = async (action: GuideTourAction) => {
+    await queryClient.invalidateQueries({
+      queryKey: ["guide", "booking", bookingId],
+    });
 
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["guide", "booking", bookingId],
-      });
+    await queryClient.invalidateQueries({
+      queryKey: ["guide", "bookings"],
+    });
 
-      await queryClient.invalidateQueries({
-        queryKey: ["guide", "bookings"],
-      });
+    await queryClient.invalidateQueries({
+      queryKey: ["admin", "bookings"],
+    });
 
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "bookings"],
-      });
+    await queryClient.invalidateQueries({
+      queryKey: ["bookings", "me"],
+    });
 
-      await queryClient.invalidateQueries({
-        queryKey: ["bookings", "me"],
-      });
-    },
-  });
+    setAnnouncement(CONFIRMED_ANNOUNCEMENTS[action]);
+  };
 
   if (isLoading) {
     return (
@@ -453,7 +427,13 @@ export default function GuideBookingDetailsPage() {
         <aside className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Tour actions</CardTitle>
+              <CardTitle
+                ref={tourActionsTitleRef}
+                tabIndex={-1}
+                className="outline-none"
+              >
+                Tour actions
+              </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
@@ -463,26 +443,21 @@ export default function GuideBookingDetailsPage() {
                     <p className="font-medium">Ready to begin?</p>
 
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      Start the tour when the journey officially begins.
+                      Start the tour when the journey officially begins. You
+                      will need the confirmation code the traveler generates
+                      in their booking.
                     </p>
                   </div>
 
                   <Button
                     className="w-full"
-                    disabled={startMutation.isPending}
-                    onClick={() => startMutation.mutate()}
+                    onClick={() => {
+                      setAnnouncement("");
+                      setConfirmAction("START");
+                    }}
                   >
-                    {startMutation.isPending ? (
-                      <>
-                        <LoaderCircle className="size-4 animate-spin" />
-                        Starting tour...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="size-4" />
-                        Start tour
-                      </>
-                    )}
+                    <Play className="size-4" aria-hidden="true" />
+                    Start tour
                   </Button>
                 </>
               )}
@@ -493,26 +468,21 @@ export default function GuideBookingDetailsPage() {
                     <p className="font-medium">Tour in progress</p>
 
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      Mark the tour as completed after the journey has finished.
+                      Mark the tour as completed after the journey has
+                      finished, using the confirmation code the traveler
+                      generates in their booking.
                     </p>
                   </div>
 
                   <Button
                     className="w-full"
-                    disabled={completeMutation.isPending}
-                    onClick={() => completeMutation.mutate()}
+                    onClick={() => {
+                      setAnnouncement("");
+                      setConfirmAction("COMPLETE");
+                    }}
                   >
-                    {completeMutation.isPending ? (
-                      <>
-                        <LoaderCircle className="size-4 animate-spin" />
-                        Completing tour...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="size-4" />
-                        Complete tour
-                      </>
-                    )}
+                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                    Complete tour
                   </Button>
                 </>
               )}
@@ -545,17 +515,24 @@ export default function GuideBookingDetailsPage() {
                 </div>
               )}
 
-              {(startMutation.isError || completeMutation.isError) && (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-                  <p className="text-sm text-destructive">
-                    {getErrorMessage(
-                      startMutation.error ?? completeMutation.error,
-                    )}
-                  </p>
-                </div>
-              )}
+              <p role="status" className="sr-only">
+                {announcement}
+              </p>
             </CardContent>
           </Card>
+
+          <GuideTourConfirmationDialog
+            bookingId={bookingId}
+            action={confirmAction}
+            onOpenChange={(open) => {
+              if (!open) {
+                setConfirmAction(null);
+              }
+            }}
+            refreshStatus={refreshStatus}
+            onConfirmed={handleConfirmed}
+            successFocusRef={tourActionsTitleRef}
+          />
 
           <Card>
             <CardHeader>
@@ -578,6 +555,16 @@ export default function GuideBookingDetailsPage() {
                   {formatDateTime(booking.confirmedAt)}
                 </p>
               </div>
+
+              {booking.startedAt && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Started</p>
+
+                  <p className="mt-1 font-medium">
+                    {formatDateTime(booking.startedAt)}
+                  </p>
+                </div>
+              )}
 
               {booking.completedAt && (
                 <div>

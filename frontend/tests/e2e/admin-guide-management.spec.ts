@@ -8,6 +8,17 @@ import path from "node:path";
 
 import { promisify } from "node:util";
 
+import {
+  createFixtureTourist,
+  type FixtureTourist,
+} from "./support/fixture-identities";
+
+import {
+  apiLogin,
+  enterGuideConfirmationCode,
+  generateConfirmationCode,
+} from "./support/tour-confirmation";
+
 /**
  * =========================================================
  * Child Process Helper
@@ -26,9 +37,11 @@ const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "Admin12345";
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
-
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+/**
+ * Throwaway tourist created per run (CR-032), never a real
+ * account; the standard E2E cleanup deletes it and its data.
+ */
+let tourist: FixtureTourist;
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
@@ -156,7 +169,10 @@ async function waitForAuthenticatedPublicNavbar(page: Page, isMobile: boolean) {
  * =========================================================
  *
  * Reuses the same fixture script as the booking lifecycle
- * suite: a fresh CONFIRMED booking with no guide assigned.
+ * suite: a fresh CONFIRMED booking with no guide assigned, owned
+ * by the throwaway tourist. It is created once Guide A exists, so
+ * its dates are allocated against the guide it will be assigned
+ * to (CR-032: no shared guide account is involved).
  */
 
 async function createBookingFixture(): Promise<BookingLifecycleFixture> {
@@ -172,7 +188,9 @@ async function createBookingFixture(): Promise<BookingLifecycleFixture> {
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: tourist.email,
+
+        E2E_GUIDE_EMAIL: GUIDE_A_EMAIL,
       },
 
       timeout: 30_000,
@@ -224,9 +242,7 @@ test.describe("Travora admin guide management", () => {
   });
 
   test.beforeAll(async () => {
-    fixture = await createBookingFixture();
-
-    console.log("Created E2E booking for guide management:", fixture.bookingId);
+    tourist = await createFixtureTourist("guide-mgmt");
   });
 
   test("admin creates a guide", async ({ page }) => {
@@ -479,9 +495,13 @@ test.describe("Travora admin guide management", () => {
   test("a guide with an active booking cannot be deactivated", async ({
     page,
   }) => {
-    if (!guideAId || !fixture) {
-      throw new Error("Guide A or the booking fixture is missing.");
+    if (!guideAId) {
+      throw new Error("Guide A is missing.");
     }
+
+    fixture = await createBookingFixture();
+
+    console.log("Created E2E booking for guide management:", fixture.bookingId);
 
     await loginAsAdmin(page);
 
@@ -580,25 +600,22 @@ test.describe("Travora admin guide management", () => {
 
     await page.goto(`/guide/bookings/${bookingId}`);
 
-    const startResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/bookings/guide/${bookingId}/start`) &&
-        response.request().method() === "PATCH",
-    );
+    // CR-032: the traveler's confirmation codes (generated through
+    // the API, as on the traveler's own device) entered by the guide.
+    const touristToken = await apiLogin(tourist.email, tourist.password);
 
-    await page.getByRole("button", { name: "Start tour" }).click();
+    for (const action of ["START", "COMPLETE"] as const) {
+      const code = await generateConfirmationCode(touristToken, bookingId, action);
 
-    await startResponsePromise;
+      const { response } = await enterGuideConfirmationCode(
+        page,
+        bookingId,
+        action,
+        code,
+      );
 
-    const completeResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/bookings/guide/${bookingId}/complete`) &&
-        response.request().method() === "PATCH",
-    );
-
-    await page.getByRole("button", { name: "Complete tour" }).click();
-
-    await completeResponsePromise;
+      expect(response.ok()).toBeTruthy();
+    }
 
     /**
      * Tourist leaves a review.
@@ -606,7 +623,7 @@ test.describe("Travora admin guide management", () => {
 
     await clearSession(page);
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, tourist.email, tourist.password);
 
     await page.goto(`/tourist/bookings/${bookingId}`);
 
@@ -803,7 +820,7 @@ test.describe("Travora admin guide management", () => {
   }) => {
     await clearSession(page);
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, tourist.email, tourist.password);
 
     await page.goto("/admin/guides");
 

@@ -14,6 +14,7 @@ const crypto = require("crypto");
 const {
   loadBackendEnv,
   assertSafeE2EEnvironment,
+  requireFixtureAccountEmail,
 } = require("./lib/e2e-guards");
 
 loadBackendEnv();
@@ -48,9 +49,11 @@ const bookingsService = require("../src/modules/bookings/bookings.service");
  *    calculations.
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+// A throwaway e2e-*@travora.com tourist, required (CR-032 Stage 3A).
+const TOURIST_EMAIL = requireFixtureAccountEmail("E2E_TOURIST_EMAIL", "Booking cancellation conflict E2E fixture");
 
-const GUIDE_EMAIL = process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com";
+// A throwaway e2e-guide-*@travora.com guide, required (CR-032 Stage 3A).
+const GUIDE_EMAIL = requireFixtureAccountEmail("E2E_GUIDE_EMAIL", "Booking cancellation conflict E2E fixture");
 
 /**
  * =========================================================

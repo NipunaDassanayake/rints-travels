@@ -7,9 +7,13 @@
  * so a broken environment fails fast with one clear message
  * instead of dozens of login failures.
  *
- * Checks the seeded accounts the specs log in with, the shared
- * guide profile, and that Stripe is configured in test mode.
- * Secrets are never printed -- only whether they are present.
+ * Checks the seeded admin account the specs log in with and that
+ * Stripe is configured in test mode. Secrets are never printed --
+ * only whether they are present.
+ *
+ * Since CR-032 Stage 3A no spec uses a shared tourist or guide:
+ * each creates throwaway e2e-*@travora.com accounts, so neither the
+ * former shared tourist nor the shared guide is required here.
  */
 
 const {
@@ -25,19 +29,9 @@ const prisma = require("../src/config/prisma");
 
 const REQUIRED_ACCOUNTS = [
   {
-    label: "E2E tourist",
-    email: process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com",
-    role: "TOURIST",
-  },
-  {
     label: "E2E admin",
     email: process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com",
     role: "ADMIN",
-  },
-  {
-    label: "E2E guide",
-    email: process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com",
-    role: "TOUR_GUIDE",
   },
 ];
 

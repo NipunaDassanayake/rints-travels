@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 import crypto from "node:crypto";
 
 /**
@@ -33,9 +35,15 @@ const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "Admin12345";
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("pkg-detail");
+});
 
 const REFRESH_COOKIE = "travora_refresh_token";
 
@@ -376,9 +384,9 @@ test.describe("CR-029 /packages/[slug] detail", () => {
       `/login?returnUrl=${encodeURIComponent(`/tourist/requests/new?packageId=${ids.dense}`)}`,
     );
 
-    await page.getByLabel("Email").fill(TOURIST_EMAIL);
+    await page.getByLabel("Email").fill(e2eTourist.email);
 
-    await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+    await page.getByLabel("Password").fill(e2eTourist.password);
 
     await page.getByRole("button", { name: "Sign in" }).click();
 

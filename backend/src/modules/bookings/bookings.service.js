@@ -7,11 +7,19 @@ const bookingsRepository = require("./bookings.repository");
 const tourGuidesRepository = require("../tour-guides/tourGuides.repository");
 
 const {
+  AppError,
   NotFoundError,
   ForbiddenError,
   BadRequestError,
   ConflictError,
 } = require("../../utils/AppError");
+
+const {
+  CODE_TTL_MS,
+  generateCode,
+  hashCode,
+  codeMatches,
+} = require("./bookingLifecycleChallenge");
 
 const { USER_ROLES } = require("../../core/constants/auth.constants");
 
@@ -34,10 +42,15 @@ const generateBookingReference = () => {
  * =========================================================
  */
 
+/*
+ * Transitions an admin may request directly. Starting and
+ * completing a tour are not here: they only happen through the
+ * traveler-confirmed lifecycle (CR-032).
+ */
 const BOOKING_STATUS_TRANSITIONS = {
-  CONFIRMED: ["IN_PROGRESS", "CANCELLED"],
+  CONFIRMED: ["CANCELLED"],
 
-  IN_PROGRESS: ["COMPLETED", "CANCELLED"],
+  IN_PROGRESS: ["CANCELLED"],
 
   COMPLETED: [],
 
@@ -202,11 +215,21 @@ const getBookingById = async (bookingId, currentUser) => {
 
 /**
  * =========================================================
- * Admin - Update Booking Status
+ * Admin - Update Booking Status (cancellation only, CR-032)
  * =========================================================
+ *
+ * The generic admin status endpoint can only cancel. Starting
+ * and completing a tour need the traveler's confirmation code
+ * (verifyLifecycleChallenge); no admin path bypasses that.
  */
 
 const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
+  if (newStatus !== "CANCELLED") {
+    throw new BadRequestError(
+      "Bookings can only be cancelled here. Tours are started and completed by the assigned guide with the traveler's confirmation code.",
+    );
+  }
+
   const booking = await bookingsRepository.findBookingById(bookingId);
 
   if (!booking) {
@@ -221,14 +244,20 @@ const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
     );
   }
 
-  if (newStatus === "IN_PROGRESS" && !booking.quotation.guideId) {
-    throw new BadRequestError("Assign a tour guide before starting the tour");
+  const result = await bookingsRepository.cancelBookingTransaction({ bookingId });
+
+  if (result.outcome === "NOT_FOUND") {
+    throw new NotFoundError("Booking not found");
   }
 
-  const updatedBooking = await bookingsRepository.updateBookingStatus(
-    bookingId,
-    newStatus,
-  );
+  if (result.outcome === "STATUS_MISMATCH") {
+    throw new ConflictError(
+      `Cannot change booking status from ${result.currentStatus} to ${newStatus}`,
+      { code: "BOOKING_STATUS_MISMATCH", currentStatus: result.currentStatus },
+    );
+  }
+
+  const updatedBooking = result.booking;
 
   logger.info({
     event: "BOOKING_STATUS_CHANGED",
@@ -245,9 +274,11 @@ const updateBookingStatus = async (bookingId, newStatus, currentUser) => {
 
     paymentId: updatedBooking.paymentId,
 
-    previousStatus: booking.status,
+    previousStatus: result.previousStatus,
 
     newStatus: updatedBooking.status,
+
+    invalidatedChallenges: result.invalidatedChallenges,
 
     changedByUserId: currentUser.id,
 
@@ -312,14 +343,19 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
     );
   }
 
-  const updatedBooking = await bookingsRepository.assignGuideToBooking(
-    bookingId,
-    guideId,
-  );
+  const result = await bookingsRepository.assignGuideToBooking(bookingId, guideId);
 
-  if (!updatedBooking) {
+  if (result.outcome === "NOT_FOUND") {
     throw new NotFoundError("Booking not found");
   }
+
+  if (result.outcome === "STATUS_MISMATCH") {
+    throw new BadRequestError(
+      `Cannot assign a guide to a ${result.currentStatus.toLowerCase()} booking`,
+    );
+  }
+
+  const updatedBooking = result.booking;
 
   logger.info({
     event: "BOOKING_GUIDE_ASSIGNED",
@@ -330,9 +366,11 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
 
     quotationId: updatedBooking.quotationId,
 
-    previousGuideId: booking.quotation.guideId,
+    previousGuideId: result.previousGuideId,
 
     guideId,
+
+    invalidatedChallenges: result.invalidatedChallenges,
 
     assignedByUserId: currentUser.id,
 
@@ -344,104 +382,257 @@ const assignBookingGuide = async (bookingId, guideId, currentUser) => {
 
 /**
  * =========================================================
- * Guide - Validate Assigned Booking
+ * Traveler - Generate Tour Confirmation Code (CR-032)
  * =========================================================
+ *
+ * Returns the plaintext code exactly once. Only its HMAC is
+ * stored, and it is never logged.
  */
 
-const getAssignedGuideBooking = async (bookingId, guideUserId) => {
-  const booking = await bookingsRepository.findBookingById(bookingId);
+const createLifecycleChallenge = async (bookingId, action, currentUser) => {
+  const challengeId = crypto.randomUUID();
 
-  if (!booking) {
+  const code = generateCode();
+
+  const now = new Date();
+
+  const expiresAt = new Date(now.getTime() + CODE_TTL_MS);
+
+  const result = await bookingsRepository.createLifecycleChallengeTransaction({
+    bookingId,
+
+    touristUserId: currentUser.id,
+
+    action,
+
+    challengeId,
+
+    codeHash: hashCode({ challengeId, bookingId, action, code }),
+
+    expiresAt,
+
+    now,
+  });
+
+  switch (result.outcome) {
+    case "NOT_FOUND":
+      throw new NotFoundError("Booking not found");
+
+    case "FORBIDDEN":
+      throw new ForbiddenError("You do not have permission to confirm this booking");
+
+    case "STATUS_MISMATCH":
+      throw new ConflictError(
+        action === "START"
+          ? "Only a confirmed booking can be started"
+          : "Only a tour in progress can be completed",
+        { code: "BOOKING_STATUS_MISMATCH", currentStatus: result.currentStatus },
+      );
+
+    case "NO_ASSIGNED_GUIDE":
+      throw new ConflictError("A tour guide has not been assigned to this booking yet", {
+        code: "NO_ASSIGNED_GUIDE",
+      });
+
+    default:
+      break;
+  }
+
+  logger.info({
+    event: "BOOKING_LIFECYCLE_CODE_GENERATED",
+
+    bookingId,
+
+    bookingReference: result.bookingReference,
+
+    action,
+
+    challengeId: result.challenge.id,
+
+    touristUserId: currentUser.id,
+
+    replacedChallenges: result.replacedChallenges,
+
+    expiresAt: result.challenge.expiresAt,
+  });
+
+  return {
+    action: result.challenge.action,
+
+    code,
+
+    expiresAt: result.challenge.expiresAt,
+
+    guide: result.guide,
+  };
+};
+
+/**
+ * =========================================================
+ * Guide - Start / Complete Tour With Code (CR-032)
+ * =========================================================
+ *
+ * The repository transaction returns an outcome and commits
+ * (so failed attempts and expiry are recorded); errors are only
+ * raised here, after the commit.
+ */
+
+const VERIFY_EVENTS = {
+  START: "GUIDE_TOUR_STARTED",
+
+  COMPLETE: "GUIDE_TOUR_COMPLETED",
+};
+
+const verifyLifecycleChallenge = async (bookingId, action, code, currentUser) => {
+  const result = await bookingsRepository.verifyLifecycleChallengeTransaction({
+    bookingId,
+
+    guideUserId: currentUser.id,
+
+    action,
+
+    codeMatches: (challenge) => codeMatches(challenge, code),
+  });
+
+  if (result.outcome === "VERIFIED") {
+    logger.info({
+      event: VERIFY_EVENTS[action],
+
+      bookingId,
+
+      bookingReference: result.bookingReference,
+
+      action,
+
+      challengeId: result.challengeId,
+
+      guideUserId: currentUser.id,
+
+      previousStatus: result.previousStatus,
+
+      newStatus: result.booking.status,
+
+      startedAt: result.booking.startedAt,
+
+      completedAt: result.booking.completedAt,
+    });
+
+    return result.booking;
+  }
+
+  if (result.outcome === "NOT_FOUND") {
     throw new NotFoundError("Booking not found");
   }
 
-  const assignedGuideUserId = booking.quotation.guide?.userId;
+  /*
+   * More than one open code for the same booking and action
+   * breaks the generation invariant. Fail closed: nothing was
+   * counted or transitioned. A newly generated code invalidates
+   * every open one, which restores the invariant.
+   */
+  if (result.outcome === "INTEGRITY_VIOLATION") {
+    logger.error({
+      event: "BOOKING_LIFECYCLE_INTEGRITY_VIOLATION",
 
-  if (!assignedGuideUserId || assignedGuideUserId !== guideUserId) {
-    throw new ForbiddenError("You are not assigned to this booking");
-  }
+      bookingId,
 
-  return booking;
-};
+      bookingReference: result.bookingReference,
 
-/**
- * =========================================================
- * Guide - Start Tour
- * =========================================================
- */
+      action,
 
-const startGuideTour = async (bookingId, currentUser) => {
-  const booking = await getAssignedGuideBooking(bookingId, currentUser.id);
+      guideUserId: currentUser.id,
 
-  if (booking.status !== "CONFIRMED") {
-    throw new BadRequestError(
-      `Tour cannot be started from ${booking.status} status`,
+      openChallenges: result.openChallenges,
+    });
+
+    throw new AppError(
+      "This confirmation code can't be checked right now. Ask the traveler to generate a new code.",
+      500,
+      {
+        code: "CONFIRMATION_INTEGRITY_ERROR",
+      },
     );
   }
 
-  const updatedBooking = await bookingsRepository.updateBookingStatus(
+  logger.warn({
+    event: "BOOKING_LIFECYCLE_VERIFY_FAILED",
+
     bookingId,
-    "IN_PROGRESS",
-  );
 
-  logger.info({
-    event: "GUIDE_TOUR_STARTED",
+    bookingReference: result.bookingReference,
 
-    bookingId: updatedBooking.id,
+    action,
 
-    bookingReference: updatedBooking.bookingReference,
+    challengeId: result.challengeId ?? null,
 
     guideUserId: currentUser.id,
 
-    guideId: booking.quotation.guideId,
+    reason: result.outcome,
 
-    previousStatus: booking.status,
-
-    newStatus: updatedBooking.status,
+    attemptsRemaining: result.attemptsRemaining ?? null,
   });
 
-  return updatedBooking;
-};
+  if (result.exhaustedNow) {
+    logger.warn({
+      event: "BOOKING_LIFECYCLE_ATTEMPTS_EXHAUSTED",
 
-/**
- * =========================================================
- * Guide - Complete Tour
- * =========================================================
- */
+      bookingId,
 
-const completeGuideTour = async (bookingId, currentUser) => {
-  const booking = await getAssignedGuideBooking(bookingId, currentUser.id);
+      bookingReference: result.bookingReference,
 
-  if (booking.status !== "IN_PROGRESS") {
-    throw new BadRequestError(
-      `Tour cannot be completed from ${booking.status} status`,
-    );
+      action,
+
+      challengeId: result.challengeId,
+
+      guideUserId: currentUser.id,
+    });
   }
 
-  const updatedBooking = await bookingsRepository.updateBookingStatus(
-    bookingId,
-    "COMPLETED",
-  );
+  if (result.expiredNow) {
+    logger.info({
+      event: "BOOKING_LIFECYCLE_CODE_INVALIDATED",
 
-  logger.info({
-    event: "GUIDE_TOUR_COMPLETED",
+      bookingId,
 
-    bookingId: updatedBooking.id,
+      action,
 
-    bookingReference: updatedBooking.bookingReference,
+      challengeId: result.challengeId,
 
-    guideUserId: currentUser.id,
+      reason: "EXPIRED",
+    });
+  }
 
-    guideId: booking.quotation.guideId,
+  switch (result.outcome) {
+    case "NOT_ASSIGNED":
+      throw new AppError("You are not assigned to this booking", 403, {
+        code: "NOT_ASSIGNED_GUIDE",
+      });
 
-    previousStatus: booking.status,
+    case "STATUS_MISMATCH":
+      throw new ConflictError(
+        `Tour cannot be ${action === "START" ? "started" : "completed"} from ${result.currentStatus} status`,
+        { code: "BOOKING_STATUS_MISMATCH", currentStatus: result.currentStatus },
+      );
 
-    newStatus: updatedBooking.status,
+    case "CODE_EXPIRED":
+      throw new ConflictError("This confirmation code has expired", { code: "CODE_EXPIRED" });
 
-    completedAt: updatedBooking.completedAt,
-  });
+    case "ATTEMPTS_EXHAUSTED":
+      throw new AppError("Too many incorrect attempts for this confirmation code", 429, {
+        code: "TOO_MANY_ATTEMPTS",
+      });
 
-  return updatedBooking;
+    case "CODE_INCORRECT":
+      throw new BadRequestError("The confirmation code is incorrect", {
+        code: "CODE_INCORRECT",
+        attemptsRemaining: result.attemptsRemaining,
+      });
+
+    default:
+      throw new ConflictError("There is no active confirmation code for this tour", {
+        code: "NO_ACTIVE_CODE",
+      });
+  }
 };
 
 module.exports = {
@@ -458,6 +649,6 @@ module.exports = {
 
   assignBookingGuide,
 
-  startGuideTour,
-  completeGuideTour,
+  createLifecycleChallenge,
+  verifyLifecycleChallenge,
 };

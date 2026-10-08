@@ -58,7 +58,10 @@ const tourRequestsRepository = require("../src/modules/tour-requests/tourRequest
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+// A throwaway e2e-*@travora.com tourist, required (CR-032 Stage 3A).
+const { requireFixtureAccountEmail } = require("./lib/e2e-guards");
+
+const TOURIST_EMAIL = requireFixtureAccountEmail("E2E_TOURIST_EMAIL", "Guide privacy E2E fixture");
 
 function createUniqueSuffix() {
   return `${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;

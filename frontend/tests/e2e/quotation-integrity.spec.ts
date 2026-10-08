@@ -6,6 +6,13 @@ import {
   type TestInfo,
 } from "@playwright/test";
 
+import {
+  createFixtureGuide,
+  createFixtureTourist,
+  type FixtureGuide,
+  type FixtureTourist,
+} from "./support/fixture-identities";
+
 import { execFile } from "node:child_process";
 
 import path from "node:path";
@@ -27,9 +34,20 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+/** Throwaway guide for quotations that need one (never a real guide). */
+let e2eGuide: FixtureGuide;
+
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("quote-int");
+
+  e2eGuide = await createFixtureGuide("quote-int");
+});
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
@@ -59,7 +77,9 @@ async function runQuotationFixture<T>(scenario: string): Promise<T> {
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: e2eTourist.email,
+
+        E2E_GUIDE_EMAIL: e2eGuide.email,
       },
 
       timeout: 30_000,
@@ -148,7 +168,7 @@ async function adminAuth(page: Page) {
 }
 
 async function touristAuth(page: Page) {
-  await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+  await login(page, e2eTourist.email, e2eTourist.password);
 
   return captureAuthorizationHeader(page, "/tourist/quotations");
 }
@@ -1039,7 +1059,7 @@ test.describe("CR-008 quotation UI", () => {
   }) => {
     const fixture = await runQuotationFixture<VisibilityFixture>("visibility-set");
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, e2eTourist.email, e2eTourist.password);
 
     await page.goto("/tourist/quotations");
 
