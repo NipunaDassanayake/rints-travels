@@ -54,7 +54,10 @@ const quotationsRepository = require("../src/modules/quotations/quotations.repos
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+// A throwaway e2e-*@travora.com tourist, required (CR-032 Stage 3A).
+const { requireFixtureAccountEmail } = require("./lib/e2e-guards");
+
+const TOURIST_EMAIL = requireFixtureAccountEmail("E2E_TOURIST_EMAIL", "Quotation integrity E2E fixture");
 
 function createUniqueSuffix() {
   return `${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
@@ -345,11 +348,14 @@ async function scenarioDraftQuotation() {
     quotationPayload(`Draft ${uniqueSuffix}`, dates),
   );
 
+  // The spec's own throwaway guide (CR-032 Stage 3A) -- never
+  // whichever real guide happens to be available.
   const availableGuide = await prisma.tourGuideProfile.findFirst({
     where: {
       isAvailable: true,
       deletedAt: null,
       user: {
+        email: requireFixtureAccountEmail("E2E_GUIDE_EMAIL", "Quotation integrity E2E fixture"),
         status: "ACTIVE",
       },
     },

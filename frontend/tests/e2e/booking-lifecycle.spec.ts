@@ -6,6 +6,20 @@ import path from "node:path";
 
 import { promisify } from "node:util";
 
+import {
+  createFixtureGuide,
+  createFixtureTourist,
+  fixtureGuideName,
+  type FixtureGuide,
+  type FixtureTourist,
+} from "./support/fixture-identities";
+
+import {
+  apiLogin,
+  enterGuideConfirmationCode,
+  generateConfirmationCode,
+} from "./support/tour-confirmation";
+
 /**
  * =========================================================
  * Child Process Helper
@@ -20,25 +34,21 @@ const execFileAsync = promisify(execFile);
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
-
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
-
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "Admin12345";
 
 /**
- * Guide account.
- *
- * These values must match a real guide account.
+ * Tourist and guide are throwaway fixture identities created per
+ * run (CR-032), never real accounts; the standard E2E cleanup
+ * deletes them and everything they own.
  */
 
-const GUIDE_EMAIL = process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com";
+let tourist: FixtureTourist;
 
-const GUIDE_PASSWORD = process.env.E2E_GUIDE_PASSWORD ?? "Guide12345";
+let guide: FixtureGuide;
 
-const GUIDE_NAME = process.env.E2E_GUIDE_NAME ?? "Nimal Perera";
+let guideName = "";
 
 /**
  * =========================================================
@@ -141,9 +151,12 @@ async function createBookingFixture(): Promise<BookingLifecycleFixture> {
 
         /**
          * Make sure the backend fixture and
-         * frontend test use the same tourist.
+         * frontend test use the same tourist, and allocate the
+         * travel dates clear of the fixture guide's bookings.
          */
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: tourist.email,
+
+        E2E_GUIDE_EMAIL: guide.email,
       },
 
       timeout: 30_000,
@@ -210,6 +223,12 @@ test.describe("Travora booking lifecycle", () => {
    */
 
   test.beforeAll(async () => {
+    tourist = await createFixtureTourist("lifecycle");
+
+    guide = await createFixtureGuide("lifecycle");
+
+    guideName = fixtureGuideName(guide);
+
     fixture = await createBookingFixture();
 
     console.log("Created E2E booking:", fixture.bookingId);
@@ -281,7 +300,7 @@ test.describe("Travora booking lifecycle", () => {
     });
 
     const guideOption = guideSelect.locator("option").filter({
-      hasText: GUIDE_NAME,
+      hasText: guideName,
     });
 
     await expect(guideOption).toHaveCount(1);
@@ -290,7 +309,7 @@ test.describe("Travora booking lifecycle", () => {
 
     if (!guideId) {
       throw new Error(
-        `Guide option "${GUIDE_NAME}" does not contain a valid guide ID.`,
+        `Guide option "${guideName}" does not contain a valid guide ID.`,
       );
     }
 
@@ -339,7 +358,7 @@ test.describe("Travora booking lifecycle", () => {
       .getByText("Current guide", { exact: true })
       .locator("xpath=following-sibling::p[1]");
 
-    await expect(currentGuide).toHaveText(GUIDE_NAME, {
+    await expect(currentGuide).toHaveText(guideName, {
       timeout: 10_000,
     });
 
@@ -379,7 +398,7 @@ test.describe("Travora booking lifecycle", () => {
      * =================================================
      */
 
-    await login(page, GUIDE_EMAIL, GUIDE_PASSWORD);
+    await login(page, guide.email, guide.password);
 
     /**
      * =================================================
@@ -403,25 +422,26 @@ test.describe("Travora booking lifecycle", () => {
      * STEP 8
      * Start Tour
      * =================================================
+     *
+     * CR-032: the traveler generates a confirmation code on
+     * their own device (here: through the API) and the guide
+     * enters it.
      */
 
-    const startTourButton = page.getByRole("button", {
-      name: "Start tour",
-    });
+    const touristToken = await apiLogin(tourist.email, tourist.password);
 
-    await expect(startTourButton).toBeVisible();
-
-    await expect(startTourButton).toBeEnabled();
-
-    const startResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/bookings/guide/${bookingId}/start`) &&
-        response.request().method() === "PATCH",
+    const startCode = await generateConfirmationCode(
+      touristToken,
+      bookingId,
+      "START",
     );
 
-    await startTourButton.click();
-
-    const startResponse = await startResponsePromise;
+    const { response: startResponse } = await enterGuideConfirmationCode(
+      page,
+      bookingId,
+      "START",
+      startCode,
+    );
 
     expect(startResponse.ok()).toBeTruthy();
 
@@ -442,23 +462,18 @@ test.describe("Travora booking lifecycle", () => {
      * =================================================
      */
 
-    const completeTourButton = page.getByRole("button", {
-      name: "Complete tour",
-    });
-
-    await expect(completeTourButton).toBeVisible();
-
-    await expect(completeTourButton).toBeEnabled();
-
-    const completeResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/bookings/guide/${bookingId}/complete`) &&
-        response.request().method() === "PATCH",
+    const completeCode = await generateConfirmationCode(
+      touristToken,
+      bookingId,
+      "COMPLETE",
     );
 
-    await completeTourButton.click();
-
-    const completeResponse = await completeResponsePromise;
+    const { response: completeResponse } = await enterGuideConfirmationCode(
+      page,
+      bookingId,
+      "COMPLETE",
+      completeCode,
+    );
 
     expect(completeResponse.ok()).toBeTruthy();
 
@@ -506,7 +521,7 @@ test.describe("Travora booking lifecycle", () => {
      * =================================================
      */
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, tourist.email, tourist.password);
 
     /**
      * =================================================
@@ -632,7 +647,7 @@ test.describe("Travora booking lifecycle", () => {
 
     console.log("Booking lifecycle completed successfully:", bookingId);
 
-    console.log("Assigned guide:", GUIDE_NAME);
+    console.log("Assigned guide:", guideName);
 
     console.log("Review:", reviewComment);
   });

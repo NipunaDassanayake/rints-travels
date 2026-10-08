@@ -1,5 +1,14 @@
 import { expect, test, type TestInfo } from "@playwright/test";
 
+import {
+  createFixtureGuide,
+  createFixtureTourist,
+  type FixtureGuide,
+  type FixtureTourist,
+} from "./support/fixture-identities";
+
+import { api, apiLogin } from "./support/tour-confirmation";
+
 import { execFile } from "node:child_process";
 
 import path from "node:path";
@@ -21,9 +30,15 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("reliability");
+});
 
 const BACKEND_SCRIPTS = path.resolve(process.cwd(), "../backend/scripts");
 
@@ -132,16 +147,16 @@ test.describe("CR-018 hydration-safe auth forms", () => {
       waitUntil: "commit",
     });
 
-    await page.getByLabel("Email").fill(TOURIST_EMAIL);
+    await page.getByLabel("Email").fill(e2eTourist.email);
 
-    await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+    await page.getByLabel("Password").fill(e2eTourist.password);
 
     // Hydration has certainly finished by now; values must survive it.
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByLabel("Email")).toHaveValue(TOURIST_EMAIL);
+    await expect(page.getByLabel("Email")).toHaveValue(e2eTourist.email);
 
-    await expect(page.getByLabel("Password")).toHaveValue(TOURIST_PASSWORD);
+    await expect(page.getByLabel("Password")).toHaveValue(e2eTourist.password);
 
     await page
       .getByRole("button", {
@@ -155,7 +170,7 @@ test.describe("CR-018 hydration-safe auth forms", () => {
 
     expect(page.url()).not.toContain("password");
 
-    expect(page.url()).not.toContain(encodeURIComponent(TOURIST_EMAIL));
+    expect(page.url()).not.toContain(encodeURIComponent(e2eTourist.email));
   });
 
   test("register input typed during hydration is kept", async ({ page }) => {
@@ -358,17 +373,70 @@ test.describe("CR-018 test-data cleanup", () => {
  */
 
 test.describe("CR-018 guide booking windows", () => {
+  /**
+   * A throwaway fixture tourist and guide (CR-032 Stage 3A) instead of
+   * the shared accounts, created here because the cleanup tests above
+   * delete every earlier E2E account. The guide is given two active
+   * bookings first, so the allocation check always has real bookings
+   * to steer around.
+   */
+  let windowTourist: FixtureTourist;
+
+  let windowGuide: FixtureGuide;
+
+  const fixtureEnv = () => ({
+    E2E_TOURIST_EMAIL: windowTourist.email,
+
+    E2E_GUIDE_EMAIL: windowGuide.email,
+  });
+
+  test.beforeAll(async ({}, testInfo) => {
+    if (testInfo.project.name !== "chromium") {
+      return;
+    }
+
+    windowTourist = await createFixtureTourist("windows");
+
+    windowGuide = await createFixtureGuide("windows");
+
+    const adminToken = await apiLogin(
+      process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com",
+      process.env.E2E_ADMIN_PASSWORD ?? "Admin12345",
+    );
+
+    for (let index = 0; index < 2; index += 1) {
+      const result = await runScript("prepare-booking-lifecycle-e2e.js", [], fixtureEnv());
+
+      expect(result.exitCode, result.stderr).toBe(0);
+
+      const { bookingId } = parseMarker<{ bookingId: string }>(result, "E2E_FIXTURE_JSON");
+
+      const assigned = await api("PATCH", `/bookings/${bookingId}/guide`, {
+        token: adminToken,
+        body: { guideId: windowGuide.id },
+      });
+
+      expect(assigned.status, JSON.stringify(assigned.body)).toBe(200);
+    }
+  });
+
   test.beforeEach(({}, testInfo) => {
     skipOutsideChromium(testInfo);
   });
 
   test("allocated windows never conflict with the guide's active bookings", async () => {
-    const result = await helper<{
+    const run = await runScript("e2e-reliability-helpers.js", ["allocation-check"], fixtureEnv());
+
+    expect(run.exitCode, run.stderr).toBe(0);
+
+    const result = parseMarker<{
       activeBookings: number;
       startDate: string;
       endDate: string;
       conflictFound: boolean;
-    }>("allocation-check");
+    }>(run, "E2E_FIXTURE_JSON");
+
+    expect(result.activeBookings).toBeGreaterThanOrEqual(2);
 
     expect(result.conflictFound).toBe(false);
 
@@ -384,7 +452,7 @@ test.describe("CR-018 guide booking windows", () => {
     const fixtures = [];
 
     for (let index = 0; index < 2; index += 1) {
-      const result = await runScript("prepare-booking-lifecycle-e2e.js");
+      const result = await runScript("prepare-booking-lifecycle-e2e.js", [], fixtureEnv());
 
       expect(result.exitCode, result.stderr).toBe(0);
 

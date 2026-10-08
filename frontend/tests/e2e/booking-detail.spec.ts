@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 /**
  * =========================================================
  * CR-030 Stage 5 -- Booking detail and post-trip review
@@ -15,9 +17,18 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.use({ timezoneId: "UTC" });
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("booking-detail");
+});
+
+/** Mocked responses only; never used to sign in. */
+const MOCK_TOURIST_EMAIL = "traveler@example.test";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
 
@@ -165,7 +176,7 @@ function booking(n: number, overrides: Json = {}, quoteOverrides: Json = {}, req
       createdAt: "2026-10-03T09:30:00.000Z",
       updatedAt: "2026-10-03T09:34:00.000Z",
     },
-    tourist: { id: TOURIST_ID, firstName: "Nipuna", lastName: "Tourist", email: TOURIST_EMAIL },
+    tourist: { id: TOURIST_ID, firstName: "Test", lastName: "Traveler", email: MOCK_TOURIST_EMAIL },
     ...overrides,
   };
 }
@@ -310,9 +321,9 @@ async function login(page: Page) {
 
   await page.goto("/login");
 
-  await page.getByLabel("Email").fill(TOURIST_EMAIL);
+  await page.getByLabel("Email").fill(e2eTourist.email);
 
-  await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+  await page.getByLabel("Password").fill(e2eTourist.password);
 
   await page.getByRole("button", { name: "Sign in" }).click();
 
@@ -379,6 +390,11 @@ test.describe("CR-030 Stage 5 booking states", () => {
       await expect(page.getByTestId("booking-state-lead")).toHaveText(lead);
 
       await expect(state).toContainText("Your guide: Asha Fernando");
+
+      // CR-032: with a guide assigned, the traveler can confirm the start.
+      await expect(state.getByRole("button", { name: "Confirm tour start" })).toBeVisible();
+
+      await expect(state.getByRole("button", { name: "Confirm tour completion" })).toHaveCount(0);
     });
   }
 
@@ -411,6 +427,9 @@ test.describe("CR-030 Stage 5 booking states", () => {
 
     await expect(page.getByTestId("booking-state")).toContainText("Your guide will be assigned before your trip.");
 
+    // CR-032: nobody to confirm with yet, so no confirmation is offered.
+    await expect(page.getByRole("button", { name: /Confirm tour/ })).toHaveCount(0);
+
     await expect(page.getByRole("heading", { name: "Your tour guide" })).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Rate your tour guide" })).toHaveCount(0);
@@ -432,6 +451,13 @@ test.describe("CR-030 Stage 5 booking states", () => {
     ).toBeVisible();
 
     await expect(page.getByTestId("booking-state")).toContainText("Oct 5, 2026 – Oct 10, 2026");
+
+    // CR-032: underway with a guide, the traveler can confirm completion.
+    await expect(
+      page.getByTestId("booking-state").getByRole("button", { name: "Confirm tour completion" }),
+    ).toBeVisible();
+
+    await expect(page.getByRole("button", { name: "Confirm tour start" })).toHaveCount(0);
 
     await expect(page.locator("main")).not.toContainText(/Starts in|Starts today|Starts tomorrow|Day \d+ of \d+/);
 
@@ -458,6 +484,9 @@ test.describe("CR-030 Stage 5 booking states", () => {
     await expect(page.getByRole("heading", { level: 2, name: "Rate your tour guide" })).toBeVisible();
 
     await expect(page.getByTestId("booking-facts")).toContainText("Oct 5, 2026, 4:20 PM UTC");
+
+    // CR-032: a completed trip offers no lifecycle confirmation.
+    await expect(page.getByRole("button", { name: /Confirm tour/ })).toHaveCount(0);
   });
 
   test("a cancelled booking is framed neutrally: no success, nothing upcoming, no review", async ({ page }) => {
@@ -478,6 +507,9 @@ test.describe("CR-030 Stage 5 booking states", () => {
     await expect(page.getByTestId("booking-state-lead")).toHaveText("Cancelled on Oct 6, 2026, 2:45 PM UTC");
 
     await expect(state).toContainText("This booking is no longer active.");
+
+    // CR-032: a cancelled booking offers no lifecycle confirmation.
+    await expect(page.getByRole("button", { name: /Confirm tour/ })).toHaveCount(0);
 
     // Status pill uses the neutral tone, never success.
     await expect(page.locator("[data-status='CANCELLED']")).toHaveAttribute("data-tone", "muted");

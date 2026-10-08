@@ -237,6 +237,9 @@ export interface Booking {
 
   confirmedAt: string;
 
+  /** Set when the guide starts the tour with the traveler's code (CR-032). */
+  startedAt: string | null;
+
   completedAt: string | null;
   cancelledAt: string | null;
 
@@ -250,4 +253,31 @@ export interface Booking {
   payment: BookingPayment;
 
   tourist: BookingTourist;
+}
+
+/**
+ * =========================================================
+ * Tour Confirmation Codes (CR-032)
+ * =========================================================
+ *
+ * Returned once, to the traveler who generated it. The plaintext
+ * code is never stored by the backend and cannot be fetched again.
+ */
+
+export type BookingLifecycleAction = "START" | "COMPLETE";
+
+export interface LifecycleConfirmationCode {
+  action: BookingLifecycleAction;
+
+  code: string;
+
+  expiresAt: string;
+
+  guide: {
+    firstName: string;
+    lastName: string;
+  } | null;
+
+  /** Server time of the response, to correct for client clock skew. */
+  serverTime: string | null;
 }

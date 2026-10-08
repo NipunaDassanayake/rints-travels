@@ -6,6 +6,20 @@ import path from "node:path";
 
 import { promisify } from "node:util";
 
+import {
+  createFixtureGuide,
+  createFixtureTourist,
+  fixtureGuideName,
+  type FixtureGuide,
+  type FixtureTourist,
+} from "./support/fixture-identities";
+
+import {
+  apiLogin,
+  enterGuideConfirmationCode,
+  generateConfirmationCode,
+} from "./support/tour-confirmation";
+
 /**
  * =========================================================
  * Child Process Helper
@@ -20,19 +34,21 @@ const execFileAsync = promisify(execFile);
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
-
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
-
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "Admin12345";
 
-const GUIDE_EMAIL = process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com";
+/**
+ * Tourist and guide are throwaway fixture identities created per
+ * run (CR-032), never real accounts; the standard E2E cleanup
+ * deletes them and everything they own.
+ */
 
-const GUIDE_PASSWORD = process.env.E2E_GUIDE_PASSWORD ?? "Guide12345";
+let tourist: FixtureTourist;
 
-const GUIDE_NAME = process.env.E2E_GUIDE_NAME ?? "Nimal Perera";
+let guide: FixtureGuide;
+
+let guideName = "";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
@@ -181,7 +197,9 @@ async function createBookingFixture(): Promise<BookingFixture> {
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: tourist.email,
+
+        E2E_GUIDE_EMAIL: guide.email,
       },
 
       timeout: 30_000,
@@ -234,9 +252,9 @@ async function createConflictFixture(): Promise<ConflictFixture> {
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: tourist.email,
 
-        E2E_GUIDE_EMAIL: GUIDE_EMAIL,
+        E2E_GUIDE_EMAIL: guide.email,
       },
 
       timeout: 30_000,
@@ -282,6 +300,12 @@ test.describe("Travora booking cancellation", () => {
   });
 
   test.beforeAll(async () => {
+    tourist = await createFixtureTourist("cancellation");
+
+    guide = await createFixtureGuide("cancellation");
+
+    guideName = fixtureGuideName(guide);
+
     confirmedFixture = await createBookingFixture();
 
     completedFixture = await createBookingFixture();
@@ -457,7 +481,7 @@ test.describe("Travora booking cancellation", () => {
     });
 
     const guideOption = guideSelect.locator("option").filter({
-      hasText: GUIDE_NAME,
+      hasText: guideName,
     });
 
     await expect(guideOption).toHaveCount(1);
@@ -482,29 +506,26 @@ test.describe("Travora booking cancellation", () => {
 
     await clearSession(page);
 
-    await login(page, GUIDE_EMAIL, GUIDE_PASSWORD);
+    await login(page, guide.email, guide.password);
 
     await page.goto(`/guide/bookings/${bookingId}`);
 
-    const startResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/bookings/guide/${bookingId}/start`) &&
-        response.request().method() === "PATCH",
-    );
+    // CR-032: the traveler's confirmation codes (generated through
+    // the API, as on the traveler's own device) entered by the guide.
+    const touristToken = await apiLogin(tourist.email, tourist.password);
 
-    await page.getByRole("button", { name: "Start tour" }).click();
+    for (const action of ["START", "COMPLETE"] as const) {
+      const code = await generateConfirmationCode(touristToken, bookingId, action);
 
-    await startResponsePromise;
+      const { response } = await enterGuideConfirmationCode(
+        page,
+        bookingId,
+        action,
+        code,
+      );
 
-    const completeResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/bookings/guide/${bookingId}/complete`) &&
-        response.request().method() === "PATCH",
-    );
-
-    await page.getByRole("button", { name: "Complete tour" }).click();
-
-    await completeResponsePromise;
+      expect(response.ok()).toBeTruthy();
+    }
 
     await loginAsAdmin(page);
 
@@ -559,7 +580,7 @@ test.describe("Travora booking cancellation", () => {
 
     await clearSession(page);
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, tourist.email, tourist.password);
 
     const touristAuthHeader = await captureAuthorizationHeader(
       page,
@@ -584,7 +605,7 @@ test.describe("Travora booking cancellation", () => {
 
     await clearSession(page);
 
-    await login(page, GUIDE_EMAIL, GUIDE_PASSWORD);
+    await login(page, guide.email, guide.password);
 
     const guideAuthHeader = await captureAuthorizationHeader(
       page,

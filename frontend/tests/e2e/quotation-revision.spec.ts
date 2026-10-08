@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import {
+  createFixtureGuide,
+  createFixtureTourist,
+  type FixtureGuide,
+  type FixtureTourist,
+} from "./support/fixture-identities";
+
 import { execFile } from "node:child_process";
 
 import path from "node:path";
@@ -20,17 +27,24 @@ const execFileAsync = promisify(execFile);
  * =========================================================
  */
 
-const TOURIST_EMAIL = process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com";
+/**
+ * Throwaway tourist and guide created per run (CR-032 Stage 3A) --
+ * never real accounts. The standard E2E cleanup deletes them and
+ * everything they own.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = process.env.E2E_TOURIST_PASSWORD ?? "Password123";
+let e2eGuide: FixtureGuide;
+
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("quote-rev");
+
+  e2eGuide = await createFixtureGuide("quote-rev");
+});
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com";
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "Admin12345";
-
-const GUIDE_EMAIL = process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com";
-
-const GUIDE_PASSWORD = process.env.E2E_GUIDE_PASSWORD ?? "Guide12345";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
@@ -163,7 +177,7 @@ async function createQuotationRevisionFixture(): Promise<QuotationRevisionFixtur
       env: {
         ...process.env,
 
-        E2E_TOURIST_EMAIL: TOURIST_EMAIL,
+        E2E_TOURIST_EMAIL: e2eTourist.email,
       },
 
       timeout: 30_000,
@@ -374,7 +388,7 @@ test.describe("Travora quotation revision", () => {
 
     await clearSession(page);
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, e2eTourist.email, e2eTourist.password);
 
     await page.goto("/tourist/quotations");
 
@@ -453,7 +467,7 @@ test.describe("Travora quotation revision", () => {
 
     await clearSession(page);
 
-    await login(page, TOURIST_EMAIL, TOURIST_PASSWORD);
+    await login(page, e2eTourist.email, e2eTourist.password);
 
     const touristAuthHeader = await captureAuthorizationHeader(
       page,
@@ -475,7 +489,7 @@ test.describe("Travora quotation revision", () => {
 
     await clearSession(page);
 
-    await login(page, GUIDE_EMAIL, GUIDE_PASSWORD);
+    await login(page, e2eGuide.email, e2eGuide.password);
 
     const guideAuthHeader = await captureAuthorizationHeader(page, "/guide");
 

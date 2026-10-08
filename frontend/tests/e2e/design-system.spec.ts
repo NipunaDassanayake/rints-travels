@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
+import { createFixtureGuide, createFixtureTourist } from "./support/fixture-identities";
+
 import { cn, TYPOGRAPHY_SIZES } from "../../src/lib/utils";
 
 /**
@@ -19,20 +21,34 @@ import { cn, TYPOGRAPHY_SIZES } from "../../src/lib/utils";
  * Runs once, in the chromium project.
  */
 
-const TOURIST = {
-  email: process.env.E2E_TOURIST_EMAIL ?? "nipuna@example.com",
-  password: process.env.E2E_TOURIST_PASSWORD ?? "Password123",
-};
+/**
+ * Traveler and guide portals are signed into with throwaway accounts
+ * created per run (CR-032 Stage 3A) -- never real accounts; the
+ * standard E2E cleanup deletes them. Filled in beforeAll.
+ */
+const TOURIST = { email: "", password: "" };
 
 const ADMIN = {
   email: process.env.E2E_ADMIN_EMAIL ?? "admin@travora.com",
   password: process.env.E2E_ADMIN_PASSWORD ?? "Admin12345",
 };
 
-const GUIDE = {
-  email: process.env.E2E_GUIDE_EMAIL ?? "nimal.guide@travora.com",
-  password: process.env.E2E_GUIDE_PASSWORD ?? "Guide12345",
-};
+const GUIDE = { email: "", password: "" };
+
+test.beforeAll(async ({}, testInfo) => {
+  // Every test here runs in chromium only.
+  if (testInfo.project.name !== "chromium") {
+    return;
+  }
+
+  const tourist = await createFixtureTourist("design-system");
+
+  const guide = await createFixtureGuide("design-system");
+
+  Object.assign(TOURIST, { email: tourist.email, password: tourist.password });
+
+  Object.assign(GUIDE, { email: guide.email, password: guide.password });
+});
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 

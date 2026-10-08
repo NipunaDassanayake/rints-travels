@@ -1,14 +1,22 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { createFixtureTourist, type FixtureTourist } from "./support/fixture-identities";
+
 /**
  * =========================================================
  * Accounts
  * =========================================================
  */
 
-const TOURIST_EMAIL = "nipuna@example.com";
+/**
+ * Throwaway tourist created per run (CR-032 Stage 3A) -- never a real
+ * account. The standard E2E cleanup deletes it and everything it owns.
+ */
+let e2eTourist: FixtureTourist;
 
-const TOURIST_PASSWORD = "Password123";
+test.beforeAll(async () => {
+  e2eTourist = await createFixtureTourist("admin-quote");
+});
 
 const ADMIN_EMAIL = "admin@travora.com";
 
@@ -73,9 +81,9 @@ const TEST_QUOTATION = {
 async function loginAsTourist(page: Page) {
   await page.goto("/login");
 
-  await page.getByLabel("Email").fill(TOURIST_EMAIL);
+  await page.getByLabel("Email").fill(e2eTourist.email);
 
-  await page.getByLabel("Password").fill(TOURIST_PASSWORD);
+  await page.getByLabel("Password").fill(e2eTourist.password);
 
   await page
     .getByRole("button", {
