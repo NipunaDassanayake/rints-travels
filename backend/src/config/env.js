@@ -3,6 +3,7 @@ require("dotenv").config();
 const net = require("net");
 
 const Joi = require("joi");
+const { parseRecoveryConfiguration } = require("./refreshRecovery");
 
 const envSchema = Joi.object({
   PORT: Joi.number().default(5000),
@@ -43,6 +44,8 @@ const envSchema = Joi.object({
     .default(30 * 24 * 60 * 60 * 1000),
 
   REFRESH_REUSE_GRACE_MS: Joi.number().integer().min(0).default(10_000),
+
+  AUTH_BOUND_SESSIONS_ENABLED: Joi.boolean().truthy("true").falsy("false").default(false),
 
   /*
    * Reverse proxy (unset = do not trust X-Forwarded-For).
@@ -229,6 +232,13 @@ const env = {
   },
 
   trustProxy: parseTrustProxy(value.TRUST_PROXY),
+
+  // Read keys outside Joi error rendering: invalid values must never be printed.
+  refreshRecovery: parseRecoveryConfiguration({
+    keysJson: process.env.AUTH_REFRESH_RECOVERY_KEYS,
+    activeKeyId: process.env.AUTH_REFRESH_RECOVERY_ACTIVE_KEY_ID,
+    issuanceEnabled: value.AUTH_BOUND_SESSIONS_ENABLED,
+  }),
 
   rateLimit: {
     enabled: value.AUTH_RATE_LIMIT_ENABLED,

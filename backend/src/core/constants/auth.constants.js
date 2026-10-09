@@ -20,6 +20,7 @@ const AUTH_PROVIDERS = Object.freeze({
 const TOKEN_TYPES = Object.freeze({
   ACCESS: "access",
   REFRESH: "refresh",
+  BOUND_REFRESH: "refresh_bound_v2",
 });
 
 module.exports = {

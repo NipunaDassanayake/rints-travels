@@ -89,6 +89,13 @@ const refresh = async (rawRefreshToken, refreshContext = {}) => {
 
   const now = new Date();
 
+  // CR-033 protocol boundary only. This legacy implementation must never rotate
+  // a bound row, even if a valid legacy JWT is presented. No enrollment here.
+  if (session && (session.browserBindingHash != null || session.refreshGeneration != null ||
+      session.refreshRecoveryCiphertext != null || session.refreshRecoveryExpiresAt != null)) {
+    throw new UnauthorizedError(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
+  }
+
   if (
     !session ||
     session.userId !== payload.sub ||

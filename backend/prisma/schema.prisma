@@ -284,6 +284,11 @@ model RefreshToken {
   // Hash of the refresh token replaced by the latest rotation (CR-012):
   // only that token gets the short concurrency grace period.
   previousTokenHash String?   @map("previous_token_hash") @db.VarChar(255)
+  // CR-033: null binding/generation identifies an unchanged legacy session.
+  browserBindingHash       String?   @map("browser_binding_hash") @db.VarChar(64)
+  refreshGeneration        BigInt?   @map("refresh_generation")
+  refreshRecoveryCiphertext String?  @map("refresh_recovery_ciphertext") @db.Text
+  refreshRecoveryExpiresAt DateTime? @map("refresh_recovery_expires_at") @db.Timestamp(3)
   deviceName        String?   @map("device_name") @db.VarChar(150)
   ipAddress         String?   @map("ip_address") @db.VarChar(64)
   userAgent         String?   @map("user_agent") @db.Text

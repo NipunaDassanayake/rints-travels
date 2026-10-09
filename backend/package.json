@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "seed": "prisma db seed",
     "e2e:cleanup:dry-run": "node scripts/cleanup-e2e-data.js --dry-run",
-    "e2e:cleanup": "node scripts/cleanup-e2e-data.js"
+    "e2e:cleanup": "node scripts/cleanup-e2e-data.js",
+    "test:auth-foundation": "node --test --test-concurrency=1 tests/auth/*.test.js"
   },
   "keywords": [],
   "author": "",
