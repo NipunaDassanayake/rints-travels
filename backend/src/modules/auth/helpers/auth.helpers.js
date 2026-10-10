@@ -100,6 +100,9 @@ const issueSessionTokens = (user, sessionId) => {
  * Create a login session.
  */
 const createUserSession = async (user, loginContext = {}) => {
+  if (env.refreshRecovery.issuanceEnabled) {
+    return require("../services/session.runtime").bound.create(user, loginContext);
+  }
   const sessionId = crypto.randomUUID();
 
   const { accessToken, refreshToken } = issueSessionTokens(user, sessionId);

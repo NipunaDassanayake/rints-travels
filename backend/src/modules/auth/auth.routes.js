@@ -4,6 +4,7 @@ const authController = require("./controllers/auth.controller");
 
 const validateRequest = require("../../middlewares/validateRequest");
 const authenticate = require("../../middlewares/authenticate");
+const authOrigin = require("../../middlewares/authOrigin");
 
 const {
   loginAccountLimiter,
@@ -32,18 +33,19 @@ router.post(
  */
 router.post(
   "/login",
+  authOrigin,
   validateRequest(loginSchema),
   loginAccountLimiter,
   loginIpLimiter,
   authController.login,
 );
 
-router.post("/refresh", refreshLimiter, authController.refresh);
+router.post("/refresh", authOrigin, refreshLimiter, authController.refresh);
 
-router.post("/logout", authController.logout);
+router.post("/logout", authOrigin, authController.logout);
 
 router.get("/me", authenticate, authController.getCurrentUser);
 
-router.post("/logout-all", authenticate, authController.logoutAll);
+router.post("/logout-all", authOrigin, authenticate, authController.logoutAll);
 
 module.exports = router;

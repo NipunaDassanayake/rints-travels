@@ -44,7 +44,9 @@ const logout = async (rawRefreshToken) => {
   if (
     !session ||
     session.revokedAt ||
-    session.userId !== payload.sub
+    session.userId !== payload.sub ||
+    session.browserBindingHash != null || session.refreshGeneration != null ||
+    session.refreshRecoveryCiphertext != null || session.refreshRecoveryExpiresAt != null
   ) {
     return;
   }

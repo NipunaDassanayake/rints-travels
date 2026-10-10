@@ -1,4 +1,6 @@
 const prisma = require("../../config/prisma");
+const { createSessionRepository } = require("../auth/repositories/session.repository");
+const sessions = createSessionRepository(prisma);
 
 /**
  * =========================================================
@@ -301,7 +303,11 @@ const updateTourGuideAvailability = async (guideId, isAvailable) => {
  */
 
 const deactivateTourGuide = async (guideId) => {
-  return prisma.$transaction(async (tx) => {
+  const identity = await prisma.tourGuideProfile.findFirst({ where: { id: guideId, deletedAt: null }, select: { userId: true } });
+  if (!identity) return null;
+  return sessions.withUser(identity.userId, async (tx) => {
+    await sessions.lockSessions(tx, identity.userId);
+    await tx.$queryRaw`SELECT id FROM tour_guide_profiles WHERE id = ${guideId}::uuid FOR UPDATE`;
     const guide = await tx.tourGuideProfile.findFirst({
       where: {
         id: guideId,
@@ -312,6 +318,8 @@ const deactivateTourGuide = async (guideId) => {
     if (!guide) {
       return null;
     }
+
+    await sessions.revokeLockedSessions(tx, identity.userId);
 
     await tx.tourGuideProfile.update({
       where: {

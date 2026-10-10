@@ -72,6 +72,11 @@ const createBoundCookies = ({ secure, sameSite, nodeEnv }) => {
     return [...names].map(clear);
   };
   return { bindingName, cookieName, parseName, parse, options, clearLowerGenerations,
+    clearObservedSession: (observed, sessionId) => {
+      if (!UUID.test(sessionId) || !Array.isArray(observed) || observed.length > MAX_CANDIDATES) throw invalidCredential();
+      return [...new Set(observed.filter((candidate) => parseName(candidate.name).sessionId === sessionId)
+        .map((candidate) => candidate.name))].map(clear);
+    },
     clearBinding: () => clear(bindingName) };
 };
 

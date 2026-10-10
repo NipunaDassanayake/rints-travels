@@ -61,8 +61,8 @@ test("actual backend loads, starts on an ephemeral port and rejects invalid refr
       try {
         const root = 'http://127.0.0.1:' + server.address().port;
         const health = await fetch(root + '/api/health');
-        const missing = await fetch(root + '/api/auth/refresh', {method:'POST'});
-        const invalid = await fetch(root + '/api/auth/refresh', {method:'POST', headers:{Cookie:'travora_refresh_token=synthetic-invalid'}});
+        const missing = await fetch(root + '/api/auth/refresh', {method:'POST', headers:{Origin:'https://travora.example'}});
+        const invalid = await fetch(root + '/api/auth/refresh', {method:'POST', headers:{Origin:'https://travora.example', Cookie:'travora_refresh_token=synthetic-invalid'}});
         if (health.status !== 200 || missing.status !== 401 || invalid.status !== 401) throw new Error('SMOKE_FAILED');
         if (missing.headers.has('set-cookie') || invalid.headers.has('set-cookie')) throw new Error('SMOKE_FAILED');
         console.log('SMOKE_OK');

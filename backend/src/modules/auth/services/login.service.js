@@ -16,9 +16,8 @@ const login = async (
   );
 
   return {
-    user,
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
+    ...session,
+    user: session.user || user,
   };
 };
 

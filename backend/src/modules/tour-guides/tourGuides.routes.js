@@ -3,6 +3,7 @@ const express = require("express");
 const tourGuidesController = require("./tourGuides.controller");
 
 const authenticate = require("../../middlewares/authenticate");
+const authOrigin = require("../../middlewares/authOrigin");
 
 const authorize = require("../../middlewares/authorize");
 
@@ -155,7 +156,7 @@ router.patch(
 
 router.delete(
   "/:id",
-
+  authOrigin,
   authenticate,
 
   authorize(USER_ROLES.ADMIN, USER_ROLES.SYSTEM_ADMIN),

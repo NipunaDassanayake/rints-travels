@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { appendFileSync } from "node:fs";
 
@@ -68,7 +68,12 @@ export async function api(
   route: string,
   { token, body }: { token?: string; body?: unknown } = {},
 ): Promise<ApiResult> {
-  const headers: Record<string, string> = {};
+  const frontendBaseURL = test.info().project.use.baseURL;
+  if (!frontendBaseURL) throw new Error("Playwright frontend baseURL is required");
+
+  const headers: Record<string, string> = {
+    Origin: new URL(frontendBaseURL).origin,
+  };
 
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";

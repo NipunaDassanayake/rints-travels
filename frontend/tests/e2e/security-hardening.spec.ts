@@ -104,7 +104,13 @@ async function api(
     headers?: Record<string, string>;
   } = {},
 ): Promise<ApiResult> {
-  const requestHeaders: Record<string, string> = { ...headers };
+  const frontendBaseURL = test.info().project.use.baseURL;
+  if (!frontendBaseURL) throw new Error("Playwright frontend baseURL is required");
+
+  const requestHeaders: Record<string, string> = {
+    Origin: new URL(frontendBaseURL).origin,
+    ...headers,
+  };
 
   if (body !== undefined) {
     requestHeaders["Content-Type"] = "application/json";

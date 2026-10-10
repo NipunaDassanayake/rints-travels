@@ -1,4 +1,7 @@
 const prisma = require("../../../config/prisma");
+const { createSessionRepository } = require("./session.repository");
+const { invalidCredential } = require("../helpers/auth.recoveryError");
+const sessions = createSessionRepository(prisma);
 
 const findUserByEmail = async (email) => {
   return prisma.user.findUnique({
@@ -43,8 +46,9 @@ const findActiveAdmins = async () => {
 };
 
 const createRefreshToken = async (data) => {
-  return prisma.refreshToken.create({
-    data,
+  return sessions.withUser(data.userId, async (tx, user) => {
+    if (user.status !== "ACTIVE" || user.deletedAt != null) throw invalidCredential();
+    return tx.refreshToken.create({ data });
   });
 };
 
@@ -98,26 +102,17 @@ const rotateRefreshToken = async (id, expectedTokenHash, data) => {
 };
 
 const revokeRefreshToken = async (id) => {
-  return prisma.refreshToken.update({
-    where: {
-      id,
-    },
-    data: {
-      revokedAt: new Date(),
-    },
+  const identity = await prisma.refreshToken.findUnique({ where: { id }, select: { userId: true, sessionId: true } });
+  if (!identity) return null;
+  return sessions.withUser(identity.userId, async (tx) => {
+    const row = await sessions.lockSession(tx, identity.userId, identity.sessionId);
+    if (!row || row.revokedAt) return row;
+    return sessions.revoke(tx, row.id, await sessions.now(tx));
   });
 };
 
 const revokeAllUserRefreshTokens = async (userId) => {
-  return prisma.refreshToken.updateMany({
-    where: {
-      userId,
-      revokedAt: null,
-    },
-    data: {
-      revokedAt: new Date(),
-    },
-  });
+  return sessions.withUser(userId, (tx) => sessions.revokeAll(tx, userId));
 };
 
 module.exports = {

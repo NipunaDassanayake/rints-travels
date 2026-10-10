@@ -1,5 +1,8 @@
 # CR-033 Stage 1 validation boundary
 
+This records the Stage 1 foundation boundary. For the integrated Stage 2
+backend and disposable PostgreSQL tests, see `../auth-stage2/README.md`.
+
 Run `npm run test:auth-foundation` from `backend/`. These Node tests use synthetic
 credentials, injected time, and mocked repositories. The startup smoke runs the
 actual app on an ephemeral loopback port with an unreachable synthetic database
